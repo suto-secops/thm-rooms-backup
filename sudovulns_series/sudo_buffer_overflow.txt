@@ -1,0 +1,16 @@
+SUDO BUFFER OVERFLOW.
+
+
+ssh into user:
+ssh -p 4444 tryhackme@10.10.190.93
+
+
+Note:
+Exploit is already downloaded. We just need to compile and run.
+Run exploit:
+./exploit
+
+Flag:
+cat /root/root.txt
+THM{buff3r_0v3rfl0w_rul3s}
+

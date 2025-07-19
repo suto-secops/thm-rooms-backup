@@ -1,0 +1,570 @@
+CTF COLLECTION VOL 1.
+
+
+
+
+TASK 1: AUTHOR NOTE:
+Nothing to do here.
+
+
+
+
+TASK 2: WHAT DOES THE BASE SAID?:
+To-do:
+Decode: VEhNe2p1NTdfZDNjMGQzXzdoM19iNDUzfQ==
+
+Note:
+It looks like base64 (due to A-Z a-z 0-9 + / use, and = as padding).
+Base64 decode:
+echo 'VEhNe2p1NTdfZDNjMGQzXzdoM19iNDUzfQ==' | base64 -d
+OUTPUT:
+THM{ju57_d3c0d3_7h3_b453}
+
+
+
+
+TASK 3: META META:
+To-do:
+Find location from image.
+
+Note:
+It is pretty clear the location is probably in the metadata.
+
+
+Run exiftool:
+exiftool meta_meta.png
+OUTPUT:
+ExifTool Version Number         : 13.25
+File Name                       : meta_meta.png
+Directory                       : .
+File Size                       : 588 kB
+File Modification Date/Time     : 2025:07:18 19:36:38+02:00
+File Access Date/Time           : 2025:07:18 19:46:04+02:00
+File Inode Change Date/Time     : 2025:07:18 19:36:46+02:00
+File Permissions                : -rw-r--r--
+File Type                       : PNG
+File Type Extension             : png
+MIME Type                       : image/png
+Image Width                     : 800
+Image Height                    : 480
+Bit Depth                       : 8
+Color Type                      : RGB
+Compression                     : Deflate/Inflate
+Filter                          : Adaptive
+Interlace                       : Noninterlaced
+Warning                         : [minor] Text/EXIF chunk(s) found after PNG IDAT (may be ignored by some readers)
+Exif Byte Order                 : Big-endian (Motorola, MM)
+Image Size                      : 800x480
+Megapixels                      : 0.384
+
+
+Try to force location output on exiftool:
+exiftool -gpslatitude -gpslongitude meta_meta.png
+OUTPUT:
+Warning: [minor] Text/EXIF chunk(s) found after PNG IDAT (may be ignored by some readers) - meta_meta.png
+
+
+Run binwalk: 
+binwalk meta_meta.png
+OUTPUT:
+DECIMAL       HEXADECIMAL     DESCRIPTION
+--------------------------------------------------------------------------------
+0             0x0             PNG image, 800 x 480, 8-bit/color RGB, non-interlaced
+587753        0x8F7E9         TIFF image data, big-endian, offset of first image directory: 8
+Note:
+This means there is an embbed TIFF image inside the PNG.
+
+
+Extract embedded TIFF file:
+binwalk -e meta_meta.png
+OUTPUT:
+DECIMAL       HEXADECIMAL     DESCRIPTION
+--------------------------------------------------------------------------------
+
+WARNING: One or more files failed to extract: either no utility was found or it's unimplemented
+
+
+Try to extract with dd:
+Note:
+We skip to 587753 since thats the offset where TIFF starts.
+Run dd:
+dd if=meta_meta.png of=embedded.tiff bs=1 skip=587753
+OUTPUT:
+30+0 records in
+30+0 records out
+30 bytes copied, 0.000989486 s, 30.3 kB/s
+Note:
+TIFF extracted is saved as embedded.tiff
+
+
+Run exiftool on the tiff:
+exiftool embedded.tiff
+OUTPUT:
+ExifTool Version Number         : 13.25
+File Name                       : embedded.tiff
+Directory                       : .
+File Size                       : 30 bytes
+File Modification Date/Time     : 2025:07:18 19:55:29+02:00
+File Access Date/Time           : 2025:07:18 19:55:47+02:00
+File Inode Change Date/Time     : 2025:07:18 19:55:29+02:00
+File Permissions                : -rw-r--r--
+File Type                       : TIFF
+File Type Extension             : tif
+MIME Type                       : image/tiff
+Exif Byte Order                 : Big-endian (Motorola, MM)
+
+
+Note:
+Since we are out of luck with linux based tool, we will try online sites.
+Running metadata2go (https://www.metadata2go.com/view-metadata):
+OUTPUT:
+checksum
+81a2c5b98ba6ea290e8dc9e2136ffcba
+file_name
+meta_meta.jpg
+file_size
+35 kB
+file_type
+JPEG
+file_type_extension
+jpg
+mime_type
+image/jpeg
+jfif_version
+1.01
+x_resolution
+96
+y_resolution
+96
+exif_byte_order
+Big-endian (Motorola, MM)
+resolution_unit
+inches
+y_cb_cr_positioning
+Centered
+exif_version
+231
+components_configuration
+Y, Cb, Cr, -
+flashpix_version
+100
+owner_name
+THM{3x1f_0r_3x17}
+comment
+CREATOR: gd-jpeg v1.0 (using IJG JPEG v62), quality = 60
+image_width
+800
+image_height
+480
+encoding_process
+Progressive DCT, Huffman coding
+bits_per_sample
+8
+color_components
+3
+y_cb_cr_sub_sampling
+YCbCr4:2:0 (2 2)
+image_size
+800x480
+megapixels
+0.384
+category
+image
+raw_header
+FF D8 FF E0 00 10 4A 46 49 46 00 01 01 01 00 60 00 60 00 00 FF E1 00 82 45 78 69 66 00 00 4D 4D 00 2A 00 00 00 08 00 03 01 28 00 03 00 00 00 01 00 02 00 00 02 13 00 03 00 00 00 01 00 01 00 00 87 69 00 04 00 00 00 01 00 00 00 32 00 00 00 00 00 04 90 00 00 07 00 00 00 04 30 32 33 31 91 01 00 07 00 00 00 04 01 02 03 00 A0 00 00 07 00 00 00 04 30 31 30 30 A4 30 00 02 00 00 00 12 00 00
+Note:
+The flag was in owner_name metadata: THM{3x1f_0r_3x17}
+
+
+
+
+TASK 4: MON, ARE WE GOING TO BE OKAY?:
+Clue:
+Something is hiding in the image.
+
+
+Run foremost:
+foremost -i extinction.jpg -o extinction_foremost
+OUTPUT:
+Processing: extinction.jpg
+|*|
+Note:
+Found no files.
+
+
+Note:
+We don't know any password, so when prompted, just press ENTER.
+Run steghide:
+steghide extract -sf extinction.jpg
+OUTPUT:
+wrote extracted data to "Final_message.txt".
+
+
+Check out message:
+It going to be over soon. Sleep my child.
+
+THM{500n3r_0r_l473r_17_15_0ur_7urn}
+
+
+
+
+TASK 5: ERM...MAGICK:
+We just need to select the white block to reveal the flag.
+
+
+
+
+TASK 6: QRRRRR:
+Grab link from qr:
+zbarimg qr_code.png
+OUTPUT:
+QR-Code:THM{qr_m4k3_l1f3_345y}
+scanned 1 barcode symbols from 1 images in 0.02 seconds
+
+
+
+
+TASK 7: REVERSE IT OR READ IT?:
+Check file type:
+file hello_1577977122465.hello
+OUTPUT:
+hello_1577977122465.hello: ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, BuildID[sha1]=02900338a56c3c8296f8ef7a8cf5df8699b18696, for GNU/Linux 3.2.0, not stripped
+Note:
+It's an ELF file.
+
+
+Search for the flag:
+strings hello_1577977122465.hello | grep -i 'THM'
+OUTPUT:
+THM{345y_f1nd_345y_60}
+
+
+
+
+TASK 8: ANOTHER DECODING STUFF:
+To-do:
+Decode: 3agrSy1CewF9v8ukcSkPSYm3oKUoByUpKG4L
+
+
+Run cyberchef:
+Magic option enables Base58 decode. 
+OUTPUT:
+THM{17_h45_l3553r_l3773r5}
+
+
+
+
+TASK 9: LEFT OR RIGHT:
+To-do:
+Decode: MAF{atbe_max_vtxltk}
+
+Test out different ROT in https://www.cachesleuth.com/rot.html:
+Right one is ROT7.
+OUTPUT:
+THM{hail_the_caesar}
+
+
+
+
+TASK 10: MAKE A COMMENT:
+Before opening web inspector, we select the whole task, from Task 10 to hint.
+
+
+Then open inspector:
+CTRL + I
+OUTPUT:
+<p style="display:none;">
+<span data-testid="glossary-term" class="glossary-term">THM</span>
+"{41w4y5_ch3ck_7h3_c0m3mn7} " == $0
+</p>
+Note:
+We just need to add THM before the flag.
+
+
+
+
+TASK 11: CAN YOU FIX IT?
+Check file integrity:
+file spoil_1577979329740.png
+OUTPUT:
+spoil_1577979329740.png: data
+Note:
+This means the format wasn't recognised.
+
+
+Check hex header:
+xxd spoil_1577979329740.png | head
+OUTPUT:
+00000000: 2333 445f 0d0a 1a0a 0000 000d 4948 4452  #3D_........IHDR
+00000010: 0000 0320 0000 0320 0806 0000 00db 7006  ... ... ......p.
+00000020: 6800 0000 0173 5247 4200 aece 1ce9 0000  h....sRGB.......
+00000030: 0009 7048 5973 0000 0ec4 0000 0ec4 0195  ..pHYs..........
+00000040: 2b0e 1b00 0020 0049 4441 5478 9cec dd79  +.... .IDATx...y
+00000050: 9c9c 559d eff1 cf79 9e5a bb7a 5f92 7477  ..U....y.Z.z_.tw
+00000060: f640 4802 0920 1150 c420 bba2 88a8 805c  .@H.. .P. .....\
+00000070: 1906 7c5d 64c0 79e9 752e 03ce 38e3 0e8e  ..|]d.y.u...8...
+00000080: 2f75 e63a 23ea 8c0c e830 8e03 6470 c191  /u.:#....0..dp..
+00000090: cd80 880c 4b20 0909 184c 42b6 4ed2 e9f4  ....K ...LB.N...
+Note:
+Our file starts with: 23 33 44 5f 0d 0a 1a 0a
+Png signature is: 89 50 4E 47 0D 0A 1A 0A
+After those 8 bytes, the rest is right.
+
+
+Replace 8 first bytes with right signature:
+echo -ne '\x89\x50\x4E\x47\x0D\x0A\x1A\x0A' > fixed.png
+tail -c +9 spoil_1577979329740.png >> fixed.png
+
+
+
+Verify .png extension:
+file fixed.png
+OUTPUT:
+fixed.png: PNG image data, 800 x 800, 8-bit/color RGBA, non-interlaced
+
+
+View the image:
+feh fixed.png
+Note:
+Flag is displayed.
+
+
+
+
+TASK 12: READ IT:
+Clue:
+We need to check tryhackme's social media.
+
+
+Hint:
+Reddit.
+
+
+Google dorking:
+site:reddit.com intext:"THM{"
+OUTPUT:
+
+
+
+
+TASK 13: SPIN MY HEAD:
+To-do:
+Decode: ++++++++++[>+>+++>+++++++>++++++++++<<<<-]>>>++++++++++++++.------------.+++++.>+++++++++++++++++++++++.<<++++++++++++++++++.>>-------------------.---------.++++++++++++++.++++++++++++.<++++++++++++++++++.+++++++++.<+++.+.>----.>++++. 
+
+
+Note:
+Looks like characteristic brainfuck.
+Decoded. OUTPUT:
+THM{0h_my_h34d}
+
+
+
+
+TASK 14: AN EXCLUSIVE!:
+Input: 
+S1: 44585d6b2368737c65252166234f20626d
+S2: 1010101010101010101010101010101010
+
+
+Note:
+From the clue "exclusive strings", we guess we might need to do a XOR between them.
+
+
+Python script to do xor between strings:
+# Define the hex strings
+s1 = "44585d6b2368737c65252166234f20626d"
+s2 = "1010101010101010101010101010101010"
+
+# Convert hex strings to bytes
+b1 = bytes.fromhex(s1)
+b2 = bytes.fromhex(s2)
+
+# Ensure the strings are the same length
+if len(b1) != len(b2):
+    raise ValueError("Inputs must be the same length.")
+
+# Perform XOR
+result = bytes([a ^ b for a, b in zip(b1, b2)])
+
+# Output as hex
+print(result.hex())
+
+
+Then we run the script:
+python3 collection_xor.py
+OUTPUT:
+54484d7b3378636c75353176335f30727d
+
+
+Since the output is in hex, we need to decode it.
+OUTPUT:
+THM{3xclu51v3_0r}
+
+
+
+
+TASK 15: BINARY WALK:
+Note:
+It looks like it is a hidden file again.
+
+
+Run binwalk:
+binwalk task_15.jpg
+OUTPUT:
+DECIMAL       HEXADECIMAL     DESCRIPTION
+--------------------------------------------------------------------------------
+0             0x0             JPEG image data, JFIF standard 1.02
+30            0x1E            TIFF image data, big-endian, offset of first image directory: 8
+265845        0x40E75         Zip archive data, at least v2.0 to extract, uncompressed size: 69, name: hello_there.txt
+266099        0x40F73         End of Zip archive, footer length: 22
+Note:
+We found hidden files. We now run option -e to extract them.
+
+
+Binwalk extraction:
+binwalk -e task_15.jpg
+OUTPUT:
+DECIMAL       HEXADECIMAL     DESCRIPTION
+--------------------------------------------------------------------------------
+265845        0x40E75         Zip archive data, at least v2.0 to extract, uncompressed size: 69, name: hello_there.txt
+
+WARNING: One or more files failed to extract: either no utility was found or it's unimplemented
+
+
+Move into extraction folder:
+cd _task_15.jpg.extracted/
+
+
+List files:
+ls
+OUTPUT:
+40E75.zip  hello_there.txt
+
+
+Read hello there:
+cat hello_there.txt
+OUTPUT:
+Thank you for extracting me, you are the best!
+
+THM{y0u_w4lk_m3_0u7}
+
+
+
+
+TASK 16: DARKNESS.
+Run stegsolve:
+java -jar tools/stegsolve.jar
+
+
+We use the arrow to move trough image layers.
+Blue plane 0 starts to show the flag.
+Gray bits. OUTPUT:
+THM{7h3r3_15_h0p3_1n_7h3_d4rkn355}
+
+
+
+
+TASK 17: A SOUNDING QR.
+Grab link from qr:
+zbarimg QRCTF_1579095601577.png
+OUTPUT:
+QR-Code:https://soundcloud.com/user-86667759/thm-ctf-vol1
+
+
+We listen to the audio. OUTPUT:
+"The flag is s o u n d i n g q r"
+Note:
+Then flag is THM{soundingqr}
+
+
+
+
+TASK 18: DIG UP THE PAST.
+Info:
+Targetted website: https://www.embeddedhacker.com/
+Targetted time: 2 January 2020
+
+
+We need to visit wayback machine (https://web.archive.org/) and input the given url, which redirects to https://web.archive.org/web/20200901000000*/https://www.embeddedhacker.com/.
+Then we choose date 2/1/2020, and check the only available snapshot.
+Scrolling a bit, we find the following. OUTPUT:
+Uncategorized
+THM flag
+What did you just say? flag? THM{ch3ck_th3_h4ckb4ck}
+
+
+
+
+TASK 19: UNCRACKABLE!
+Info:
+Can you solve the following? By the way, I lost the key. Sorry >.<
+
+MYKAHODTQ{RVG_YVGGK_FAL_WXF}
+	
+
+Note:
+Since it talks about a key, we are probably dealing with vignère encoding.
+We try some keys:
+thm. OUTPUT:
+TRYHACKME{YOU_FOUND_THE_KEY}
+
+
+
+
+TASK 20: SMALL BASES:
+Info:
+Decode the following text.
+
+581695969015253365094191591547859387620042736036246486373595515576333693
+
+
+Note:
+We try the following, but all fail:
+1. Base 2-36 decrypt.
+2. ASCII 2 digit groups decrypt.
+So we check the clue. OUTPUT:
+dec -> hex -> ascii
+
+
+We just need to follow said steps. We use tool https://www.rapidtables.com/convert/.
+Dec to hex:
+OUTPUT:
+54484D7B31375F6A7535375F346E5F307264316E3472795F62343533357D
+
+
+Hex to ascii:
+OUTPUT:
+THM{17_ju57_4n_0rd1n4ry_b4535}
+
+
+
+
+TASK 21: READ THE PACKET:
+We need to run wireshark and open the file:
+wireshark flag_1578026731881.pcapng
+
+
+Try to filter packets with target string:
+frame contains "thm{"
+Note:
+We get no output.
+
+
+Try uppercase:
+frame contains "THM{"
+Note: 
+We get no output.
+
+
+Check HTTP objects:
+File > export objects > HTTP
+OUTPUT:
+flag.txt
+
+
+We click preview on the flag.
+OUTPUT:
+THM{d0_n07_574lk_m3}
+
+Found me!
+

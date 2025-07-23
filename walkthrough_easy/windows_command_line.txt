@@ -1,0 +1,557 @@
+WINDOWS COMMAND LINE.
+
+
+
+
+[>>> TASK 1: INTRODUCTION]
+[1.1. WHAT IS THE DEFAULT COMMAND LINE INTERPRETER IN THE WINDOWS ENVIRONMENT?]
+Windows uses cmd.exe.
+
+
+[ACTION: ssh into target]
+ssh user@10.10.120.90
+[NOTE]
+Password is Tryhackme123!
+
+
+
+
+[>>> TASK 2: BASIC SYSTEM INFORMATION]
+[2.1. WHAT IS THE OS VERSION OF THE WINDOWS VM?]
+[ACTION: check path from command line]
+set
+[OUTPUT]
+ALLUSERSPROFILE=C:\ProgramData
+APPDATA=C:\Users\user\AppData\Roaming
+ChocolateyInstall=C:\ProgramData\chocolatey
+CommonProgramFiles=C:\Program Files\Common Files
+CommonProgramFiles(x86)=C:\Program Files (x86)\Common Files
+CommonProgramW6432=C:\Program Files\Common Files
+COMPUTERNAME=WINSRV2022-CORE
+ComSpec=C:\Windows\system32\cmd.exe
+DriverData=C:\Windows\System32\Drivers\DriverData
+EC2LAUNCH_TELEMETRY=1
+HOME=C:\Users\user
+HOMEDRIVE=C:
+HOMEPATH=\Users\user
+LOCALAPPDATA=C:\Users\user\AppData\Local
+LOGNAME=user
+NUMBER_OF_PROCESSORS=2
+OS=Windows_NT
+Path=C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\;C:\ProgramData\chocolatey\bin;C:\Windows\system32\config\systemprofile\AppData\Local\Microsoft\WindowsApps;C:\Users\user\AppData\Local\Microsoft\WindowsApps;
+PATHEXT=.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC
+PROCESSOR_ARCHITECTURE=AMD64
+PROCESSOR_IDENTIFIER=AMD64 Family 23 Model 1 Stepping 2, AuthenticAMD   
+PROCESSOR_LEVEL=23
+PROCESSOR_REVISION=0102
+ProgramData=C:\ProgramData
+ProgramFiles=C:\Program Files
+ProgramFiles(x86)=C:\Program Files (x86)
+ProgramW6432=C:\Program Files
+PROMPT=user@WINSRV2022-CORE $P$G
+PSModulePath=C:\Program Files\WindowsPowerShell\Modules;C:\Windows\system32\WindowsPowerShell\v1.0\Modules
+PUBLIC=C:\Users\Public
+SHELL=c:\windows\system32\cmd.exe
+SSH_CLIENT=10.23.25.109 45990 22
+SSH_CONNECTION=10.23.25.109 45990 10.10.123.90 22
+SSH_TTY=windows-pty
+SystemDrive=C:
+SystemRoot=C:\Windows
+TEMP=C:\Users\user\AppData\Local\Temp
+TERM=xterm-256color
+TMP=C:\Users\user\AppData\Local\Temp
+USER=user
+USERDOMAIN=WORKGROUP
+USERNAME=user
+USERPROFILE=C:\Users\user
+windir=C:\Windows
+[NOTE: path where ms will execute comands]
+Path=C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\;C:\ProgramData\chocolatey\bin;C:\Windows\system32\config\systemprofile\AppData\Local\Microsoft\WindowsApps;C:\Users\user\AppData\Local\Microsoft\WindowsApps;
+
+
+[ACTION: Check OS version]
+ver
+[OUTPUT]
+Microsoft Windows [Version 10.0.20348.2655]
+
+
+
+[2.2. WHAT IS THE HOSTNAME OF THE WINDOWS VM?]
+[ACTION: get broad info on software and hardware config]
+systeminfo
+[OUTPUT]
+Host Name:                 WINSRV2022-CORE
+OS Name:                   Microsoft Windows Server 2022 Datacenter     
+OS Version:                10.0.20348 N/A Build 20348
+OS Manufacturer:           Microsoft Corporation
+OS Configuration:          Standalone Server
+OS Build Type:             Multiprocessor Free
+Registered Owner:          Windows User
+Registered Organization:
+Product ID:                00454-60000-00001-AA763
+Original Install Date:     4/23/2024, 7:36:29 PM
+System Boot Time:          7/23/2025, 4:42:10 AM
+System Manufacturer:       Amazon EC2
+System Model:              t3a.micro
+System Type:               x64-based PC
+Processor(s):              1 Processor(s) Installed.
+                           [01]: AMD64 Family 23 Model 1 Stepping 2 AuthenticAMD ~2200 Mhz
+BIOS Version:              Amazon EC2 1.0, 10/16/2017
+Windows Directory:         C:\Windows
+System Directory:          C:\Windows\system32
+Boot Device:               \Device\HarddiskVolume1
+System Locale:             en-us;English (United States)
+Input Locale:              en-us;English (United States)
+Time Zone:                 (UTC+00:00) Dublin, Edinburgh, Lisbon, London
+Total Physical Memory:     980 MB
+Available Physical Memory: 122 MB
+Virtual Memory: Max Size:  1,300 MB
+Virtual Memory: Available: 354 MB
+Virtual Memory: In Use:    946 MB
+Page File Location(s):     C:\pagefile.sys
+Domain:                    WORKGROUP
+Logon Server:              N/A
+Hotfix(s):                 3 Hotfix(s) Installed.
+                           [01]: KB5041948
+                           [02]: KB5041160
+                           [03]: KB5041590
+Network Card(s):           1 NIC(s) Installed.
+                           [01]: Amazon Elastic Network Adapter
+                                 Connection Name: Ethernet
+                                 DHCP Enabled:    Yes
+                                 DHCP Server:     10.10.0.1
+                                 IP address(es)
+                                 [01]: 10.10.123.90
+                                 [02]: fe80::808f:3ad2:9e8e:37d6        
+Hyper-V Requirements:      A hypervisor has been detected. Features required for Hyper-V will not be displayed.
+
+
+
+
+[>>> TASK 3: NETWORK TROUBLESHOOTING]
+[ACTION: check network information]
+ipconfig
+[OUTPUT]
+Windows IP Configuration
+
+
+Ethernet adapter Ethernet:
+
+   Connection-specific DNS Suffix  . : eu-west-1.compute.internal
+   Link-local IPv6 Address . . . . . : fe80::808f:3ad2:9e8e:37d6%5
+   IPv4 Address. . . . . . . . . . . : 10.10.123.90
+   Subnet Mask . . . . . . . . . . . : 255.255.0.0
+   Default Gateway . . . . . . . . . : 10.10.0.1
+
+
+[ACTION: check network information with additional details]
+ipconfig /all
+[OUTPUT]
+Windows IP Configuration
+
+   Host Name . . . . . . . . . . . . : WINSRV2022-CORE
+   Primary Dns Suffix  . . . . . . . : 
+   Node Type . . . . . . . . . . . . : Hybrid
+   IP Routing Enabled. . . . . . . . : No
+   WINS Proxy Enabled. . . . . . . . : No
+   DNS Suffix Search List. . . . . . : eu-west-1.compute.internal
+                                       eu-west-1.ec2-utilities.amazonaws.com
+
+Ethernet adapter Ethernet:
+
+   Connection-specific DNS Suffix  . : eu-west-1.compute.internal
+   Description . . . . . . . . . . . : Amazon Elastic Network Adapter
+   Physical Address. . . . . . . . . : 02-BC-EC-E8-61-A7
+   DHCP Enabled. . . . . . . . . . . : Yes
+   Autoconfiguration Enabled . . . . : Yes
+   Link-local IPv6 Address . . . . . : fe80::808f:3ad2:9e8e:37d6%5(Preferred)
+   IPv4 Address. . . . . . . . . . . : 10.10.123.90(Preferred)
+   Subnet Mask . . . . . . . . . . . : 255.255.0.0
+   Lease Obtained. . . . . . . . . . : Wednesday, July 23, 2025 4:42:53 AM
+   Lease Expires . . . . . . . . . . : Wednesday, July 23, 2025 5:42:52 AM
+   Default Gateway . . . . . . . . . : 10.10.0.1
+   DHCP Server . . . . . . . . . . . : 10.10.0.1
+   DHCPv6 IAID . . . . . . . . . . . : 84601211
+   DHCPv6 Client DUID. . . . . . . . : 00-01-00-01-2D-B9-B7-EF-00-0C-29-FF-E5-C8
+   DNS Servers . . . . . . . . . . . : 10.0.0.2
+   NetBIOS over Tcpip. . . . . . . . : Enabled
+
+
+[EXAMPLE: pinging]
+ping example.com
+
+
+[EXAMPLE: trace network route to target]
+tracert example.com
+ 
+
+[EXAMPLE: find ip of host/domain]
+nslookup example.com
+
+
+[ACTION: display current network connections and listening ports]
+netstat
+[OUTPUT]
+Proto  Local Address          Foreign Address        State
+TCP    10.10.123.90:22        ip-10-23-25-109:45990  ESTABLISHED
+[NOTE]
+Additional options:
+-a: display connections and listening ports.
+-b: show program associated to each listening port and established connection.
+-o: reveal pidd associated with the connection.
+-n: use numerical form for addresses and port numbers.
+
+
+[ACTION: netstat with abon options]
+netstat -abon
+[OUTPUT]
+Active Connections
+
+  Proto  Local Address          Foreign Address        State           PID
+  TCP    0.0.0.0:22             0.0.0.0:0              LISTENING       1516
+ [sshd.exe]
+  TCP    0.0.0.0:135            0.0.0.0:0              LISTENING       908
+  RpcSs
+ [svchost.exe]
+  TCP    0.0.0.0:445            0.0.0.0:0              LISTENING       4
+ Can not obtain ownership information
+  TCP    0.0.0.0:3389           0.0.0.0:0              LISTENING       996
+  TermService
+ [svchost.exe]
+  TCP    0.0.0.0:5985           0.0.0.0:0              LISTENING       4
+ Can not obtain ownership information
+  TCP    0.0.0.0:47001          0.0.0.0:0              LISTENING       4
+ Can not obtain ownership information
+  TCP    0.0.0.0:49664          0.0.0.0:0              LISTENING       684
+ [lsass.exe]
+  TCP    0.0.0.0:49665          0.0.0.0:0              LISTENING       536
+ Can not obtain ownership information
+  TCP    0.0.0.0:49666          0.0.0.0:0              LISTENING       240
+  EventLog
+ [svchost.exe]
+  TCP    0.0.0.0:49667          0.0.0.0:0              LISTENING       388
+  Schedule
+ [svchost.exe]
+  TCP    0.0.0.0:49668          0.0.0.0:0              LISTENING       660
+ Can not obtain ownership information
+  TCP    10.10.123.90:22        10.23.25.109:45990     ESTABLISHED     1516
+ [sshd.exe]
+  TCP    10.10.123.90:139       0.0.0.0:0              LISTENING       4
+ Can not obtain ownership information
+  TCP    10.10.123.90:49820     3.253.222.196:443      SYN_SENT        2936
+ [amazon-ssm-agent.exe]
+  TCP    [::]:22                [::]:0                 LISTENING       1516
+ [sshd.exe]
+  TCP    [::]:135               [::]:0                 LISTENING       908
+  RpcSs
+ [svchost.exe]
+  TCP    [::]:445               [::]:0                 LISTENING       4
+ Can not obtain ownership information
+  TCP    [::]:3389              [::]:0                 LISTENING       996
+  TermService
+ [svchost.exe]
+  TCP    [::]:5985              [::]:0                 LISTENING       4
+ Can not obtain ownership information
+  TCP    [::]:47001             [::]:0                 LISTENING       4
+ Can not obtain ownership information
+  TCP    [::]:49664             [::]:0                 LISTENING       684
+ [lsass.exe]
+  TCP    [::]:49665             [::]:0                 LISTENING       536
+ Can not obtain ownership information
+  TCP    [::]:49666             [::]:0                 LISTENING       240
+  EventLog
+ [svchost.exe]
+  TCP    [::]:49667             [::]:0                 LISTENING       388
+  Schedule
+ [svchost.exe]
+  TCP    [::]:49668             [::]:0                 LISTENING       660
+ Can not obtain ownership information
+  UDP    0.0.0.0:123            *:*                                    
+1424
+  W32Time
+ [svchost.exe]
+  UDP    0.0.0.0:500            *:*                                    
+388
+  IKEEXT
+ [svchost.exe]
+  UDP    0.0.0.0:3389           *:*                                    
+996
+  TermService
+ [svchost.exe]
+  UDP    0.0.0.0:4500           *:*                                    
+388
+  IKEEXT
+ [svchost.exe]
+  UDP    0.0.0.0:5353           *:*                                    
+1048
+  Dnscache
+ [svchost.exe]
+  UDP    0.0.0.0:5355           *:*                                    
+1048
+  Dnscache
+ [svchost.exe]
+  UDP    0.0.0.0:61725          *:*                                    
+1048
+  Dnscache
+ [svchost.exe]
+  UDP    0.0.0.0:65263          *:*                                    
+1048
+  Dnscache
+ [svchost.exe]
+  UDP    10.10.123.90:137       *:*                                    
+4
+ Can not obtain ownership information
+  UDP    10.10.123.90:138       *:*                                    
+4
+ Can not obtain ownership information
+  UDP    127.0.0.1:50678        127.0.0.1:50678                        
+388
+  iphlpsvc
+ [svchost.exe]
+  UDP    [::]:123               *:*                                    
+1424
+  W32Time
+ [svchost.exe]
+  UDP    [::]:500               *:*                                    
+388
+  IKEEXT
+ [svchost.exe]
+  UDP    [::]:3389              *:*                                    
+996
+  TermService
+ [svchost.exe]
+  UDP    [::]:4500              *:*                                    
+388
+  IKEEXT
+ [svchost.exe]
+  UDP    [::]:5353              *:*                                    
+1048
+  Dnscache
+ [svchost.exe]
+  UDP    [::]:5355              *:*                                    
+1048
+  Dnscache
+ [svchost.exe]
+  UDP    [::]:61725             *:*                                    
+1048
+  Dnscache
+ [svchost.exe]
+  UDP    [::]:65263             *:*                                    
+1048
+  Dnscache
+ [svchost.exe]
+
+
+
+[3.1. WHICH COMMAND CAN BE USE TO LOOK UP THE SERVER'S PHYSICAL ADDRESS (MAC ADDRESS)?]
+ipconfig /all
+
+
+
+[3.2. WHAT IS THE NAME OF THE PROCESS LISTENING ON PORT 3389?]
+[NOTE]
+Checking output from netstat -abon, previously ran.
+[OUTPUT]
+  TCP    0.0.0.0:3389           0.0.0.0:0              LISTENING       996
+  TermService
+ [svchost.exe]
+
+
+
+[3.3. WHAT IS THE SUBNET MASK?]
+[Note]
+Checking output fom ipconfig /all ,previously ran.
+[OUTPUT]
+   Subnet Mask . . . . . . . . . . . : 255.255.0.0
+
+
+
+
+[>>> TASK 4: FILE AND DISK MANAGEMENT]
+[ACTION: display current directory]
+cd
+[OUTPUT]
+C:\Users\user
+
+
+[ACTION: display child directories]
+dir
+[OUTPUT]
+ Volume in drive C has no label.
+ Volume Serial Number is 5448-D41F
+
+05/08/2021  09:15 AM    <DIR>          Music
+05/08/2021  09:15 AM    <DIR>          Pictures
+05/08/2021  09:15 AM    <DIR>          Saved Games
+05/08/2021  09:15 AM    <DIR>          Videos
+[NOTE]
+Dir can be ran with options:
+/a: display hidden and system files.
+/s: display files in current directory and all subdirectories.
+
+
+[ACTION: visually display child directories and subdirectories]
+tree
+[OUTPUT]
+Folder PATH listing
+Volume serial number is 5448-D41F
+C:.
+├───Desktop
+├───Documents
+├───Downloads
+├───Favorites
+├───Links
+├───Music
+├───Pictures
+├───Saved Games
+└───Videos
+
+
+[EXAMPLE: move to target directory]
+cd <directory_name>
+
+
+[EXAMPLE: go up a level in directory hierarchy]
+cd ..
+
+
+[EXAMPLE: create a directory]
+mkdir <directory_name>
+
+
+[EXAMPLE: delete a directory]
+rmdir <directory_name>
+
+
+[EXAMPLE: read content of .txt file]
+type <file_name>
+
+
+[EXAMPLE: copy and paste files]
+copy <original_file> <copy_file>
+
+
+[EXAMPLE: move a file]
+copy <initial_file_path> <final_file_path>
+
+
+[EXAMPLE: delete a file]
+Option 1: del <file_name>
+Option 2: erase <file_name>
+
+
+
+[4.1. WHAT ARE THE FILE'S CONTENTS IN C:\Treasure\Hunt?]
+[ACTION: try to read the file]
+type C:\Treasure\Hunt
+[OUTPUT]
+Access is denied.
+
+
+[ACTION: list content in target directory]
+dir C:\Treasure\Hunt
+[OUTPUT]
+ Directory of C:\Treasure\Hunt
+
+08/20/2024  01:54 PM    <DIR>          .
+08/20/2024  01:54 PM    <DIR>          ..
+08/20/2024  01:54 PM                18 flag.txt
+               1 File(s)             18 bytes
+               2 Dir(s)   9,170,853,888 bytes free
+
+
+[ACTION: Create a copy of flag.txt and try read it]
+copy C:\Treasure\Hunt\flag.txt flag_copy.txt
+type flag_copy.txt
+[OUTPUT]
+THM{CLI_POWER}
+
+
+
+
+[>>> TASK 5: TASK AND PROCESS MANAGEMENT]
+[ACTION: list running processes]
+tasklist
+[OUTPUT]
+Image Name                     PID Session Name        Session#    Mem Usage
+========================= ======== ================ =========== ============
+System Idle Process              0 Services                   0          8 K
+System                           4 Services                   0        124 K
+Registry                        96 Services                   0      9,068 K
+smss.exe                       316 Services                   0        260 K
+csrss.exe                      436 Services                   0      2,532 K
+csrss.exe                      512 Console                    1      1,980 K
+wininit.exe                    536 Services                   0      1,940 K
+winlogon.exe                   592 Console                    1     12,172 K
+services.exe                   660 Services                   0      4,320 K
+lsass.exe                      684 Services                   0     10,660 K
+svchost.exe                    788 Services                   0      7,284 K
+fontdrvhost.exe                824 Services                   0      1,424 K
+fontdrvhost.exe                828 Console                    1      1,748 K
+svchost.exe                    908 Services                   0      6,428 K
+svchost.exe                    996 Services                   0      7,844 K
+svchost.exe                    240 Services                   0     11,940 K
+svchost.exe                    388 Services                   0     39,124 K
+svchost.exe                    428 Services                   0      6,916 K
+svchost.exe                   1048 Services                   0     21,192 K
+svchost.exe                   1072 Services                   0      8,112 K
+svchost.exe                   1320 Services                   0     12,176 K
+svchost.exe                   1328 Services                   0      9,672 K
+svchost.exe                   1404 Services                   0     16,960 K
+svchost.exe                   1424 Services                   0      4,516 K
+sshd.exe                      1516 Services                   0      3,188 K
+MsMpEng.exe                   1536 Services                   0    207,352 K
+svchost.exe                   1656 Services                   0      3,848 K
+svchost.exe                   1964 Services                   0      2,652 K
+AggregatorHost.exe            2296 Services                   0      2,328 K
+LogonUI.exe                   2636 Console                    1     11,900 K
+conhost.exe                   1604 Console                    1     16,744 K
+NisSrv.exe                    2772 Services                   0     10,636 K
+amazon-ssm-agent.exe          2936 Services                   0     17,636 K
+msdtc.exe                     2496 Services                   0     11,076 K
+sshd.exe                      2532 Services                   0      8,076 K
+sshd.exe                      2452 Services                   0      7,956 K
+conhost.exe                   2472 Services                   0      5,304 K
+cmd.exe                       2576 Services                   0      5,852 K
+tasklist.exe                  1020 Services                   0      8,756 K
+WmiPrvSE.exe                  1004 Services                   0      9,096 K
+[NOTE]
+Display help page: tasklist /?
+
+
+[SYNTAX: kill a task]
+taskkill /PID <target_pid>
+
+
+
+[5.1. WHAT COMMAND WOULD YOU USE TO FIND THE RUNNING PROCESSES RELATED TO NOTEPAD.EXE?]
+tasklist /FI "imagename eq notepad.exe"
+
+
+
+[5.2. WHAT COMMAND CAN YOU USE TO KILL THE PROCESS WITH PID 1516?]
+taskkill /PID 1516
+
+
+
+[6.>>> TASK 6: CONCLUSION]
+[COMMAND: check file system and disk volumes for errors and bad sectors]
+chdsk
+
+
+[COMMAND: Display list of installed device drivers]
+driverquery
+
+
+[COMMAND: scan system files for corruption, and attempt repairs]
+sfc /scannow
+
+
+
+[6.1. THE COMMAND shutdown /s CAN SHUT DOWN A SYSTEM. WHAT IS THE COMMAND YOU CAN USE TO RESTART A SYSTEM?]
+shutdown /r
+
+
+
+[6.2. WHAT COMMAND CAN YOU USE TO ABORT A SCHEDULED SYSTEM SHUTDOWN?]
+shutdown /a

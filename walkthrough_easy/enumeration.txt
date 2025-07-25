@@ -5,4 +5,384 @@ ENUMERATION.
 
 [>>> TASK 1: INTRODUCTION]
 [1.1. WHAT COMMAND WOULD YOU USE TO START THE POWERSHELL INTERACTIVE COMMAND LINE?]
+powershell.exe
 
+
+
+
+[>>> 2. PURPOSE]
+[2.1. IN SSH KEY-BASED AUTHENTICATION, WHICH KEY DOES THE CLIENT NEED?]
+[NOTE]
+Public key is used to verify the knowledge of the private key, which is kept secret.
+[ANSWER]
+private key
+
+
+
+
+[>>> 3. LINUX ENUMERATION]
+[ACTION: ssh into machine]
+ssh user@10.10.156.186
+[NOTE]
+Password: THM6877
+
+
+
+[3.1. WHAT IS THE NAME OF THE LINUX DISTRIBUTION USED IN THE VM?]
+[ACTION: check linux distro]
+cat /etc/os-release 
+[OUTPUT]
+NAME="Ubuntu"
+VERSION="20.04.6 LTS (Focal Fossa)"
+ID=ubuntu
+ID_LIKE=debian
+PRETTY_NAME="Ubuntu 20.04.6 LTS"
+VERSION_ID="20.04"
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+VERSION_CODENAME=focal
+UBUNTU_CODENAME=focal
+[ANSWER]
+Ubuntu
+
+
+
+[3.2. WHAT IS THE VERSION NUMBER?]
+[ANSWER (from last output)]
+20.04.6
+
+
+
+[3.3. WHAT IS THE NAME OF THE OTHER USER WHO LAST LOGGED IN TO THE SYSTEM?]
+[ACTION: display listing of last logged-in users]
+last
+[OUTPUT]
+user     pts/0        10.23.25.109     Fri Jul 25 08:30   still logged in
+reboot   system boot  5.15.0-138-gener Fri Jul 25 08:24   still running
+root     pts/0        10.23.8.228      Sun May 11 14:21 - crash (74+18:02)
+reboot   system boot  5.15.0-138-gener Sun May 11 14:21   still running
+root     pts/0        10.23.8.228      Sun May 11 14:19 - down   (00:01)
+reboot   system boot  5.15.0-138-gener Sun May 11 14:16 - 14:20  (00:04)
+reboot   system boot  5.15.0-138-gener Sun Apr 27 10:54 - 14:20 (14+03:25)
+reboot   system boot  5.4.0-120-generi Sun Apr 27 10:38 - 10:53  (00:15)
+reboot   system boot  5.4.0-120-generi Mon Jun 20 13:10 - 13:13  (00:02)
+randa    pts/0        10.20.30.1       Mon Jun 20 11:00 - 11:01  (00:00)
+reboot   system boot  5.4.0-120-generi Mon Jun 20 09:58 - 11:01  (01:03)
+
+wtmp begins Mon Jun 20 09:58:27 2022
+[ANSWER]
+randa
+
+
+
+[3.4. WHAT IS THE HIGHEST LISTENING TCP PORT NUMBER?]
+[NOTE]
+user's password: THM6877
+[ACTION: display programs listening on tcp]
+sudo netstat -pltn
+[OTPUT]
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 10.10.156.186:53        0.0.0.0:*               LISTEN      733/named           
+tcp        0      0 10.10.156.186:53        0.0.0.0:*               LISTEN      733/named           
+tcp        0      0 127.0.0.53:53           0.0.0.0:*               LISTEN      659/systemd-resolve 
+tcp        0      0 127.0.0.1:53            0.0.0.0:*               LISTEN      733/named           
+tcp        0      0 127.0.0.1:53            0.0.0.0:*               LISTEN      733/named           
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      815/sshd: /usr/sbin 
+tcp        0      0 127.0.0.1:6667          0.0.0.0:*               LISTEN      843/inspircd        
+tcp        0      0 127.0.0.1:953           0.0.0.0:*               LISTEN      733/named           
+tcp        0      0 127.0.0.1:953           0.0.0.0:*               LISTEN      733/named           
+tcp        0      0 0.0.0.0:389             0.0.0.0:*               LISTEN      847/slapd           
+tcp6       0      0 ::1:53                  :::*                    LISTEN      733/named           
+tcp6       0      0 ::1:53                  :::*                    LISTEN      733/named           
+tcp6       0      0 :::22                   :::*                    LISTEN      815/sshd: /usr/sbin 
+tcp6       0      0 :::21                   :::*                    LISTEN      774/vsftpd          
+tcp6       0      0 ::1:953                 :::*                    LISTEN      733/named           
+tcp6       0      0 ::1:953                 :::*                    LISTEN      733/named           
+tcp6       0      0 :::389                  :::*                    LISTEN      847/slapd           
+tcp6       0      0 fe80::68:79ff:fe76:e:53 :::*                    LISTEN      733/named           
+tcp6       0      0 fe80::68:79ff:fe76:e:53 :::*                    LISTEN      733/named           
+[ANSWER]
+6667
+
+
+
+[3.5. WHAT IS THE PROGRAM NAME OF THE SERVICE LISTENING TO IT?]
+[ANSWER (from last output)]
+inspircd
+
+
+
+[5.4. THERE IS A SCRIPT RUNNING IN THE BACKGROUND. ITS NAME STARTS WITH THM. WHAT IS THE NAME OF THE SCRIPT?]
+[ACTION: filter running process for name starting with THM]
+ps aux | grep 'THM*'
+[OUTPUT]
+randa        778  0.0  0.0   2616   528 ?        Ss   08:24   0:00 /bin/sh -c /home/randa/THM-24765.sh
+randa        779  0.0  0.1   6900  3360 ?        S    08:24   0:00 /bin/bash /home/randa/THM-24765.sh
+user        1414  0.0  0.0   6440   720 pts/0    S+   08:46   0:00 grep --color=auto THM*
+[ANSWER]
+THM-24765.sh
+
+
+
+
+[>>> 4. WINDOWS ENUMERATION]
+[ACTION: ssh into machine]
+ssh user@10.10.202.15
+[NOTE]
+Password: THM33$$88
+
+
+
+[4.1. WHAT IS THE FULL OS NAME?]
+[ACTION: run systeminfo]
+systeminfo
+[OUTPUT]
+Host Name:                 RED-WIN-ENUM
+OS Name:                   Microsoft Windows Server 2019 Datacenter     
+OS Version:                10.0.17763 N/A Build 17763
+OS Manufacturer:           Microsoft Corporation
+OS Configuration:          Standalone Server
+OS Build Type:             Multiprocessor Free
+Registered Owner:          EC2
+Registered Organization:   Amazon.com
+Product ID:                00430-00000-00000-AA155
+Original Install Date:     3/17/2021, 2:59:06 PM
+System Boot Time:          7/25/2025, 8:48:52 AM
+System Manufacturer:       Amazon EC2
+System Model:              t3a.small
+System Type:               x64-based PC
+Processor(s):              1 Processor(s) Installed.
+                           [01]: AMD64 Family 23 Model 1 Stepping 2 Auth
+enticAMD ~2200 Mhz
+BIOS Version:              Amazon EC2 1.0, 10/16/2017
+Windows Directory:         C:\Windows
+System Directory:          C:\Windows\system32
+Boot Device:               \Device\HarddiskVolume1
+System Locale:             en-us;English (United States)
+Input Locale:              en-us;English (United States)
+Time Zone:                 (UTC) Coordinated Universal Time
+Total Physical Memory:     2,016 MB
+Available Physical Memory: 1,058 MB
+Virtual Memory: Max Size:  2,400 MB
+Virtual Memory: Available: 1,466 MB
+Virtual Memory: In Use:    934 MB
+Page File Location(s):     C:\pagefile.sys
+Domain:                    WORKGROUP
+Logon Server:              N/A
+Hotfix(s):                 30 Hotfix(s) Installed.
+                           [01]: KB5015731
+                           [02]: KB4470502
+                           [03]: KB4470788
+                           [04]: KB4480056
+                           [05]: KB4486153
+                           [06]: KB4493510
+                           [07]: KB4499728
+                           [08]: KB4504369
+                           [09]: KB4512577
+                           [10]: KB4512937
+                           [11]: KB4521862
+                           [12]: KB4523204
+                           [13]: KB4535680
+                           [14]: KB4539571
+                           [15]: KB4549947
+                           [16]: KB4558997
+                           [17]: KB4562562
+                           [18]: KB4566424
+                           [19]: KB4570332
+                           [20]: KB4577586
+                           [21]: KB4577667
+                           [22]: KB4587735
+                           [23]: KB4589208
+                           [24]: KB4598480
+                           [25]: KB4601393
+                           [26]: KB5000859
+                           [27]: KB5015811
+                           [28]: KB5012675
+                           [29]: KB5014031
+                           [30]: KB5014797
+Network Card(s):           1 NIC(s) Installed.
+                           [01]: Amazon Elastic Network Adapter
+                                 Connection Name: Ethernet 3
+                                 DHCP Enabled:    Yes
+                                 DHCP Server:     10.10.0.1
+                                 IP address(es)
+                                 [01]: 10.10.202.15
+                                 [02]: fe80::cd3e:cb2d:2959:f293        
+Hyper-V Requirements:      A hypervisor has been detected. Features requ
+ired for Hyper-V will not be displayed.
+[ANSWER]
+Microsoft Windows Server 2019 DatacenterMicrosoft Windows Server 2019 Datacenter
+
+
+
+[4.2. WHAT IS THE OS VERSION?]
+[ANSWER (from last output)]
+10.0.17763
+
+
+
+[4.3. HOW MANY HOTFIXES ARE INSTALLED ON THIS MS WINDOWS SERVER?]
+[Answer (from last output)]
+30
+
+
+
+[4.4. WHAT IS THE LOWEST TCP PORT NUMBER LISTENING ON THE SYSTEM?]
+[NOTE]
+Linux and windows netstat syntax is different. 
+[ACTION: display listening tcp]
+netstat -an | findstr "LISTENING" | findstr ":"
+[OUTPUT]
+TCP    0.0.0.0:22             0.0.0.0:0              LISTENING        
+  TCP    0.0.0.0:80             0.0.0.0:0              LISTENING        
+  TCP    0.0.0.0:135            0.0.0.0:0              LISTENING        
+  TCP    0.0.0.0:445            0.0.0.0:0              LISTENING        
+  TCP    0.0.0.0:3389           0.0.0.0:0              LISTENING        
+  TCP    0.0.0.0:5357           0.0.0.0:0              LISTENING        
+  TCP    0.0.0.0:5985           0.0.0.0:0              LISTENING        
+  TCP    0.0.0.0:47001          0.0.0.0:0              LISTENING        
+  TCP    0.0.0.0:49664          0.0.0.0:0              LISTENING        
+  TCP    0.0.0.0:49665          0.0.0.0:0              LISTENING        
+  TCP    0.0.0.0:49666          0.0.0.0:0              LISTENING        
+  TCP    0.0.0.0:49667          0.0.0.0:0              LISTENING        
+  TCP    0.0.0.0:49668          0.0.0.0:0              LISTENING        
+  TCP    0.0.0.0:49669          0.0.0.0:0              LISTENING        
+  TCP    0.0.0.0:49676          0.0.0.0:0              LISTENING        
+  TCP    10.10.251.30:53        0.0.0.0:0              LISTENING        
+  TCP    10.10.251.30:139       0.0.0.0:0              LISTENING        
+  TCP    127.0.0.1:53           0.0.0.0:0              LISTENING        
+  TCP    [::]:22                [::]:0                 LISTENING        
+  TCP    [::]:80                [::]:0                 LISTENING        
+  TCP    [::]:135               [::]:0                 LISTENING        
+  TCP    [::]:445               [::]:0                 LISTENING        
+  TCP    [::]:3389              [::]:0                 LISTENING        
+  TCP    [::]:5357              [::]:0                 LISTENING        
+  TCP    [::]:5985              [::]:0                 LISTENING        
+  TCP    [::]:47001             [::]:0                 LISTENING        
+  TCP    [::]:49664             [::]:0                 LISTENING        
+  TCP    [::]:49665             [::]:0                 LISTENING        
+  TCP    [::]:49666             [::]:0                 LISTENING        
+  TCP    [::]:49667             [::]:0                 LISTENING        
+  TCP    [::]:49668             [::]:0                 LISTENING        
+  TCP    [::]:49669             [::]:0                 LISTENING        
+  TCP    [::]:49676             [::]:0                 LISTENING        
+  TCP    [::1]:53               [::]:0                 LISTENING        
+  TCP    [fe80::cced:da82:1a4b:eaef%4]:53  [::]:0                 LISTEN
+ING
+[ANSWER]
+22
+
+
+
+[4.5. WHAT IS THE NAME OF THE PROGRAM LISTENING ON THAT PORT?]
+[NOTE]
+Command: netstat -abno | findstr ":22", requires root. 
+[ACTION: find pid of program]
+netstat -ano | findstr ":22"
+[OUTPUT]
+  TCP    0.0.0.0:22             0.0.0.0:0              LISTENING       1
+236
+  TCP    10.10.251.30:22        10.23.25.109:44416     ESTABLISHED     1
+236
+  TCP    [::]:22                [::]:0                 LISTENING       1
+236
+[NOTE]
+pid is 1236
+
+
+[ACTION: check program using the pid (non-sudo method)]
+tasklist /FI "PID eq 1236"
+[OUTPUT]
+Image Name                     PID Session Name        Session#    Mem U
+sage
+========================= ======== ================ =========== ========
+====
+sshd.exe                      1236 Services                   0      7,0
+24 K
+[ANSWER]
+sshd.exe
+
+
+
+
+[>>> 5. DNS, SMB, AND SNMP]
+[5.1. KNOWING THAT THE DOMAIN NAME ON THE MS WINDOWS SERVER OF IP 10.10.251.30 IS redteam.thm, USE dig TO CARRY OUT A DOMAIN TRANSFER. WHAT IS THE FLAG THAT YOU GET IN THE RECORDS?]
+[ACTION: dig dns zone transfer on requested parameters (RUN ON LINUX)]
+dig -t AXFR redteam.thm @10.10.251.30
+[OUTPUT]
+; <<>> DiG 9.20.9-1-Debian <<>> -t AXFR redteam.thm @10.10.251.30
+;; global options: +cmd
+redteam.thm.		3600	IN	SOA	red-win-enum. hostmaster. 5 900 600 86400 3600
+redteam.thm.		3600	IN	NS	red-win-enum.
+first.redteam.thm.	3600	IN	A	10.10.254.1
+flag.redteam.thm.	3600	IN	TXT	"THM{DNS_ZONE}"
+second.redteam.thm.	3600	IN	A	10.10.254.2
+tryhackme.redteam.thm.	3600	IN	CNAME	tryhackme.com.
+redteam.thm.		3600	IN	SOA	red-win-enum. hostmaster. 5 900 600 86400 3600
+;; Query time: 47 msec
+;; SERVER: 10.10.251.30#53(10.10.251.30) (TCP)
+;; WHEN: Fri Jul 25 11:14:48 CEST 2025
+;; XFR size: 7 records (messages 1, bytes 295)
+[ANSWER]
+THM{DNS_ZONE}
+
+
+
+[5.2. WHAT IS THE NAME OF THE SHARE AVAILABLE OVER SMB PROTOCOL AND STARTS WITH THM?]
+[ACTION: check smb shared folders]
+net share
+[OUTPUT]
+Share name   Resource                        Remark
+-------------------------------------------------------------------------------
+C$           C:\                             Default shareIPC$                                         Remote IPC
+ADMIN$       C:\Windows                      Remote AdminInternal     C:\Internal Files               Internal Documents
+THM{829738}  C:\Users\user\Private           Enjoy SMB sharesUsers        C:\Users
+The command completed successfully.
+[ANSWER]
+THM{829738}
+
+
+
+[5.3. KNOWING THE COMMUNITY STRING USED BY THE SNMP SERVICE IS public, USE snmpcheck TO COLLECT INFORMATION ABOUT THE MS WINDOW SERVER OF IP 10.10.251.30. WHAT IS THE LOCATION SPECIFIED?]
+[ACTION: run snmpcheck on target parameters]
+snmpwalk -v1 -c public 10.10.251.30
+[OUTPUT (beginning snippet)]
+iso.3.6.1.2.1.1.1.0 = STRING: "Hardware: AMD64 Family 23 Model 1 Stepping 2 AT/AT COMPATIBLE - Software: Windows Version 6.3 (Build 17763 Multiprocessor Free)"
+iso.3.6.1.2.1.1.2.0 = OID: iso.3.6.1.4.1.311.1.1.3.1.2
+iso.3.6.1.2.1.1.3.0 = Timeticks: (220864) 0:36:48.64
+iso.3.6.1.2.1.1.4.0 = STRING: "TryHackMe"
+iso.3.6.1.2.1.1.5.0 = STRING: "RED-WIN-ENUM"
+iso.3.6.1.2.1.1.6.0 = STRING: "THM{SNMP_SERVICE}"
+iso.3.6.1.2.1.1.7.0 = INTEGER: 79
+iso.3.6.1.2.1.2.1.0 = INTEGER: 11
+iso.3.6.1.2.1.2.2.1.1.1 = INTEGER: 1
+iso.3.6.1.2.1.2.2.1.1.2 = INTEGER: 2
+iso.3.6.1.2.1.2.2.1.1.3 = INTEGER: 3
+iso.3.6.1.2.1.2.2.1.1.4 = INTEGER: 4
+iso.3.6.1.2.1.2.2.1.1.5 = INTEGER: 5
+iso.3.6.1.2.1.2.2.1.1.6 = INTEGER: 6
+iso.3.6.1.2.1.2.2.1.1.7 = INTEGER: 7
+iso.3.6.1.2.1.2.2.1.1.8 = INTEGER: 8
+iso.3.6.1.2.1.2.2.1.1.9 = INTEGER: 9
+iso.3.6.1.2.1.2.2.1.1.10 = INTEGER: 10
+iso.3.6.1.2.1.2.2.1.1.11 = INTEGER: 11
+iso.3.6.1.2.1.2.2.1.2.1 = Hex-STRING: 53 6F 66 74 77 61 72 65 20 4C 6F 6F 70 62 61 63 
+6B 20 49 6E 74 65 72 66 61 63 65 20 31 00 
+[ANSWER]
+THM{SNMP_SERVICE}
+
+
+
+
+[>>> TASK 6: MORE TOOLS FOR WINDOWS]
+[6.1. WHAT UTILITY FROM Sysinternals Suit SHOWS THE LOGGED-IN USERS?]
+PsLoggedOn
+
+
+
+
+[>>> TASK 7: CONCLUSION]
+Nothing to do here

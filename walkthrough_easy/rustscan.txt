@@ -1,0 +1,194 @@
+RUSTSCAN.
+
+
+
+
+[>>> TASK 1: ABOUT RUSTSCAN]
+Nothing to do here.
+
+
+
+
+[>>> TASK 2: INSTALLING RUSTSCAN]
+[ACTION: download rustscan]
+Download rustscan.deb.zip from https://github.com/bee-san/RustScan/releases.
+
+
+[ACTION: setup rustscan]
+unzip rustscan.deb.zip
+sudo dpkg -i rustscan_2.4.1-1_amd64.deb
+rustscan
+
+
+
+
+[>>> TASK 3: ACCESIBLE]
+Nothing to do here.
+
+
+
+
+[>>> TASK 4: FAST]
+Nothing to do here.
+
+
+
+
+[>>> TASK 5: EXTENSIBLE]
+[5.1. WHAT IS THE SCRIPTING FILE CONFIG CALLED?]
+rustscan_scripts.toml
+
+
+
+[5.2. CAN YOU RUN OTHER BINARIES WITH RUSTSCAN? (T)rue / (F)alse]
+T
+
+
+
+[5.3. DOES RUSTSCAN SUPPORT SCRIPTS IN JAVASCRIPT? (T)rue / (F)alse]
+F
+
+
+
+
+[>>> TASK 6: ADAPTIVE]
+Nothing to do here.
+
+
+
+
+[>>> TASK 7: SCANNING TIME!]
+[7.1. TRY RUNNING THE SCAN FOR ALL PORTS]
+[ACTION: scan all ports]
+rustscan -a 10.10.125.108 -r 1-65525
+[OUTPUT]
+PORT   STATE SERVICE REASON
+22/tcp open  ssh     syn-ack ttl 63
+80/tcp open  http    syn-ack ttl 63
+
+
+
+
+[7.2. AFTER SCANNING THIS, HOW MANY PORTS DO WE FIND OPEN UNDER 1000?]
+[ANSWER (based on last output)]
+2
+
+
+
+[7.3. PERFORM A SERVICE VERSION DETECTION SCAN, WHAT IS THE VERSION SOFTWARE RUNNING ON PORT 22?]
+[ACTION: version scan on port 22]
+rustscan -p 22 -a 10.10.125.108 -- -sV
+[OUTPUT]
+PORT   STATE SERVICE REASON         VERSION
+22/tcp open  ssh     syn-ack ttl 63 OpenSSH 6.6.1p1 Ubuntu 2ubuntu2.10 (Ubuntu Linux; protocol 2.0)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+[ANSWER]
+6.6.1p1
+
+
+
+[7.4. PERFORM AN AGGRESIVE SCAN, WHAT FLAG ISN'T SET UNDER THE RESULTS FOR PORT 80?]
+[ACTION: aggresive scan on port 80]
+rustscan -p 80 -a 10.10.125.108 -- -A
+[OUTPUT]
+PORT   STATE SERVICE REASON         VERSION
+80/tcp open  http    syn-ack ttl 63 Apache httpd 2.4.7 ((Ubuntu))
+| http-methods: 
+|_  Supported Methods: GET HEAD POST OPTIONS
+| http-cookie-flags: 
+|   /: 
+|     PHPSESSID: 
+|_      httponly flag not set
+|_http-favicon: Unknown favicon MD5: 69C728902A3F1DF75CF9EAC73BD55556
+|_http-server-header: Apache/2.4.7 (Ubuntu)
+| http-title: Login :: Damn Vulnerable Web Application (DVWA) v1.10 *Develop...
+|_Requested resource was login.php
+| http-robots.txt: 1 disallowed entry 
+|_/
+Warning: OSScan results may be unreliable because we could not find at least 1 open and 1 closed port
+OS fingerprint not ideal because: Missing a closed TCP port so results incomplete
+Aggressive OS guesses: Linux 4.4 (99%), Linux 3.8 - 3.16 (96%), Linux 3.2 - 4.14 (96%), Linux 3.10 - 3.13 (96%), Linux 3.13 (96%), Linux 5.4 (96%), Linux 2.6.32 - 3.10 (95%), Linux 4.15 (94%), Linux 3.10 - 4.11 (94%), Linux 3.13 - 4.4 (94%)
+No exact OS matches for host (test conditions non-ideal).
+TCP/IP fingerprint:
+SCAN(V=7.95%E=4%D=7/25%OT=80%CT=%CU=33359%PV=Y%DS=2%DC=T%G=N%TM=6883B481%P=x86_64-pc-linux-gnu)
+SEQ(SP=FD%GCD=1%ISR=10A%TI=Z%CI=I%II=I%TS=8)
+SEQ(SP=FF%GCD=1%ISR=10C%TI=Z%CI=I%II=I%TS=8)
+OPS(O1=M509ST11NW7%O2=M509ST11NW7%O3=M509NNT11NW7%O4=M509ST11NW7%O5=M509ST11NW7%O6=M509ST11)
+WIN(W1=68DF%W2=68DF%W3=68DF%W4=68DF%W5=68DF%W6=68DF)
+ECN(R=Y%DF=Y%T=40%W=6903%O=M509NNSNW7%CC=Y%Q=)
+T1(R=Y%DF=Y%T=40%S=O%A=S+%F=AS%RD=0%Q=)
+T2(R=N)
+T3(R=N)
+T4(R=Y%DF=Y%T=40%W=0%S=A%A=Z%F=R%O=%RD=0%Q=)
+T5(R=Y%DF=Y%T=40%W=0%S=Z%A=S+%F=AR%O=%RD=0%Q=)
+T6(R=Y%DF=Y%T=40%W=0%S=A%A=Z%F=R%O=%RD=0%Q=)
+T7(R=Y%DF=Y%T=40%W=0%S=Z%A=S+%F=AR%O=%RD=0%Q=)
+U1(R=Y%DF=N%T=40%IPL=164%UN=0%RIPL=G%RID=G%RIPCK=G%RUCK=G%RUD=G)
+IE(R=Y%DFI=N%T=40%CD=S)
+
+Uptime guess: 0.014 days (since Fri Jul 25 18:24:05 2025)
+Network Distance: 2 hops
+TCP Sequence Prediction: Difficulty=253 (Good luck!)
+IP ID Sequence Generation: All zeros
+
+TRACEROUTE (using port 80/tcp)
+HOP RTT      ADDRESS
+1   49.88 ms 10.23.0.1
+2   49.84 ms 10.10.125.108
+
+NSE: Script Post-scanning.
+NSE: Starting runlevel 1 (of 3) scan.
+Initiating NSE at 18:44
+Completed NSE at 18:44, 0.00s elapsed
+NSE: Starting runlevel 2 (of 3) scan.
+Initiating NSE at 18:44
+Completed NSE at 18:44, 0.00s elapsed
+NSE: Starting runlevel 3 (of 3) scan.
+Initiating NSE at 18:44
+Completed NSE at 18:44, 0.00s elapsed
+Read data files from: /usr/share/nmap
+[NOTE: relevant output snippet]
+ http-cookie-flags: 
+|   /: 
+|     PHPSESSID: 
+|_      httponly flag not set
+[ANSWER]
+httponly
+
+
+
+
+[>>> TASK 8: RUSTSCAN QUIZ]
+[8.1. FIRST, HOW DO YOU ACCESS THE HELP MENU?]
+[ANSWER]
+-h
+
+
+
+[8.2. OFTEN REFERRED TO AS "QUIET" MODE, WHAT SWITCH CAN DO THIS?]
+[ANSWER]
+-q
+
+
+
+[8.3. WHICH SWITCH CAN HELP US TO SCAN FOR A PARTICULAR RANGE?]
+[ANSWER]
+-r
+
+
+
+[8.4. WHAT SWITCH WOULD YOU USE TO FIND OUT RUSTSCAN'S VERSION?]
+[ANSWER]
+-v
+
+
+
+[8.5. WHICH SWITCH WILL HELP US TO SELECT BATCH SIZE?]
+[ANSWER]
+-b
+
+
+
+[8.6. WHICH SWITCH CAN SET TIMEOUT?]
+[ANSWER]
+-t

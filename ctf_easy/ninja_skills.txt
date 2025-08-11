@@ -1,0 +1,219 @@
+NINJA SKILLS.
+
+
+
+
+[>>> TASK 1: NINJA SKILLS]
+[NOTE]
+File list:
+8V2L
+bny0
+c4ZX
+D8B3
+FHl1
+oiMO
+PFbD
+rmfX
+SRSq
+uqyw
+v2Vb
+X1Uy
+SSh creds: new-user|new-user
+[ACTION: ssh as new-user]
+ssh new-user@10.10.208.193
+
+
+
+
+[1.1. WHICH OF THE ABOVE FILES ARE OWNED BY THE BEST-GROUP GROUP (ENTER THE ANSWER SEPARATED BY SPACES IN ALPHABETIC ORDER)]
+[ACTION: create a txt with all file names]
+printf "bny0\nc4ZX\nD8B3\nFHl1\noiMO\nPFbD\nrmfX\nSRSq\nuqyw\nv2Vb\nX1Uy\n" > files_names.txt
+[NOTE]
+find / -group best-group: returns all files owned by best-group.
+We need to filter for our txt file.
+
+
+[ACTION: script with name condition]
+#!/bin/bash
+while read name; do     # reads every line of files_names.txt
+ find / -group best-group -name "$name" 2>/dev/null     # only return matches with targeted names (and no errors)
+done < files_names.txt     # end of reading loop, use our txt as input. 
+
+
+[ACTION: run script]
+chmod +x best-group_owned.sh
+bash best-group_owned.sh
+[OUTPUT]
+/mnt/D8B3
+/home/v2Vb
+[ANSWER]
+D8B3 v2Vb
+
+
+
+
+[1.2. WHICH OF THESE FILES CONTAIN AN IP ADDRESS?]
+[NOTE]
+Ips look like: aaa.bbb.c.d (ipv4)
+Regex filter for 4 groups of 1-3 digits: [0-9]{1,3}(\.[0-9]{1,3}){3}
+One-liner command: 
+while IFS= read -r name; do # reads files_names.txt
+    find / -type f -name "$name" 2>/dev/null \ # finds files from txt
+    -exec grep -H -E "[0-9]{1,3}(\.[0-9]{1,3}){3}" {} + 2>/dev/null # searches for ip like strings
+done < files_names.txt # uses our txt as input
+
+[ACTION: run one-liner]
+[OUTPUT]
+/opt/oiMO:wNXbEERat4wE0w/O9Mn1.1.1.1VeiSLv47L4B2Mxy3M0XbCYVf9TSJeg905weaIk
+[ANSWER]
+oiMO
+
+
+
+
+[1.3. WHICH FILE HAS THE SHA1 HASH OF https://discord.com/channels/1305146760456437774/1305146760955428997#:~:text=9d54da7584015647ba052173b84d45e8007eba94?]
+[NOTE]
+sha1sum /path/example.txt: returns sha1 hash of example.txt
+
+Command to display all sha1 hashes:
+while IFS= read -r name; do
+    find / -type f -name "$name" 2>/dev/null -exec sha256sum {} + # {} acts as placeholder for names, and + uses find output as sha input.
+done < files_names.txt
+
+One-liner filtering for target:
+while IFS= read -r name; do
+    find / -type f -name "$name" 2>/dev/null -exec sha1sum {} + | grep "^9d54da7584015647ba052173b84d45e8007eba94"
+done < files_names.txt
+[ACTION: run one-liner]
+[OUTPUT]
+9d54da7584015647ba052173b84d45e8007eba94  /mnt/c4ZX
+[ANSWER]
+c4ZX
+
+
+
+
+[1.4. WHICH FILE CONTAINS 230 LINES?]
+[NOTE]
+wc -l example.txt: returns lines of text.
+Command to display lines of all files:
+while IFS= read -r name; do
+    find / -type f -name "$name" 2>/dev/null -exec wc -l {} +
+done < files_names.txt
+
+
+One-liner to filter for target:
+while IFS= read -r name; do
+    find / -type f -name "$name" 2>/dev/null -exec wc -l {} + | grep -E "^230\s"
+done < files_names.txt
+
+Weirdly, last command gets no output.
+
+
+[ACTION: get lines of all files]
+while IFS= read -r name; do
+    find / -type f -name "$name" 2>/dev/null -exec wc -l {} +
+done < files_names.txt
+[OUTPUT]
+209 /mnt/c4ZX
+209 /mnt/D8B3
+209 /var/FHl1
+209 /opt/oiMO
+209 /opt/PFbD
+209 /media/rmfX
+209 /etc/ssh/SRSq
+209 /var/log/uqyw
+209 /home/v2Vb
+209 /X1Uy
+[NOTE]
+Some files such as bny0 are missing.
+It is probably stored in /root.
+
+
+[ACTION: check suid binaries]
+find / -perm -4000 -type f 2>/dev/null
+[OUTPUT]
+/sbin/pam_timestamp_check
+/sbin/mount.nfs
+/sbin/unix_chkpwd
+/lib64/dbus-1/dbus-daemon-launch-helper
+/bin/umount
+/bin/mount
+/bin/su
+/usr/sbin/ccreds_chkpwd
+/usr/sbin/seunshare
+/usr/sbin/usernetctl
+/usr/bin/chfn
+/usr/bin/sudo
+/usr/bin/newgrp
+/usr/bin/gpasswd
+/usr/bin/chage
+/usr/bin/crontab
+/usr/bin/at
+/usr/bin/chsh
+/usr/bin/passwd
+[NOTE]
+crontab looks like a safe option. However, we aren't sudo. So running sudo /usr/bin/crontab (or sudo crontab -e) will fail.
+[ACTION: run crontab]
+sudo crontab -e
+[OUTPUT]
+new-user is not in the sudoers file.  This incident will be reported.
+[NOTE]
+After attempting to privesc and rereading the txt file, I realized bny0 was the only file not displayed.
+[ANSWER]
+bny0
+
+
+
+
+[1.5. WHICH FILE'S OWNER HAS AN ID OF 502?]
+[NOTE]
+stat --format='%u' filename.txt: returns uid of its owner.
+
+Command to return uid of all files:
+while IFS= read -r name; do
+    find / -type f -name "$name" 2>/dev/null -exec stat --format='%u %n' {} +
+done < files_names.txt
+
+Command to return id of target owner:
+while IFS= read -r name; do
+    find / -type f -name "$name" 2>/dev/null -exec stat --format='%u %n' {} + | \
+    awk '$1 == 502 {print $2}'
+done < files_names.txt
+[ACTION: run second command]
+[OUTPUT]
+X1Uy
+
+
+
+
+[1.6. WHAT FILE IS EXECUTABLE BY EVERYONE?]
+ls -l filename.txt: returns permissions on file.
+
+Since filtering for the bits we want leads to a complicated script, I will just display the permissions of all of them and find the target manually.
+[ACTION: run permission listing script]
+#!/bin/bash
+while IFS= read -r name; do
+    find / -type f -name "$name" 2>/dev/null -exec stat -c '%A %n' {} +
+done < files_names.txt
+[OUTPUT]
+-rw-rw-r-- /mnt/c4ZX
+-rw-rw-r-- /mnt/D8B3
+-rw-rw-r-- /var/FHl1
+-rw-rw-r-- /opt/oiMO
+-rw-rw-r-- /opt/PFbD
+-rw-rw-r-- /media/rmfX
+-rw-rw-r-- /etc/ssh/SRSq
+-rw-rw-r-- /var/log/uqyw
+-rw-rw-r-- /home/v2Vb
+-rw-rw-r-- /X1Uy
+[NOTE]
+Even when running without -type f, the same files are missing.
+
+
+[ACTION: run fixed command]
+find / -type f \( -name 8V2L -o -name bny0 -o -name c4ZX -o -name D8B3 -o -name FHl1 -o -name oiMO -o -name PFbD -o -name rmfX -o -name SRSq -o -name uqyw -o -name v2Vb -o -name X1Uy \) -perm -111 2>/dev/null
+[OUTPUT]
+/etc/8V2L
+[ANSWER]
+8V2L

